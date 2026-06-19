@@ -1,0 +1,224 @@
+/* ── Page ───────────────────────────────────────────────────────────────────── */
+.login-page {
+  min-height: 100vh;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'DM Sans', sans-serif;
+  padding: 1rem;
+}
+
+/* ── Card ───────────────────────────────────────────────────────────────────── */
+.login-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 2.5rem 2rem;
+  width: 100%;
+  max-width: 460px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+/* ── Logo ───────────────────────────────────────────────────────────────────── */
+.login-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+
+.login-logo-icon {
+  width: 64px;
+  height: 64px;
+  background: #1a56db;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Titles ─────────────────────────────────────────────────────────────────── */
+.login-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 8px;
+}
+
+.login-sub {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0 0 1.75rem;
+}
+
+/* ── Error ──────────────────────────────────────────────────────────────────── */
+.login-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #dc2626;
+  margin-bottom: 1.25rem;
+  text-align: left;
+}
+
+/* ── Form ───────────────────────────────────────────────────────────────────── */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: left;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-field label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.login-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ── Input Wrap ─────────────────────────────────────────────────────────────── */
+.login-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.login-input-icon {
+  position: absolute;
+  left: 12px;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.login-input-wrap input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 44px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #0f172a;
+  background: #f9fafb;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.login-input-wrap input:focus {
+  border-color: #1a56db;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.1);
+}
+
+.login-input-wrap input::placeholder {
+  color: #9ca3af;
+}
+
+.login-eye-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.login-eye-btn:hover {
+  color: #374151;
+}
+
+/* ── Keep Signed In ─────────────────────────────────────────────────────────── */
+.login-keep {
+  display: flex;
+  align-items: center;
+}
+
+.login-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+}
+
+.login-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #1a56db;
+  cursor: pointer;
+}
+
+/* ── Sign In Button ─────────────────────────────────────────────────────────── */
+.login-btn {
+  background: #1a56db;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 13px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: 'DM Sans', sans-serif;
+  margin-top: 4px;
+}
+
+.login-btn:hover {
+  background: #1447c0;
+}
+
+.login-btn:active {
+  transform: scale(0.98);
+}
+
+.login-btn:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────────── */
+.login-footer {
+  margin-top: 1.5rem;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.login-footer a {
+  color: #1a56db;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login-footer a:hover {
+  text-decoration: underline;
+}
+
+.login-copyright {
+  margin-top: 1rem;
+  font-size: 12px;
+  color: #9ca3af;
+}

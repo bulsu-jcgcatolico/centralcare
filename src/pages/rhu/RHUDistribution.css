@@ -1,0 +1,542 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   RHU DISTRIBUTION PAGE STYLES
+   (appended to base layout styles)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── New Distribution button ────────────────────────────────────────────────── */
+.rhu-dist-new-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Stats row ──────────────────────────────────────────────────────────────── */
+.rhu-dist-stats-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.rhu-dist-stat-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.1rem 1.4rem;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 200px;
+  flex: 1;
+}
+.rhu-dist-stat-icon {
+  width: 42px; height: 42px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.rhu-dist-icon--orange { background: #fff7ed; color: #ea580c; }
+.rhu-dist-icon--blue   { background: #eff6ff; color: #1a56db; }
+.rhu-dist-stat-label { font-size: 12px; color: #6b7280; font-weight: 500; margin: 0 0 4px; }
+.rhu-dist-stat-value { font-size: 26px; font-weight: 700; color: #0f172a; margin: 0; line-height: 1; }
+
+/* ── Section card ───────────────────────────────────────────────────────────── */
+.rhu-dist-section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.rhu-dist-section-header {
+  padding: 1rem 1.25rem 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+.rhu-dist-section-title { font-size: 15px; font-weight: 600; color: #0f172a; margin: 0 0 3px; }
+.rhu-dist-section-sub   { font-size: 12px; color: #9ca3af; margin: 0; }
+
+/* ── Distribution table ─────────────────────────────────────────────────────── */
+.rhu-dist-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.rhu-dist-table thead { background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+.rhu-dist-table th {
+  padding: 10px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.rhu-dist-table tbody tr { border-bottom: 1px solid #f3f4f6; transition: background 0.15s; }
+.rhu-dist-table tbody tr:hover { background: #f9fafb; }
+.rhu-dist-table tbody tr:last-child { border-bottom: none; }
+.rhu-dist-table td { padding: 15px 16px; color: #374151; }
+.rhu-dist-table td strong { color: #0f172a; }
+
+/* ── Status badge ───────────────────────────────────────────────────────────── */
+.rhu-dist-status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.rhu-dist--pending { background: #fef3c7; color: #b45309; }
+.rhu-dist--done    { background: #d1fae5; color: #065f46; }
+
+/* ── Action group ───────────────────────────────────────────────────────────── */
+.rhu-dist-action-group { display: flex; gap: 6px; align-items: center; }
+
+.rhu-dist-btn-review {
+  padding: 6px 14px;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.rhu-dist-btn-review:hover { background: #f9fafb; }
+
+.rhu-dist-btn-distribute {
+  padding: 6px 14px;
+  border-radius: 6px;
+  background: #1a56db;
+  color: #fff;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s;
+}
+.rhu-dist-btn-distribute:hover:not(:disabled) { background: #1648c0; }
+.rhu-dist-btn-distribute:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.rhu-dist-done-label { font-size: 12px; font-weight: 600; color: #16a34a; }
+
+/* ── Loading / empty ────────────────────────────────────────────────────────── */
+.rhu-dist-loading { padding: 2rem; text-align: center; color: #6b7280; font-size: 14px; }
+.rhu-dist-empty {
+  padding: 3rem 2rem;
+  text-align: center;
+  color: #9ca3af;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+.rhu-dist-empty strong { color: #374151; }
+
+/* ── New Distribution Modal ─────────────────────────────────────────────────── */
+.rhu-dist-modal {
+  background: #fff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+}
+.rhu-dist-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+.rhu-dist-modal-title { font-size: 17px; font-weight: 600; color: #0f172a; margin: 0; }
+.rhu-dist-modal-close {
+  background: none; border: none; font-size: 26px;
+  color: #9ca3af; cursor: pointer; line-height: 1;
+  padding: 0; width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+}
+.rhu-dist-modal-close:hover { color: #6b7280; }
+
+.rhu-dist-modal-body   { padding: 1.25rem 1.5rem; }
+.rhu-dist-modal-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* Form inside modal */
+.rhu-dist-form-field { margin-bottom: 1.1rem; }
+.rhu-dist-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 6px;
+}
+.rhu-dist-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 14px;
+  color: #0f172a;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.rhu-dist-input:focus { border-color: #1a56db; box-shadow: 0 0 0 3px rgba(26,86,219,0.1); }
+.rhu-dist-input::placeholder { color: #9ca3af; }
+
+/* Items grid */
+.rhu-dist-items-grid-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 28px;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.rhu-dist-item-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 28px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.rhu-dist-remove-btn {
+  width: 28px; height: 28px;
+  background: #fef2f2; border: 1px solid #fecaca;
+  border-radius: 6px; color: #dc2626;
+  font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.rhu-dist-remove-btn:hover { background: #fee2e2; }
+
+.rhu-dist-add-item-btn {
+  background: none;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: #6b7280;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+.rhu-dist-add-item-btn:hover { background: #f9fafb; border-color: #9ca3af; color: #374151; }
+
+/* Modal footer buttons */
+.rhu-dist-btn-cancel {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 9px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.rhu-dist-btn-cancel:hover { background: #e5e7eb; }
+
+.rhu-dist-btn-add {
+  background: #1a56db;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.rhu-dist-btn-add:hover:not(:disabled) { background: #1648c0; }
+.rhu-dist-btn-add:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Review modal rows */
+.rhu-review-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 14px;
+  color: #374151;
+}
+.rhu-review-row:last-child { border-bottom: none; }
+.rhu-review-row span:first-child { color: #6b7280; font-weight: 500; }
+
+/* ── Responsive ─────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .rhu-dist-stats-row { flex-direction: column; }
+  .rhu-dist-item-row, .rhu-dist-items-grid-header {
+    grid-template-columns: 1fr 1fr 28px;
+  }
+}
+@media (max-width: 600px) {
+  .rhu-dist-item-row, .rhu-dist-items-grid-header {
+    grid-template-columns: 1fr;
+  }
+  .rhu-dist-remove-btn { width: 100%; }
+}
+
+/* ── Distribution Plan Card ─────────────────────────────────────────────────── */
+.rhu-dist-plan {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+.rhu-dist-plan-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+.rhu-dist-plan-title { font-size: 15px; font-weight: 600; color: #0f172a; margin: 0 0 3px; }
+.rhu-dist-plan-sub   { font-size: 13px; color: #6b7280; margin: 0; }
+
+.rhu-dist-plan-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.rhu-badge--done    { background: #d1fae5; color: #065f46; }
+.rhu-badge--pending { background: #fef3c7; color: #92400e; }
+
+.rhu-btn-danger-sm {
+  background: none;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.rhu-btn-danger-sm:hover { background: #fef2f2; }
+
+/* ── Editable Barangay % Table ──────────────────────────────────────────────── */
+.rhu-barangay-pct-table {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 13px;
+}
+.rhu-barangay-pct-header {
+  display: grid;
+  grid-template-columns: 1fr 160px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.rhu-barangay-pct-row {
+  display: grid;
+  grid-template-columns: 1fr 160px;
+  align-items: center;
+  padding: 8px 14px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+}
+.rhu-barangay-pct-row:last-of-type { border-bottom: none; }
+.rhu-barangay-pct-total {
+  display: grid;
+  grid-template-columns: 1fr 160px;
+  padding: 8px 14px;
+  background: #f9fafb;
+  border-top: 2px solid #e5e7eb;
+  font-weight: 600;
+  font-size: 13px;
+}
+.rhu-pct-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rhu-pct-input {
+  width: 80px !important;
+  padding: 5px 8px !important;
+  font-size: 13px !important;
+  text-align: right;
+}
+.rhu-pct-symbol { font-size: 13px; color: #6b7280; }
+.rhu-pct-total--ok   { color: #16a34a; }
+.rhu-pct-total--warn { color: #dc2626; }
+
+/* ── Modal size ─────────────────────────────────────────────────────────────── */
+.rhu-modal--lg { max-width: 700px; }
+
+/* ── Nav Notification Badge ──────────────────────────────────────────────────── */
+.rhu-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-badge {
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 99px;
+  min-width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+/* ── Primary / Secondary Buttons (used across Distribution page) ───────────── */
+.rhu-btn-primary {
+  background: #1a56db;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.rhu-btn-primary:hover:not(:disabled) { background: #1447c0; }
+.rhu-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.rhu-btn-secondary {
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.rhu-btn-secondary:hover { background: #f9fafb; border-color: #9ca3af; }
+
+/* ── Action group buttons (Review / Distribute / Delete) ────────────────────── */
+.rhu-action-group { display: flex; gap: 6px; align-items: center; }
+
+.rhu-btn-action {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  transition: all 0.15s;
+}
+.rhu-btn-action:hover { background: #f9fafb; }
+
+.rhu-btn-review {
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+.rhu-btn-review:hover { background: #f9fafb; }
+
+.rhu-btn-distribute {
+  background: #1a56db;
+  color: #fff;
+  border: none;
+  font-weight: 600;
+}
+.rhu-btn-distribute:hover:not(:disabled) { background: #1447c0; }
+.rhu-btn-distribute:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Page header (with button aligned right) ─────────────────────────────── */
+.rhu-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+/* ── Empty State (used in Distribution + Inventory) ──────────────────────── */
+.rhu-empty-state {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+.rhu-empty-icon {
+  width: 80px; height: 80px; margin: 0 auto 1.5rem;
+  background: #f3f4f6; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; color: #9ca3af;
+}
+.rhu-empty-title { font-size: 20px; font-weight: 600; color: #0f172a; margin: 0 0 8px; }
+.rhu-empty-text  { font-size: 14px; color: #6b7280; max-width: 480px; margin: 0 auto 2rem; line-height: 1.6; }
+
+/* ── Modal (generic, used by New Distribution modal too) ────────────────────── */
+.rhu-modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; padding: 1rem;
+}
+.rhu-modal {
+  background: #fff; border-radius: 12px;
+  width: 100%; max-width: 540px; max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+}
+.rhu-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1.25rem 1.5rem 1rem; border-bottom: 1px solid #e5e7eb;
+}
+.rhu-modal-title  { font-size: 17px; font-weight: 600; color: #0f172a; margin: 0; }
+.rhu-modal-close  {
+  background: none; border: none; font-size: 26px; color: #9ca3af;
+  cursor: pointer; line-height: 1; padding: 0;
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+}
+.rhu-modal-close:hover { color: #374151; }
+.rhu-modal-body   { padding: 1.5rem; }
+.rhu-modal-footer {
+  display: flex; gap: 10px; justify-content: flex-end;
+  padding: 1rem 1.5rem; border-top: 1px solid #e5e7eb;
+}
+
+/* ── Form (used inside New Distribution modal) ───────────────────────────── */
+.rhu-form-field { margin-bottom: 1rem; }
+.rhu-form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.rhu-label {
+  display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;
+}
+.rhu-input {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid #d1d5db; border-radius: 8px;
+  padding: 9px 12px; font-size: 14px; color: #0f172a;
+  background: #fff; outline: none; transition: border-color 0.2s;
+}
+.rhu-input:focus { border-color: #1a56db; box-shadow: 0 0 0 3px rgba(26,86,219,0.1); }
+.rhu-input::placeholder { color: #9ca3af; }
+
+@media (max-width: 1024px) {
+  .rhu-form-row { grid-template-columns: 1fr; }
+}

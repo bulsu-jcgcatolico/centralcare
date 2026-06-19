@@ -1,0 +1,168 @@
+/* ── Wrapper ─────────────────────────────────────────────────────────────────── */
+.rl-wrapper {
+  min-height: 100vh;
+  background: #f3f4f6;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Top Bar ─────────────────────────────────────────────────────────────────── */
+.rl-topbar {
+  background: #111827;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+  height: 52px;
+  flex-shrink: 0;
+}
+
+.rl-topbar-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+  color: #fff;
+}
+
+.rl-topbar-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.rl-btn-outline {
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 7px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.rl-btn-outline:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* ── Main ────────────────────────────────────────────────────────────────────── */
+.rl-main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 2.5rem 1.5rem;
+}
+
+/* ── Letter Paper ────────────────────────────────────────────────────────────── */
+.rl-paper {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  max-width: 900px;
+  padding: 3rem 4rem;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 14px;
+  line-height: 1.9;
+  color: #0f172a;
+}
+
+.rl-paper-title {
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 1.75rem;
+  font-family: 'Times New Roman', Times, serif;
+}
+
+.rl-date {
+  margin: 0 0 1.25rem;
+  font-family: 'Times New Roman', Times, serif;
+}
+
+.rl-recipient {
+  margin: 0;
+  font-family: 'Times New Roman', Times, serif;
+}
+.rl-recipient p {
+  margin: 0;
+  line-height: 1.7;
+}
+
+/* ── Body textarea ───────────────────────────────────────────────────────────── */
+.rl-body {
+  margin: 1.75rem 0;
+}
+
+.rl-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  border-left: 2px solid #e5e7eb;
+  padding: 4px 12px;
+  font-size: 14px;
+  font-family: 'Times New Roman', Times, serif;
+  line-height: 1.9;
+  color: #0f172a;
+  background: transparent;
+  outline: none;
+  resize: vertical;
+  min-height: 200px;
+}
+.rl-textarea:focus {
+  border-left-color: #1a56db;
+}
+.rl-textarea::placeholder {
+  color: #9ca3af;
+}
+
+/* ── Closing / Signatory ─────────────────────────────────────────────────────── */
+.rl-closing {
+  margin-top: 2rem;
+  font-family: 'Times New Roman', Times, serif;
+}
+.rl-closing > p {
+  margin: 0 0 0.25rem;
+  font-style: italic;
+}
+
+.rl-signatory {
+  margin-top: 2.25rem;
+}
+.rl-signatory-name {
+  font-weight: 700;
+  margin: 0;
+  font-family: 'Times New Roman', Times, serif;
+}
+.rl-signatory-role {
+  margin: 0;
+  font-size: 13px;
+  font-family: 'Times New Roman', Times, serif;
+  color: #374151;
+}
+
+/* ── Print styles ────────────────────────────────────────────────────────────── */
+@media print {
+  .rl-topbar  { display: none !important; }
+  .rl-wrapper { background: #fff; }
+  .rl-main    { padding: 0; }
+  .rl-paper   {
+    box-shadow: none;
+    border-radius: 0;
+    max-width: 100%;
+    padding: 1.5rem 2rem;
+  }
+  .rl-textarea {
+    border: none;
+  }
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .rl-paper  { padding: 2rem 1.5rem; }
+  .rl-topbar { padding: 0 1rem; }
+}

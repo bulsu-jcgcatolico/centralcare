@@ -1,0 +1,131 @@
+/* ── Reuse MidwifeDashboard layout styles ── */
+@import './MidwifeDashboard.css';
+
+/* ── Page Header ────────────────────────────────────────────────────────────── */
+.midwife-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.midwife-page-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 4px;
+}
+
+.midwife-page-sub {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* ── Reports Card ────────────────────────────────────────────────────────────── */
+.midwife-reports-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.midwife-reports-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 1rem;
+}
+
+.midwife-reports-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
+.midwife-reports-item {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.midwife-reports-item:hover {
+  border-color: #1a56db;
+  background: #eff6ff;
+  box-shadow: 0 2px 4px rgba(26, 86, 219, 0.1);
+}
+
+.midwife-reports-item-icon {
+  font-size: 24px;
+  margin-bottom: 0.5rem;
+}
+
+.midwife-reports-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0;
+}
+
+.midwife-reports-item-desc {
+  font-size: 11px;
+  color: #9ca3af;
+  margin: 4px 0 0;
+}
+
+/* ── Reports Table ─────────────────────────────────────────────────────────── */
+.midwife-reports-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.midwife-reports-table thead {
+  background: #f3f4f6;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.midwife-reports-table th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+}
+
+.midwife-reports-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #6b7280;
+}
+
+.midwife-reports-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+/* ── Status Badge ──────────────────────────────────────────────────────────── */
+.midwife-status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.midwife-status-badge.success {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.midwife-status-badge.warning {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.midwife-status-badge.danger {
+  background: #fee2e2;
+  color: #dc2626;
+}

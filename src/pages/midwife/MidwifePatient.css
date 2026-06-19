@@ -1,0 +1,466 @@
+/* Reuse MidwifeDashboard layout styles */
+@import './MidwifeDashboard.css';
+
+/* ── Stats Grid 4 columns ───────────────────────────────────────────────────── */
+.midwife-stats-grid--4 {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.midwife-stat-card-box {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.midwife-stat-icon-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.midwife-stat-icon-box.blue   { background: #eff6ff; color: #1a56db; }
+.midwife-stat-icon-box.green  { background: #f0fdf4; color: #16a34a; }
+.midwife-stat-icon-box.orange { background: #fff7ed; color: #ea580c; }
+.midwife-stat-icon-box.purple { background: #faf5ff; color: #9333ea; }
+
+.midwife-stat-label-box {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  margin: 0 0 4px;
+}
+
+.midwife-stat-value-box {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  line-height: 1;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────────── */
+.midwife-btn-primary {
+  background: #1a56db;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.midwife-btn-primary:hover {
+  background: #1648c0;
+}
+
+.midwife-btn-primary:active {
+  background: #1240aa;
+}
+
+.midwife-btn-secondary {
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.midwife-btn-secondary:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.midwife-btn-secondary:active {
+  background: #f3f4f6;
+}
+
+/* ── Patient Toolbar ────────────────────────────────────────────────────────── */
+.midwife-patient-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.midwife-search-patient {
+  flex: 1;
+  max-width: 300px;
+  padding: 8px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #374151;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.midwife-search-patient:focus {
+  border-color: #1a56db;
+}
+
+.midwife-tab-buttons {
+  display: flex;
+  gap: 4px;
+  background: #f3f4f6;
+  padding: 4px;
+  border-radius: 8px;
+  margin-left: auto;
+}
+
+.midwife-tab-btn {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 24px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.midwife-tab-btn:hover {
+  color: #374151;
+}
+
+.midwife-tab-btn.active {
+  background: #1a56db;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ── Filter & Actions ───────────────────────────────────────────────────────── */
+.midwife-filter-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.midwife-filter-dropdown {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.midwife-filter-dropdown label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.midwife-filter-dropdown select {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #374151;
+  background: #fff;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.midwife-filter-dropdown select:focus {
+  border-color: #1a56db;
+}
+
+.midwife-action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Table ──────────────────────────────────────────────────────────────────── */
+.midwife-section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.midwife-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.midwife-table thead {
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.midwife-table th {
+  padding: 12px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.midwife-table tbody tr {
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.15s;
+}
+
+.midwife-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.midwife-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.midwife-table td {
+  padding: 14px;
+  color: #374151;
+  font-size: 13px;
+}
+
+.midwife-table td strong {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.midwife-status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.midwife-status--complete {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.midwife-status--incomplete {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.midwife-btn-icon {
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.midwife-btn-icon:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+/* ── Empty State ────────────────────────────────────────────────────────────── */
+.midwife-empty-state {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.midwife-empty-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 1.5rem;
+  background: #f3f4f6;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+}
+
+.midwife-empty-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 8px;
+}
+
+.midwife-empty-text {
+  font-size: 14px;
+  color: #6b7280;
+  max-width: 480px;
+  margin: 0 auto 2rem;
+  line-height: 1.6;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────────── */
+@media (max-width: 1200px) {
+  .midwife-stats-grid--4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .midwife-patient-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .midwife-search-patient {
+    max-width: 100%;
+  }
+
+  .midwife-tab-buttons {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .midwife-tab-btn {
+    flex: 1;
+  }
+
+  .midwife-filter-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .midwife-filter-dropdown {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .midwife-action-buttons {
+    width: 100%;
+  }
+
+  .midwife-action-buttons button {
+    flex: 1;
+  }
+
+  .midwife-table {
+    font-size: 12px;
+  }
+
+  .midwife-table th,
+  .midwife-table td {
+    padding: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .midwife-stats-grid--4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Edit / Delete action buttons ───────────────────────────────────────────── */
+.midwife-btn-icon {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.midwife-btn-icon:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+.midwife-btn-icon--danger {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+.midwife-btn-icon--danger:hover { background: #fee2e2; }
+
+/* ── Modal (for edit) ───────────────────────────────────────────────────────── */
+.midwife-modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; padding: 1rem;
+}
+.midwife-modal {
+  background: #fff; border-radius: 12px;
+  width: 100%; max-width: 480px;
+  max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+}
+.midwife-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1.25rem 1.5rem 1rem; border-bottom: 1px solid #e5e7eb;
+}
+.midwife-modal-title { font-size: 17px; font-weight: 600; color: #0f172a; margin: 0; }
+.midwife-modal-close {
+  background: none; border: none; font-size: 24px;
+  color: #9ca3af; cursor: pointer;
+}
+.midwife-modal-close:hover { color: #374151; }
+.midwife-modal-body   { padding: 1.5rem; }
+.midwife-modal-footer {
+  display: flex; gap: 10px; justify-content: flex-end;
+  padding: 1rem 1.5rem; border-top: 1px solid #e5e7eb;
+}
+.midwife-form-field { margin-bottom: 1rem; }
+.midwife-label {
+  display: block; font-size: 13px; font-weight: 500;
+  color: #374151; margin-bottom: 6px;
+}
+.midwife-input {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid #d1d5db; border-radius: 8px;
+  padding: 9px 12px; font-size: 14px; color: #0f172a;
+  background: #fff; outline: none; transition: border-color 0.2s;
+}
+.midwife-input:focus { border-color: #1a56db; }
+
+/* ── Nav Notification Badge ──────────────────────────────────────────────────── */
+.midwife-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-badge {
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 99px;
+  min-width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}

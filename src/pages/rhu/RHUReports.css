@@ -1,0 +1,61 @@
+/* Reuse RHUDashboard layout styles */
+@import './RHUDashboard.css';
+
+/* ── Stats Grid 3 columns ──────────────────────────────────────────────────── */
+.rhu-stats-grid--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* ── Tabs ───────────────────────────────────────────────────────────────────── */
+.rhu-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid #e5e7eb;
+  margin-bottom: 1.5rem;
+}
+
+.rhu-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: -2px;
+}
+
+.rhu-tab:hover {
+  color: #374151;
+  background: #f9fafb;
+}
+
+.rhu-tab.active {
+  color: #1a56db;
+  border-bottom-color: #1a56db;
+  font-weight: 600;
+}
+
+/* ── Empty Actions ──────────────────────────────────────────────────────────── */
+.rhu-empty-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .rhu-stats-grid--3 {
+    grid-template-columns: 1fr;
+  }
+
+  .rhu-tabs {
+    overflow-x: auto;
+  }
+
+  .rhu-tab {
+    white-space: nowrap;
+  }
+}

@@ -1,0 +1,14 @@
+/* ── Force Light Mode on entire app ─────────────────────────────────────────── */
+:root {
+  color-scheme: light !important;
+}
+
+input, textarea, select {
+  color-scheme: light !important;
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+input::placeholder, textarea::placeholder {
+  color: #9ca3af;
+}

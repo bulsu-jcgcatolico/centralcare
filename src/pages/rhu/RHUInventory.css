@@ -1,0 +1,241 @@
+/* Reuse RHUDistribution layout styles */
+@import './RHUDistribution.css';
+
+/* ── Stats Grid 3 columns ──────────────────────────────────────────────────── */
+.rhu-stats-grid--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* ── Inventory Section ─────────────────────────────────────────────────────── */
+.rhu-inventory-section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+}
+
+.rhu-inventory-table {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+@media (max-width: 1200px) {
+  .rhu-stats-grid--3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .rhu-inventory-table .rhu-table-header,
+  .rhu-inventory-table .rhu-table-row {
+    grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1.2fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .rhu-stats-grid--3 {
+    grid-template-columns: 1fr;
+  }
+
+  .rhu-inventory-table .rhu-table-header,
+  .rhu-inventory-table .rhu-table-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Stats Grid 4 columns (Inventory page) ────────────────────────────────── */
+.rhu-stats-grid--4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (max-width: 1100px) {
+  .rhu-stats-grid--4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .rhu-stats-grid--4 { grid-template-columns: 1fr; }
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────────── */
+.rhu-btn-primary {
+  background: #1a56db;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.rhu-btn-primary:hover:not(:disabled) { background: #1447c0; }
+.rhu-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.rhu-btn-secondary {
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.rhu-btn-secondary:hover { background: #f9fafb; border-color: #9ca3af; }
+
+.rhu-action-group { display: flex; gap: 6px; align-items: center; }
+
+.rhu-btn-action {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  transition: all 0.15s;
+}
+.rhu-btn-action:hover { background: #f9fafb; }
+.rhu-btn-del {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+.rhu-btn-del:hover { background: #fee2e2; }
+
+/* ── Page header with button (Inventory style) ───────────────────────────── */
+.rhu-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+/* ── Inventory Table Section ──────────────────────────────────────────────── */
+.rhu-inv-section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.rhu-inv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.rhu-inv-table thead { background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+.rhu-inv-table th {
+  padding: 11px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.rhu-inv-table tbody tr { border-bottom: 1px solid #f3f4f6; transition: background 0.15s; }
+.rhu-inv-table tbody tr:hover { background: #f9fafb; }
+.rhu-inv-table tbody tr:last-child { border-bottom: none; }
+.rhu-inv-table td { padding: 14px; color: #374151; }
+.rhu-inv-table td strong { color: #0f172a; font-weight: 600; }
+
+.rhu-product-key { font-size: 12px; color: #6b7280; font-weight: 500; }
+.rhu-subcategory-pill {
+  display: inline-block;
+  background: #f3f4f6;
+  color: #374151;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ── Status Badges ─────────────────────────────────────────────────────────── */
+.rhu-inv-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.rhu-status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.rhu-status--good     { background: #d1fae5; color: #065f46; }
+.rhu-dot--good        { background: #16a34a; }
+.rhu-status--low      { background: #fef3c7; color: #92400e; }
+.rhu-dot--low         { background: #d97706; }
+.rhu-status--critical { background: #fee2e2; color: #991b1b; }
+.rhu-dot--critical    { background: #dc2626; }
+
+/* ── Empty State ───────────────────────────────────────────────────────────── */
+.rhu-empty-state {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+.rhu-empty-icon {
+  width: 80px; height: 80px; margin: 0 auto 1.5rem;
+  background: #f3f4f6; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; color: #9ca3af;
+}
+.rhu-empty-title { font-size: 20px; font-weight: 600; color: #0f172a; margin: 0 0 8px; }
+.rhu-empty-text  { font-size: 14px; color: #6b7280; max-width: 480px; margin: 0 auto 2rem; line-height: 1.6; }
+
+/* ── Modal ─────────────────────────────────────────────────────────────────── */
+.rhu-modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; padding: 1rem;
+}
+.rhu-modal {
+  background: #fff; border-radius: 12px;
+  width: 100%; max-width: 540px; max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+}
+.rhu-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1.25rem 1.5rem 1rem; border-bottom: 1px solid #e5e7eb;
+}
+.rhu-modal-title  { font-size: 17px; font-weight: 600; color: #0f172a; margin: 0; }
+.rhu-modal-close  {
+  background: none; border: none; font-size: 26px; color: #9ca3af;
+  cursor: pointer; line-height: 1; padding: 0;
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+}
+.rhu-modal-close:hover { color: #374151; }
+.rhu-modal-body   { padding: 1.5rem; }
+.rhu-modal-footer {
+  display: flex; gap: 10px; justify-content: flex-end;
+  padding: 1rem 1.5rem; border-top: 1px solid #e5e7eb;
+}
+
+/* ── Form ──────────────────────────────────────────────────────────────────── */
+.rhu-form-field { margin-bottom: 1rem; }
+.rhu-form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.rhu-label {
+  display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;
+}
+.rhu-input {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid #d1d5db; border-radius: 8px;
+  padding: 9px 12px; font-size: 14px; color: #0f172a;
+  background: #fff; outline: none; transition: border-color 0.2s;
+}
+.rhu-input:focus { border-color: #1a56db; box-shadow: 0 0 0 3px rgba(26,86,219,0.1); }
+.rhu-input::placeholder { color: #9ca3af; }
+
+@media (max-width: 1024px) {
+  .rhu-form-row { grid-template-columns: 1fr; }
+}

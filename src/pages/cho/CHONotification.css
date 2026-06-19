@@ -1,0 +1,80 @@
+/* Reuse CHODashboard layout styles */
+@import './CHODashboard.css';
+
+/* ── Header Actions ─────────────────────────────────────────────────────────── */
+.cho-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Yellow stat variant ────────────────────────────────────────────────────── */
+.cho-stat--yellow .cho-stat-label { color: #f59e0b; }
+.cho-stat--yellow .cho-stat-value { color: #d97706; }
+
+/* ── Filter Chips ───────────────────────────────────────────────────────────── */
+.cho-filter-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.cho-chip {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cho-chip:hover {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+}
+
+.cho-chip.active {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1a56db;
+  font-weight: 600;
+}
+
+/* ── Alert List ─────────────────────────────────────────────────────────────── */
+.cho-alert-list {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem auto;
+  max-width: 500px;
+  text-align: left;
+}
+
+.cho-alert-list li {
+  padding: 12px 16px;
+  background: #f9fafb;
+  border-left: 3px solid #1a56db;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.cho-alert-list li strong {
+  color: #0f172a;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .cho-header-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .cho-header-actions button {
+    width: 100%;
+  }
+}

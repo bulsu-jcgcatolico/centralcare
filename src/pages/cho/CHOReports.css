@@ -1,0 +1,61 @@
+/* Reuse CHODashboard layout styles */
+@import './CHODashboard.css';
+
+/* ── Stats Grid 3 columns ──────────────────────────────────────────────────── */
+.cho-stats-grid--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* ── Tabs ───────────────────────────────────────────────────────────────────── */
+.cho-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid #e5e7eb;
+  margin-bottom: 1.5rem;
+}
+
+.cho-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: -2px;
+}
+
+.cho-tab:hover {
+  color: #374151;
+  background: #f9fafb;
+}
+
+.cho-tab.active {
+  color: #1a56db;
+  border-bottom-color: #1a56db;
+  font-weight: 600;
+}
+
+/* ── Empty Actions ──────────────────────────────────────────────────────────── */
+.cho-empty-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .cho-stats-grid--3 {
+    grid-template-columns: 1fr;
+  }
+
+  .cho-tabs {
+    overflow-x: auto;
+  }
+
+  .cho-tab {
+    white-space: nowrap;
+  }
+}
