@@ -74,7 +74,6 @@
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  overflow: hidden;
   margin-bottom: 1.5rem;
 }
 
@@ -308,4 +307,16 @@
   min-width: 18px;
   text-align: center;
   flex-shrink: 0;
+}
+
+/* ── Plan header actions (Distribute All + Delete Plan) ──────────────────────── */
+.cho-plan-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.cho-btn-sm {
+  padding: 7px 14px !important;
+  font-size: 13px !important;
 }

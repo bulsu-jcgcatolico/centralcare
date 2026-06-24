@@ -175,6 +175,39 @@ export default function CHODistribution() {
     setDistributingId(null);
   }
 
+  // Distribute to ALL RHUs in this plan at once
+  async function distributeAllRHUs(dist) {
+    if (!confirm(`Distribute ${dist.medicineName} to all ${dist.rhuDistribution.length} RHUs now?`)) return;
+    setDistributingId("all-" + dist.id);
+    try {
+      const updatedRhuDist = dist.rhuDistribution.map(r => ({ ...r, status: "Distributed" }));
+
+      await updateDoc(doc(db, "distributions", dist.id), {
+        rhuDistribution: updatedRhuDist,
+        status: "Completed"
+      });
+
+      // Notify each RHU
+      for (const rhu of updatedRhuDist) {
+        await addDoc(collection(db, "notifications"), {
+          type: "distribution",
+          title: "Supply Distributed",
+          message: `Your ${rhu.boxes} boxes of ${dist.medicineName} have been dispatched by CHO.`,
+          toRhuId: rhu.id,
+          toRhuName: rhu.name,
+          fromType: "cho",
+          distributionId: dist.id,
+          read: false,
+          createdAt: serverTimestamp()
+        });
+      }
+
+      alert("Distributed to all RHUs successfully!");
+      loadDistributions();
+    } catch (err) { alert("Error: " + err.message); }
+    setDistributingId(null);
+  }
+
   async function deleteDistribution(id) {
     if (!confirm("Delete this distribution record?")) return;
     try {
@@ -289,7 +322,16 @@ export default function CHODistribution() {
                       <strong>{dist.medicineName}</strong> — {dist.totalBoxes} boxes total &nbsp;·&nbsp; {dist.date}
                     </p>
                   </div>
-                  <button className="cho-btn-danger-sm" onClick={() => deleteDistribution(dist.id)}>Delete Plan</button>
+                  <div className="cho-plan-header-actions">
+                    {dist.status !== "Completed" && (
+                      <button className="cho-btn-primary cho-btn-sm"
+                        disabled={distributingId === "all-" + dist.id}
+                        onClick={() => distributeAllRHUs(dist)}>
+                        {distributingId === "all-" + dist.id ? "Distributing..." : "Distribute All"}
+                      </button>
+                    )}
+                    <button className="cho-btn-danger-sm" onClick={() => deleteDistribution(dist.id)}>Delete Plan</button>
+                  </div>
                 </div>
 
                 <div className="cho-table-wrapper">

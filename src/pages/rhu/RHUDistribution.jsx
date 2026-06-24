@@ -223,6 +223,38 @@ export default function RHUDistribution() {
     setDistributingId(null);
   }
 
+  // Distribute to ALL barangays in this plan at once
+  async function distributeAllBarangays(dist) {
+    if (!confirm(`Distribute ${dist.medicineName} to all ${dist.barangayDistribution.length} barangays now?`)) return;
+    setDistributingId("all-" + dist.id);
+    try {
+      const updated = dist.barangayDistribution.map(b => ({ ...b, status: "Distributed" }));
+
+      await updateDoc(doc(db, "rhu_distributions", dist.id), {
+        barangayDistribution: updated,
+        status: "Completed"
+      });
+
+      for (const b of updated) {
+        await addDoc(collection(db, "notifications"), {
+          type:           "distribution",
+          title:          "Supply Dispatched",
+          message:        `Your ${b.boxes} boxes of ${dist.medicineName} have been dispatched by ${userData?.rhuName}.`,
+          toBarangayName: b.name,
+          fromRhuId:      userData?.rhuId  ?? "",
+          fromRhuName:    userData?.rhuName ?? "",
+          distributionId: dist.id,
+          read:           false,
+          createdAt:      serverTimestamp()
+        });
+      }
+
+      alert("Distributed to all barangays successfully!");
+      loadDistributions();
+    } catch (err) { alert("Error: " + err.message); }
+    setDistributingId(null);
+  }
+
   async function deleteDistribution(id) {
     if (!confirm("Delete this distribution?")) return;
     try {
@@ -355,6 +387,14 @@ export default function RHUDistribution() {
                     <span className={`rhu-dist-plan-badge ${dist.status === "Completed" ? "rhu-badge--done" : "rhu-badge--pending"}`}>
                       {dist.status}
                     </span>
+                    {dist.status !== "Completed" && (
+                      <button className="rhu-btn-primary"
+                        style={{ padding: "7px 14px", fontSize: "13px" }}
+                        disabled={distributingId === "all-" + dist.id}
+                        onClick={() => distributeAllBarangays(dist)}>
+                        {distributingId === "all-" + dist.id ? "Distributing..." : "Distribute All"}
+                      </button>
+                    )}
                     <button className="rhu-btn-danger-sm" onClick={() => deleteDistribution(dist.id)}>Delete</button>
                   </div>
                 </div>
