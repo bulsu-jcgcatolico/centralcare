@@ -295,6 +295,7 @@
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   margin-bottom: 1.5rem;
+  overflow: visible !important;
 }
 .rhu-dist-plan-header {
   display: flex;
