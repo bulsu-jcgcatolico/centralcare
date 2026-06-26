@@ -26,13 +26,7 @@ export default function MidwifePatients() {
   const [patients, setPatients]   = useState([]);
   const [loading, setLoading]     = useState(false);
 
-  // Edit modal
-  const [showEditModal, setShowEditModal]   = useState(false);
-  const [editPatient, setEditPatient]       = useState(null);
-  const [editContact, setEditContact]       = useState("");
-  const [editLastVisit, setEditLastVisit]   = useState("");
-  const [editStatus, setEditStatus]         = useState("");
-  const [saving, setSaving]                 = useState(false);
+  const [saving, setSaving] = useState(false);
 
   function handleLogout() { logout(); navigate("/"); }
 
@@ -57,33 +51,6 @@ export default function MidwifePatients() {
     } else {
       navigate("/midwife/patients/add/adult");
     }
-  }
-
-  function openEdit(patient) {
-    setEditPatient(patient);
-    setEditContact(patient.contact || "");
-    setEditLastVisit(patient.lastVisit || "");
-    setEditStatus(patient.status || "active");
-    setShowEditModal(true);
-  }
-
-  async function saveEdit() {
-    if (!editPatient) return;
-    setSaving(true);
-    try {
-      await updateDoc(doc(db, "patients", editPatient.id), {
-        contact:   editContact,
-        lastVisit: editLastVisit,
-        status:    editStatus,
-      });
-      setPatients(patients.map(p =>
-        p.id === editPatient.id
-          ? { ...p, contact: editContact, lastVisit: editLastVisit, status: editStatus }
-          : p
-      ));
-      setShowEditModal(false);
-    } catch (err) { alert("Error saving: " + err.message); }
-    setSaving(false);
   }
 
   async function deletePatient(id) {
@@ -359,7 +326,7 @@ export default function MidwifePatients() {
                       <td>
                         <div style={{ display: "flex", gap: "6px" }}>
                           <button className="midwife-btn-icon"
-                            onClick={() => openEdit(patient)}>
+                            onClick={() => navigate(`/midwife/patients/edit/${patient.id}`)}>
                             Edit
                           </button>
                           <button className="midwife-btn-icon midwife-btn-icon--danger"
@@ -376,47 +343,6 @@ export default function MidwifePatients() {
           )}
         </main>
       </div>
-
-      {/* ── Edit Modal ── */}
-      {showEditModal && editPatient && (
-        <div className="midwife-modal-overlay" onClick={() => setShowEditModal(false)}>
-          <div className="midwife-modal" onClick={e => e.stopPropagation()}>
-            <div className="midwife-modal-header">
-              <h2 className="midwife-modal-title">Edit Patient — {editPatient.name}</h2>
-              <button className="midwife-modal-close" onClick={() => setShowEditModal(false)}>x</button>
-            </div>
-            <div className="midwife-modal-body">
-              <div className="midwife-form-field">
-                <label className="midwife-label">Contact Number</label>
-                <input className="midwife-input" type="text"
-                  value={editContact} onChange={e => setEditContact(e.target.value)} />
-              </div>
-              <div className="midwife-form-field">
-                <label className="midwife-label">Last Visit Date</label>
-                <input className="midwife-input" type="date"
-                  value={editLastVisit} onChange={e => setEditLastVisit(e.target.value)} />
-              </div>
-              <div className="midwife-form-field">
-                <label className="midwife-label">Status</label>
-                <select className="midwife-input" value={editStatus}
-                  onChange={e => setEditStatus(e.target.value)}>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="transferred">Transferred</option>
-                </select>
-              </div>
-            </div>
-            <div className="midwife-modal-footer">
-              <button className="midwife-btn-secondary" onClick={() => setShowEditModal(false)}>
-                Cancel
-              </button>
-              <button className="midwife-btn-primary" onClick={saveEdit} disabled={saving}>
-                {saving ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

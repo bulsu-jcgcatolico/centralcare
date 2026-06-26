@@ -1,7 +1,9 @@
-import { useState, useRef } from "react";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useState, useEffect, useRef } from "react";
+import {
+  collection, addDoc, updateDoc, doc, getDoc, serverTimestamp
+} from "firebase/firestore";
 import { db } from "../../firebase/config";
-import { useNavigate, NavLink } from "react-router-dom";
+import { useNavigate, useParams, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import "./MidwifeAddPatient.css";
 
@@ -17,70 +19,143 @@ function generatePatientId() {
   return "PT-" + Math.floor(10000 + Math.random() * 89999);
 }
 
-export default function MidwifeAddPatient({ type = "child" }) {
+function makeEmptyRecord(id) {
+  return {
+    id, date: "", bp: "", hr: "", rr: "", wt: "", ht: "", temp: "",
+    headCircum: "", armCircum: "", armLength: "", waistCircum: "",
+    skinFold: "", limbLength: "",
+    complaints: "", diagnosis: "", medications: ""
+  };
+}
+
+/**
+ * Works in two modes:
+ *  - Add mode:  <MidwifeAddPatient type="child" />          → route /midwife/patients/add/child
+ *  - Edit mode: <MidwifeAddPatient mode="edit" />            → route /midwife/patients/edit/:id
+ *               (patient's existing `type` is loaded from Firebase, no need to pass it)
+ */
+export default function MidwifeAddPatient({ type: typeProp = "child", mode = "add" }) {
   const { logout, user, userData } = useAuth();
   const navigate = useNavigate();
-  const [records, setRecords] = useState([{ id: 1 }]);
+  const { id } = useParams(); // present only in edit mode
+
+  const isEdit = mode === "edit";
+
+  const [type, setType] = useState(typeProp);
+  const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
 
-  // Use refs to collect form data without controlled inputs
-  const formRef = useRef(null);
+  // ── All form fields (controlled) ────────────────────────────────────────────
+  const [fields, setFields] = useState({
+    lastName: "", firstName: "", middleName: "", suffix: "",
+    birthday: "", age: "", sex: "", birthPlace: "", contact: "",
+    religion: "", philHealth: "", memberName: "", address: "",
+    // child
+    fatherName: "", motherName: "", placeDelivered: "", placeDeliveredOther: "",
+    deliveryType: "", birthLength: "", birthWeight: "", attendantBirth: "",
+    // adult
+    civilStatus: "", maidenName: "", memberBirthday: "", familyMember: "",
+    bloodType: "", spouseName: "", education: "",
+    menarche: "", lmp: "", gravidity: "", edc: "", parity: "",
+    fullterm: "", preterm: "", abortion: "", livebirth: "",
+  });
+  const [immunization, setImmunization] = useState({});
+  const [records, setRecords] = useState([makeEmptyRecord(1)]);
 
-  function handleLogout() { logout(); navigate("/"); }
-  function handleCancel() { navigate("/midwife/patients"); }
-  function addRecord()    { setRecords(p => [...p, { id: Date.now() }]); }
-  function removeRecord(id) {
-    if (records.length > 1) setRecords(p => p.filter(r => r.id !== id));
+  function setField(name, value) {
+    setFields(prev => ({ ...prev, [name]: value }));
   }
 
+  function handleLogout() { logout(); navigate("/"); }
+
+  // ── Load existing patient data when editing ─────────────────────────────────
+  useEffect(() => {
+    if (!isEdit || !id) return;
+    (async () => {
+      setLoading(true);
+      try {
+        const snap = await getDoc(doc(db, "patients", id));
+        if (!snap.exists()) {
+          alert("Patient record not found.");
+          navigate("/midwife/patients");
+          return;
+        }
+        const data = snap.data();
+        setType(data.type || "child");
+        setFields(prev => ({ ...prev, ...data }));
+        setImmunization(data.immunization || {});
+        if (Array.isArray(data.clinicalRecords) && data.clinicalRecords.length > 0) {
+          setRecords(data.clinicalRecords.map((r, i) => ({ ...makeEmptyRecord(i + 1), ...r, id: i + 1 })));
+        }
+      } catch (err) {
+        alert("Error loading patient: " + err.message);
+      }
+      setLoading(false);
+    })();
+  }, [isEdit, id]);
+
+  function updateRecord(rid, field, value) {
+    setRecords(prev => prev.map(r => r.id === rid ? { ...r, [field]: value } : r));
+  }
+  function addRecord() {
+    setRecords(prev => [...prev, makeEmptyRecord(Date.now())]);
+  }
+  function removeRecord(rid) {
+    if (records.length > 1) setRecords(prev => prev.filter(r => r.id !== rid));
+  }
+  function updateImmunization(vaccine, value) {
+    setImmunization(prev => ({ ...prev, [vaccine]: value }));
+  }
+
+  const fullName = `${fields.lastName}, ${fields.firstName} ${fields.middleName}`.trim();
+
+  const requiredVaccines = ["BCG", "HEPA B W/IN 24 HOURS", "PENTAVALENT 1", "PENTAVALENT 2",
+    "PENTAVALENT 3", "OPV 1", "OPV 2", "OPV 3", "MCV 1 (AMV)"];
+  const immunizationStatus = requiredVaccines.every(v => immunization[v])
+    ? "Complete" : "Incomplete";
+
   async function handleSave() {
-    if (!formRef.current) return;
+    if (!fields.lastName.trim() || !fields.firstName.trim()) {
+      alert("Please enter at least the patient's Last Name and First Name.");
+      return;
+    }
     setSaving(true);
     try {
-      // Collect all named inputs from the form
-      const inputs = formRef.current.querySelectorAll("input[name], textarea[name]");
-      const data = {};
-      inputs.forEach(el => {
-        if (el.type === "checkbox") {
-          if (el.checked) {
-            // Store multiple checkboxes with same name as array
-            if (data[el.name]) {
-              data[el.name] = Array.isArray(data[el.name])
-                ? [...data[el.name], el.value]
-                : [data[el.name], el.value];
-            } else {
-              data[el.name] = el.value;
-            }
-          }
-        } else if (el.type === "radio") {
-          if (el.checked) data[el.name] = el.value;
-        } else {
-          if (el.value) data[el.name] = el.value;
-        }
-      });
-
-      const fullName = [data.lastName, data.firstName, data.middleName]
-        .filter(Boolean).join(", ");
-
-      await addDoc(collection(db, "patients"), {
-        patientId:    generatePatientId(),
+      const patientData = {
+        ...fields,
         type,
-        name:         fullName,
+        name: fullName,
+        age: parseInt(fields.age) || 0,
         barangayName: userData?.barangayName ?? "",
-        createdBy:    user?.uid ?? "",
-        createdAt:    serverTimestamp(),
-        lastVisit:    new Date().toLocaleDateString(),
-        status:       "active",
-        ...data,
-      });
+        clinicalRecords: records.map(r => ({ ...r, id: undefined })),
+        ...(type === "child" && { immunization, immunizationStatus }),
+      };
 
-      alert("Patient record saved successfully!");
+      if (isEdit) {
+        await updateDoc(doc(db, "patients", id), {
+          ...patientData,
+          updatedAt: serverTimestamp(),
+        });
+        alert("Patient record updated successfully!");
+      } else {
+        await addDoc(collection(db, "patients"), {
+          ...patientData,
+          patientId: generatePatientId(),
+          createdBy: user?.uid ?? "",
+          createdAt: serverTimestamp(),
+          lastVisit: new Date().toLocaleDateString(),
+          status: "active",
+        });
+        alert("Patient record saved successfully!");
+      }
       navigate("/midwife/patients");
     } catch (error) {
       alert("Error saving: " + error.message);
     }
     setSaving(false);
   }
+
+  function handleCancel() { navigate("/midwife/patients"); }
 
   const TA = {
     display: "block", width: "100%", minHeight: "140px", height: "140px",
@@ -91,11 +166,21 @@ export default function MidwifeAddPatient({ type = "child" }) {
   };
 
   const CHILD_VITALS = [
-    "BP","HR","RR","WT","HT","TEMP",
-    "Head Circum","Arm Circum","Arm Length",
-    "Waist Circum","SkinFold Thickness","Limb Length"
+    ["bp","BP"],["hr","HR"],["rr","RR"],["wt","WT"],["ht","HT"],["temp","TEMP"],
+    ["headCircum","Head Circum"],["armCircum","Arm Circum"],["armLength","Arm Length"],
+    ["waistCircum","Waist Circum"],["skinFold","SkinFold Thickness"],["limbLength","Limb Length"]
   ];
-  const ADULT_VITALS = ["BP","HR","RR","WT","HT","TEMP"];
+  const ADULT_VITALS = [["bp","BP"],["hr","HR"],["rr","RR"],["wt","WT"],["ht","HT"],["temp","TEMP"]];
+
+  if (loading) {
+    return (
+      <div className="midwife-layout">
+        <div className="midwife-main" style={{ alignItems: "center", justifyContent: "center", display: "flex" }}>
+          <p>Loading patient record...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="midwife-layout">
@@ -145,85 +230,81 @@ export default function MidwifeAddPatient({ type = "child" }) {
         <main className="midwife-content">
           <div className="ap-page-header">
             <h1 className="ap-page-title">
-              Add New {type === "child" ? "Child" : "Adult"} Patient Record
+              {isEdit ? "Edit" : "Add New"} {type === "child" ? "Child" : "Adult"} Patient Record
             </h1>
             <button className="ap-print-btn" onClick={() => window.print()}>Print</button>
           </div>
 
-          <form ref={formRef}>
-            {/* ── PATIENT INFO ── */}
-            <div className="ap-info-card">
-              {type === "child" ? <ChildInfo /> : <AdultInfo />}
-            </div>
+          {/* ── PATIENT INFO ── */}
+          <div className="ap-info-card">
+            {type === "child"
+              ? <ChildInfo fields={fields} setField={setField} immunization={immunization} updateImmunization={updateImmunization} />
+              : <AdultInfo fields={fields} setField={setField} />}
+          </div>
 
-            {/* ── CLINICAL RECORDS ── */}
-            {records.map((rec, idx) => (
-              <div key={rec.id} className="ap-clinical-card">
-                <div style={{ width: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-                  <table className="ap-clinical-table">
-                    <thead>
-                      <tr>
-                        <th className="ap-th-date">DATE</th>
-                        <th className="ap-th-vitals">VITAL SIGNS</th>
-                        <th>CHIEF COMPLAINTS</th>
-                        <th>DIAGNOSIS</th>
-                        <th>MEDICATIONS / TREATMENT</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="ap-td-date">
-                          <input type="date" className="ap-date-input"
-                            name={`date_${idx}`} />
-                        </td>
-                        <td className="ap-td-vitals">
-                          {(type === "child" ? CHILD_VITALS : ADULT_VITALS).map(v => (
-                            <div key={v} className="ap-vital-row">
-                              <span>{v}:</span>
-                              <input type="text" name={`vital_${v}_${idx}`} />
-                            </div>
-                          ))}
-                        </td>
-                        <td className="ap-td-text">
-                          <textarea name={`complaints_${idx}`} style={TA}
-                            placeholder="Enter chief complaints..." />
-                        </td>
-                        <td className="ap-td-text">
-                          <textarea name={`diagnosis_${idx}`} style={TA}
-                            placeholder="Enter diagnosis..." />
-                        </td>
-                        <td className="ap-td-text">
-                          <textarea name={`medications_${idx}`} style={TA}
-                            placeholder="Enter medications / treatment..." />
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+          {/* ── CLINICAL RECORDS ── */}
+          {records.map((rec) => (
+            <div key={rec.id} className="ap-clinical-card">
+              <table className="ap-clinical-table">
+                <thead>
+                  <tr>
+                    <th className="ap-th-date">DATE</th>
+                    <th className="ap-th-vitals">VITAL SIGNS</th>
+                    <th>CHIEF COMPLAINTS</th>
+                    <th>DIAGNOSIS</th>
+                    <th>MEDICATIONS / TREATMENT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="ap-td-date">
+                      <input type="date" className="ap-date-input"
+                        value={rec.date}
+                        onChange={e => updateRecord(rec.id, "date", e.target.value)} />
+                    </td>
+                    <td className="ap-td-vitals">
+                      {(type === "child" ? CHILD_VITALS : ADULT_VITALS).map(([field, label]) => (
+                        <div key={field} className="ap-vital-row">
+                          <span>{label}:</span>
+                          <input type="text"
+                            value={rec[field] || ""}
+                            onChange={e => updateRecord(rec.id, field, e.target.value)} />
+                        </div>
+                      ))}
+                    </td>
+                    <td className="ap-td-text">
+                      <textarea style={TA} placeholder="Enter chief complaints..."
+                        value={rec.complaints}
+                        onChange={e => updateRecord(rec.id, "complaints", e.target.value)} />
+                    </td>
+                    <td className="ap-td-text">
+                      <textarea style={TA} placeholder="Enter diagnosis..."
+                        value={rec.diagnosis}
+                        onChange={e => updateRecord(rec.id, "diagnosis", e.target.value)} />
+                    </td>
+                    <td className="ap-td-text">
+                      <textarea style={TA} placeholder="Enter medications / treatment..."
+                        value={rec.medications}
+                        onChange={e => updateRecord(rec.id, "medications", e.target.value)} />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              {records.length > 1 && (
+                <div className="ap-remove-wrap">
+                  <button className="ap-remove-btn" onClick={() => removeRecord(rec.id)}>Remove</button>
                 </div>
-                {records.length > 1 && (
-                  <div className="ap-remove-wrap">
-                    <button type="button" className="ap-remove-btn"
-                      onClick={() => removeRecord(rec.id)}>
-                      Remove
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </form>
+              )}
+            </div>
+          ))}
 
           {/* ── BOTTOM ACTIONS ── */}
           <div className="ap-bottom">
-            <button type="button" className="ap-add-btn" onClick={addRecord}>
-              + Add Another Record
-            </button>
+            <button className="ap-add-btn" onClick={addRecord}>+ Add Another Record</button>
             <div className="ap-bottom-right">
-              <button type="button" className="ap-cancel-btn" onClick={handleCancel}>
-                Cancel
-              </button>
-              <button type="button" className="ap-save-btn"
-                onClick={handleSave} disabled={saving}>
-                {saving ? "Saving..." : "Save Record"}
+              <button className="ap-cancel-btn" onClick={handleCancel}>Cancel</button>
+              <button className="ap-save-btn" onClick={handleSave} disabled={saving}>
+                {saving ? "Saving..." : isEdit ? "Update Record" : "Save Record"}
               </button>
             </div>
           </div>
@@ -234,54 +315,73 @@ export default function MidwifeAddPatient({ type = "child" }) {
 }
 
 /* ── CHILD INFO ── */
-function ChildInfo() {
+function ChildInfo({ fields, setField, immunization, updateImmunization }) {
+  const f = fields;
   return (
     <div className="ap-info-grid">
       <div className="ap-info-col">
-        <div className="ap-row"><span>Last Name:</span><input type="text" name="lastName" /></div>
+        <div className="ap-row"><span>Last Name:</span>
+          <input type="text" value={f.lastName} onChange={e => setField("lastName", e.target.value)} /></div>
         <div className="ap-row">
           <span>First Name:</span>
-          <input type="text" name="firstName" className="ap-flex2" />
+          <input type="text" className="ap-flex2" value={f.firstName} onChange={e => setField("firstName", e.target.value)} />
           <span className="ap-span-sm">Suffix:</span>
-          <input type="text" name="suffix" className="ap-w80" />
+          <input type="text" className="ap-w80" value={f.suffix} onChange={e => setField("suffix", e.target.value)} />
         </div>
-        <div className="ap-row"><span>Middle Name:</span><input type="text" name="middleName" /></div>
-        <div className="ap-row"><span>Father's Name:</span><input type="text" name="fatherName" /></div>
-        <div className="ap-row"><span>Mother's Name:</span><input type="text" name="motherName" /></div>
-        <div className="ap-row"><span>Contact Number:</span><input type="text" name="contact" /></div>
-        <div className="ap-row"><span>Religion:</span><input type="text" name="religion" /></div>
-        <div className="ap-row"><span>PhilHealth:</span><input type="text" name="philHealth" /></div>
+        <div className="ap-row"><span>Middle Name:</span>
+          <input type="text" value={f.middleName} onChange={e => setField("middleName", e.target.value)} /></div>
+        <div className="ap-row"><span>Father's Name:</span>
+          <input type="text" value={f.fatherName} onChange={e => setField("fatherName", e.target.value)} /></div>
+        <div className="ap-row"><span>Mother's Name:</span>
+          <input type="text" value={f.motherName} onChange={e => setField("motherName", e.target.value)} /></div>
+        <div className="ap-row"><span>Contact Number:</span>
+          <input type="text" value={f.contact} onChange={e => setField("contact", e.target.value)} /></div>
+        <div className="ap-row"><span>Religion:</span>
+          <input type="text" value={f.religion} onChange={e => setField("religion", e.target.value)} /></div>
+        <div className="ap-row"><span>PhilHealth:</span>
+          <input type="text" value={f.philHealth} onChange={e => setField("philHealth", e.target.value)} /></div>
         <div className="ap-row">
           <span>Member's Name:</span>
-          <input type="text" name="memberName" placeholder="Last Name, First Name, Middle Name" />
+          <input type="text" placeholder="Last Name, First Name, Middle Name"
+            value={f.memberName} onChange={e => setField("memberName", e.target.value)} />
         </div>
       </div>
       <div className="ap-info-col">
         <div className="ap-row">
-          <span>Birthday:</span><input type="date" name="birthday" className="ap-w130" />
-          <span className="ap-span-sm">Age:</span><input type="number" name="age" className="ap-w60" />
-          <span className="ap-span-sm">Sex:</span><input type="text" name="sex" className="ap-w60" />
+          <span>Birthday:</span><input type="date" className="ap-w130" value={f.birthday} onChange={e => setField("birthday", e.target.value)} />
+          <span className="ap-span-sm">Age:</span><input type="number" className="ap-w60" value={f.age} onChange={e => setField("age", e.target.value)} />
+          <span className="ap-span-sm">Sex:</span><input type="text" className="ap-w60" value={f.sex} onChange={e => setField("sex", e.target.value)} />
         </div>
-        <div className="ap-row"><span>BirthPlace:</span><input type="text" name="birthPlace" /></div>
+        <div className="ap-row"><span>BirthPlace:</span>
+          <input type="text" value={f.birthPlace} onChange={e => setField("birthPlace", e.target.value)} /></div>
         <div className="ap-row">
           <span>Place Delivered:</span>
-          <label className="ap-cb"><input type="checkbox" name="placeDelivered" value="Lying In" />Lying In</label>
-          <label className="ap-cb"><input type="checkbox" name="placeDelivered" value="Hospital" />Hospital</label>
-          <label className="ap-cb"><input type="checkbox" name="placeDelivered" value="Others" />Others:</label>
-          <input type="text" name="placeDeliveredOther" className="ap-w80" />
+          {["Lying In","Hospital","Others"].map(opt => (
+            <label key={opt} className="ap-cb">
+              <input type="checkbox" checked={f.placeDelivered === opt}
+                onChange={() => setField("placeDelivered", opt)} />{opt}
+            </label>
+          ))}
         </div>
         <div className="ap-row">
           <span>Type of Delivery:</span>
-          <label className="ap-cb"><input type="checkbox" name="deliveryType" value="NSD" />NSD</label>
-          <label className="ap-cb"><input type="checkbox" name="deliveryType" value="CS" />CS</label>
+          {["NSD","CS"].map(opt => (
+            <label key={opt} className="ap-cb">
+              <input type="checkbox" checked={f.deliveryType === opt}
+                onChange={() => setField("deliveryType", opt)} />{opt}
+            </label>
+          ))}
         </div>
-        <div className="ap-row"><span>Birth Length:</span><input type="text" name="birthLength" className="ap-w120" /></div>
-        <div className="ap-row"><span>Birth Weight:</span><input type="text" name="birthWeight" className="ap-w120" /></div>
-        <div className="ap-row"><span>Attendant at Birth:</span><input type="text" name="attendantBirth" /></div>
-        <div className="ap-row"><span>Complete Address:</span><input type="text" name="address" /></div>
+        <div className="ap-row"><span>Birth Length:</span>
+          <input type="text" className="ap-w120" value={f.birthLength} onChange={e => setField("birthLength", e.target.value)} /></div>
+        <div className="ap-row"><span>Birth Weight:</span>
+          <input type="text" className="ap-w120" value={f.birthWeight} onChange={e => setField("birthWeight", e.target.value)} /></div>
+        <div className="ap-row"><span>Attendant at Birth:</span>
+          <input type="text" value={f.attendantBirth} onChange={e => setField("attendantBirth", e.target.value)} /></div>
+        <div className="ap-row"><span>Complete Address:</span>
+          <input type="text" value={f.address} onChange={e => setField("address", e.target.value)} /></div>
       </div>
 
-      {/* Immunization */}
       <div className="ap-immun-section">
         <div className="ap-immun-header">
           <div>IMMUNIZATION</div><div>Date</div>
@@ -298,7 +398,8 @@ function ChildInfo() {
               {col.map(v => (
                 <div key={v} className="ap-immun-row">
                   <span>{v}:</span>
-                  <input type="date" name={`immun_${v}`} />
+                  <input type="date" value={immunization[v] || ""}
+                    onChange={e => updateImmunization(v, e.target.value)} />
                 </div>
               ))}
             </div>
@@ -310,69 +411,91 @@ function ChildInfo() {
 }
 
 /* ── ADULT INFO ── */
-function AdultInfo() {
+function AdultInfo({ fields, setField }) {
+  const f = fields;
   return (
     <div className="ap-info-grid">
       <div className="ap-info-col">
-        <div className="ap-row"><span>Last Name:</span><input type="text" name="lastName" /></div>
+        <div className="ap-row"><span>Last Name:</span>
+          <input type="text" value={f.lastName} onChange={e => setField("lastName", e.target.value)} /></div>
         <div className="ap-row">
           <span>First Name:</span>
-          <input type="text" name="firstName" className="ap-flex2" />
+          <input type="text" className="ap-flex2" value={f.firstName} onChange={e => setField("firstName", e.target.value)} />
           <span className="ap-span-sm">Suffix:</span>
-          <input type="text" name="suffix" className="ap-w80" />
+          <input type="text" className="ap-w80" value={f.suffix} onChange={e => setField("suffix", e.target.value)} />
         </div>
-        <div className="ap-row"><span>Middle Name:</span><input type="text" name="middleName" /></div>
-        <div className="ap-row"><span>Civil Status:</span><input type="text" name="civilStatus" /></div>
+        <div className="ap-row"><span>Middle Name:</span>
+          <input type="text" value={f.middleName} onChange={e => setField("middleName", e.target.value)} /></div>
+        <div className="ap-row"><span>Civil Status:</span>
+          <input type="text" value={f.civilStatus} onChange={e => setField("civilStatus", e.target.value)} /></div>
         <div className="ap-row">
           <span>Maiden Name:</span>
-          <input type="text" name="maidenName" placeholder="For Married Women" />
+          <input type="text" placeholder="For Married Women" value={f.maidenName} onChange={e => setField("maidenName", e.target.value)} />
         </div>
-        <div className="ap-row"><span>PhilHealth #:</span><input type="text" name="philHealth" /></div>
+        <div className="ap-row"><span>PhilHealth #:</span>
+          <input type="text" value={f.philHealth} onChange={e => setField("philHealth", e.target.value)} /></div>
         <div className="ap-row">
           <span>Name:</span>
-          <input type="text" name="memberName" placeholder="Last Name, First Name, Middle Name" />
+          <input type="text" placeholder="Last Name, First Name, Middle Name"
+            value={f.memberName} onChange={e => setField("memberName", e.target.value)} />
         </div>
-        <div className="ap-row"><span>Member's Birthday:</span><input type="date" name="memberBirthday" /></div>
+        <div className="ap-row"><span>Member's Birthday:</span>
+          <input type="date" value={f.memberBirthday} onChange={e => setField("memberBirthday", e.target.value)} /></div>
         <div className="ap-row">
           <span>Family Member:</span>
-          <label className="ap-cb"><input type="checkbox" name="familyMember" value="Head" />Head</label>
-          <label className="ap-cb"><input type="checkbox" name="familyMember" value="Spouse" />Spouse</label>
-          <label className="ap-cb"><input type="checkbox" name="familyMember" value="Child" />Child</label>
-          <label className="ap-cb"><input type="checkbox" name="familyMember" value="Others" />Others</label>
+          {["Head","Spouse","Child","Others"].map(opt => (
+            <label key={opt} className="ap-cb">
+              <input type="checkbox" checked={f.familyMember === opt}
+                onChange={() => setField("familyMember", opt)} />{opt}
+            </label>
+          ))}
         </div>
       </div>
       <div className="ap-info-col">
         <div className="ap-row">
-          <span>Birthday:</span><input type="date" name="birthday" className="ap-w130" />
-          <span className="ap-span-sm">Age:</span><input type="number" name="age" className="ap-w60" />
-          <span className="ap-span-sm">Sex:</span><input type="text" name="sex" className="ap-w60" />
+          <span>Birthday:</span><input type="date" className="ap-w130" value={f.birthday} onChange={e => setField("birthday", e.target.value)} />
+          <span className="ap-span-sm">Age:</span><input type="number" className="ap-w60" value={f.age} onChange={e => setField("age", e.target.value)} />
+          <span className="ap-span-sm">Sex:</span><input type="text" className="ap-w60" value={f.sex} onChange={e => setField("sex", e.target.value)} />
         </div>
-        <div className="ap-row"><span>BirthPlace:</span><input type="text" name="birthPlace" /></div>
-        <div className="ap-row"><span>Blood Type:</span><input type="text" name="bloodType" /></div>
-        <div className="ap-row"><span>Father's Name:</span><input type="text" name="fatherName" /></div>
-        <div className="ap-row"><span>Mother's Name:</span><input type="text" name="motherName" /></div>
-        <div className="ap-row"><span>Contact Number:</span><input type="text" name="contact" /></div>
-        <div className="ap-row"><span>Religion:</span><input type="text" name="religion" /></div>
-        <div className="ap-row"><span>Name of Spouse:</span><input type="text" name="spouseName" /></div>
-        <div className="ap-row"><span>Complete Address:</span><input type="text" name="address" /></div>
-        <div className="ap-row"><span>Educational Attainment:</span><input type="text" name="education" /></div>
+        <div className="ap-row"><span>BirthPlace:</span>
+          <input type="text" value={f.birthPlace} onChange={e => setField("birthPlace", e.target.value)} /></div>
+        <div className="ap-row"><span>Blood Type:</span>
+          <input type="text" value={f.bloodType} onChange={e => setField("bloodType", e.target.value)} /></div>
+        <div className="ap-row"><span>Father's Name:</span>
+          <input type="text" value={f.fatherName} onChange={e => setField("fatherName", e.target.value)} /></div>
+        <div className="ap-row"><span>Mother's Name:</span>
+          <input type="text" value={f.motherName} onChange={e => setField("motherName", e.target.value)} /></div>
+        <div className="ap-row"><span>Contact Number:</span>
+          <input type="text" value={f.contact} onChange={e => setField("contact", e.target.value)} /></div>
+        <div className="ap-row"><span>Religion:</span>
+          <input type="text" value={f.religion} onChange={e => setField("religion", e.target.value)} /></div>
+        <div className="ap-row"><span>Name of Spouse:</span>
+          <input type="text" value={f.spouseName} onChange={e => setField("spouseName", e.target.value)} /></div>
+        <div className="ap-row"><span>Complete Address:</span>
+          <input type="text" value={f.address} onChange={e => setField("address", e.target.value)} /></div>
+        <div className="ap-row"><span>Educational Attainment:</span>
+          <input type="text" value={f.education} onChange={e => setField("education", e.target.value)} /></div>
       </div>
 
-      {/* Female section */}
       <div className="ap-female-section">
         <p className="ap-female-title">For Female Patient Only:</p>
         <div className="ap-female-grid">
-          <div className="ap-row"><span>Age of Menarche Started:</span><input type="text" name="menarche" /></div>
-          <div className="ap-row"><span>LMP:</span><input type="text" name="lmp" /></div>
-          <div className="ap-row"><span>Gravidity:</span><input type="text" name="gravidity" /></div>
-          <div className="ap-row"><span>EDC (If Pregnant):</span><input type="text" name="edc" /></div>
-          <div className="ap-row"><span>Parity:</span><input type="text" name="parity" /></div>
+          <div className="ap-row"><span>Age of Menarche Started:</span>
+            <input type="text" value={f.menarche} onChange={e => setField("menarche", e.target.value)} /></div>
+          <div className="ap-row"><span>LMP:</span>
+            <input type="text" value={f.lmp} onChange={e => setField("lmp", e.target.value)} /></div>
+          <div className="ap-row"><span>Gravidity:</span>
+            <input type="text" value={f.gravidity} onChange={e => setField("gravidity", e.target.value)} /></div>
+          <div className="ap-row"><span>EDC (If Pregnant):</span>
+            <input type="text" value={f.edc} onChange={e => setField("edc", e.target.value)} /></div>
+          <div className="ap-row"><span>Parity:</span>
+            <input type="text" value={f.parity} onChange={e => setField("parity", e.target.value)} /></div>
         </div>
         <div className="ap-parity-row">
-          {["Full Term","Preterm","Abortion","Livebirth"].map(p => (
-            <div key={p} className="ap-parity-item">
-              <label>{p}</label>
-              <input type="text" name={p.toLowerCase().replace(" ", "")} />
+          {[["Full Term","fullterm"],["Preterm","preterm"],["Abortion","abortion"],["Livebirth","livebirth"]].map(([label, key]) => (
+            <div key={key} className="ap-parity-item">
+              <label>{label}</label>
+              <input type="text" value={f[key]} onChange={e => setField(key, e.target.value)} />
             </div>
           ))}
         </div>
