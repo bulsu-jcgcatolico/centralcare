@@ -540,3 +540,68 @@
 @media (max-width: 1024px) {
   .rhu-form-row { grid-template-columns: 1fr; }
 }
+
+/* ── New Distribution Modal — manual barangay + items entry ──────────────────── */
+.rhu-new-dist-items-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 8px;
+  margin-top: 1.25rem;
+}
+.rhu-new-dist-items-header span {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.rhu-new-dist-item-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 28px;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.rhu-new-dist-item-row:has(button:nth-child(2)) {
+  grid-template-columns: 1fr 1fr;
+}
+
+.rhu-new-dist-remove-btn {
+  width: 28px;
+  height: 28px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  color: #dc2626;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.rhu-new-dist-remove-btn:hover { background: #fee2e2; }
+
+.rhu-add-item-btn {
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+.rhu-add-item-btn:hover { background: #f9fafb; border-color: #9ca3af; }
+
+@media (max-width: 600px) {
+  .rhu-new-dist-items-header,
+  .rhu-new-dist-item-row {
+    grid-template-columns: 1fr;
+  }
+}

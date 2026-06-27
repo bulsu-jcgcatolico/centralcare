@@ -18,19 +18,6 @@ const navItems = [
   { label: "Notifications", to: "/rhu/notifications"  },
 ];
 
-// Default barangay population percentages (editable in the modal)
-const DEFAULT_BARANGAYS = [
-  { id: 1, name: "Longos",     populationPercent: 0.15 },
-  { id: 2, name: "Caingin",    populationPercent: 0.12 },
-  { id: 3, name: "Catmon",     populationPercent: 0.18 },
-  { id: 4, name: "Bulihan",    populationPercent: 0.10 },
-  { id: 5, name: "Guinihawa",  populationPercent: 0.08 },
-  { id: 6, name: "Liang",      populationPercent: 0.11 },
-  { id: 7, name: "Lugam",      populationPercent: 0.09 },
-  { id: 8, name: "Mojon",      populationPercent: 0.10 },
-  { id: 9, name: "Bangkal",    populationPercent: 0.07 },
-];
-
 export default function RHUDistribution() {
   const { logout, user, userData } = useAuth();
   const navigate = useNavigate();
@@ -42,12 +29,10 @@ export default function RHUDistribution() {
   const [saving, setSaving]                 = useState(false);
   const [distributingId, setDistributingId] = useState(null);
 
-  // New distribution modal
-  const [showNewModal, setShowNewModal]     = useState(false);
-  const [selectedInvId, setSelectedInvId]  = useState("");
-  const [totalBoxes, setTotalBoxes]         = useState("");
-  const [barangays, setBarangays]           = useState(DEFAULT_BARANGAYS);
-  const [calculatedDist, setCalculatedDist] = useState([]);
+  // New distribution modal — manual entry (barangay name + item list)
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [barangayName, setBarangayName] = useState("");
+  const [items, setItems] = useState([{ id: 1, name: "", quantity: "" }]);
 
   // Review modal
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -85,106 +70,105 @@ export default function RHUDistribution() {
     setLoading(false);
   }
 
-  // Update a barangay's population percent in the editable table
-  function updateBarangayPercent(id, value) {
-    setBarangays(barangays.map(b =>
-      b.id === id ? { ...b, populationPercent: parseFloat(value) / 100 || 0 } : b
-    ));
-    setCalculatedDist([]); // reset calc when % changes
+  // Item row management for the New Distribution modal
+  function addItemRow() {
+    setItems(prev => [...prev, { id: Date.now(), name: "", quantity: "" }]);
   }
-
-  // Auto-calculate boxes per barangay
-  function calculateDistribution() {
-    const total = parseInt(totalBoxes);
-    if (!total || total <= 0) { alert("Enter a valid number of boxes"); return; }
-    const item = inventory.find(i => i.id === selectedInvId);
-    if (!item) { alert("Please select a medicine"); return; }
-    const avail = item.remaining ?? item.quantity;
-    if (total > avail) { alert(`Only ${avail} boxes remaining!`); return; }
-
-    const totalPercent = barangays.reduce((s, b) => s + b.populationPercent, 0);
-    if (Math.abs(totalPercent - 1) > 0.02) {
-      alert(`Population % total is ${(totalPercent * 100).toFixed(0)}% — should equal 100%. Please adjust.`);
-      return;
-    }
-
-    let rem = total;
-    const result = barangays.map((b, i) => {
-      const boxes = i === barangays.length - 1
-        ? rem
-        : Math.round(total * b.populationPercent);
-      rem -= boxes;
-      return { ...b, boxes, status: "Pending" };
-    });
-    setCalculatedDist(result);
+  function removeItemRow(id) {
+    if (items.length > 1) setItems(prev => prev.filter(it => it.id !== id));
+  }
+  function updateItemRow(id, field, value) {
+    setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: value } : it));
+  }
+  function resetNewModal() {
+    setBarangayName("");
+    setItems([{ id: 1, name: "", quantity: "" }]);
   }
 
   // Save plan + deduct inventory + notify all barangays
+  // Save manual distribution — one barangay, one or more items
   async function saveDistributionPlan() {
-    if (calculatedDist.length === 0) return;
+    if (!barangayName.trim()) { alert("Please enter the barangay name."); return; }
+    const validItems = items.filter(it => it.name.trim() && parseInt(it.quantity) > 0);
+    if (validItems.length === 0) { alert("Please enter at least one item with a name and quantity."); return; }
+
     setSaving(true);
     try {
-      const item = inventory.find(i => i.id === selectedInvId);
-      const total = parseInt(totalBoxes);
-
-      // 1. Save distribution record
-      const docRef = await addDoc(collection(db, "rhu_distributions"), {
-        fromType:             "rhu",
-        fromRhuId:            userData?.rhuId  ?? "",
-        fromRhuName:          userData?.rhuName ?? "",
-        inventoryId:          selectedInvId,
-        medicineName:         item.name,
-        totalBoxes:           total,
-        barangayDistribution: calculatedDist,
-        status:               "Pending",
-        createdBy:            user?.uid ?? "",
-        createdAt:            serverTimestamp(),
-        date:                 new Date().toLocaleDateString()
+      // Match each typed item name against RHU's own inventory (case-insensitive)
+      // to find the matching stock to deduct from. If not found, still proceed
+      // (allows distributing items not tracked in inventory, e.g. donated stock).
+      const itemDetails = validItems.map(it => {
+        const qty = parseInt(it.quantity);
+        const invMatch = inventory.find(
+          i => i.name.trim().toLowerCase() === it.name.trim().toLowerCase()
+        );
+        return { name: it.name.trim(), boxes: qty, invMatch };
       });
 
-      // 2. Deduct remaining from inventory
-      const newRemaining = (item.remaining ?? item.quantity) - total;
-      await updateDoc(doc(db, "inventory", selectedInvId), { remaining: newRemaining });
-      await checkAndNotifyLowStock({ id: selectedInvId, name: item.name, remaining: newRemaining }, "rhu", userData);
+      const totalBoxesAll = itemDetails.reduce((s, it) => s + it.boxes, 0);
 
-      // 3. Write to barangay_inventory + notify each barangay
-      for (const b of calculatedDist) {
-        // Create inventory record for midwife to see and dispense from
+      // 1. Save the distribution record for this barangay
+      const docRef = await addDoc(collection(db, "rhu_distributions"), {
+        fromType:    "rhu",
+        fromRhuId:   userData?.rhuId  ?? "",
+        fromRhuName: userData?.rhuName ?? "",
+        medicineName: itemDetails.map(it => it.name).join(", "),
+        totalBoxes:   totalBoxesAll,
+        barangayDistribution: [{
+          id:     barangayName.trim().toLowerCase().replace(/\s+/g, "-"),
+          name:   barangayName.trim(),
+          boxes:  totalBoxesAll,
+          items:  itemDetails.map(it => ({ name: it.name, boxes: it.boxes })),
+          status: "Pending",
+        }],
+        status:    "Pending",
+        createdBy: user?.uid ?? "",
+        createdAt: serverTimestamp(),
+        date:      new Date().toLocaleDateString()
+      });
+
+      // 2. For each item: deduct from RHU inventory (if matched) + create midwife inventory + notify
+      for (const it of itemDetails) {
+        if (it.invMatch) {
+          const newRemaining = (it.invMatch.remaining ?? it.invMatch.quantity) - it.boxes;
+          await updateDoc(doc(db, "inventory", it.invMatch.id), { remaining: newRemaining });
+          await checkAndNotifyLowStock({ id: it.invMatch.id, name: it.invMatch.name, remaining: newRemaining }, "rhu", userData);
+        }
+
         await addDoc(collection(db, "inventory"), {
-          productKey:    item.productKey ?? "",
-          name:          item.name,
-          category:      item.category ?? "",
-          subCategory:   item.subCategory ?? "",
-          quantity:      b.boxes,
-          remaining:     b.boxes,
-          expiry:        item.expiry ?? "",
-          source:        "RHU",
-          ownerType:     "midwife",
-          barangayName:  b.name,
-          fromRhuId:     userData?.rhuId  ?? "",
-          fromRhuName:   userData?.rhuName ?? "",
+          productKey:   it.invMatch?.productKey ?? "",
+          name:         it.name,
+          category:     it.invMatch?.category ?? "",
+          subCategory:  it.invMatch?.subCategory ?? "",
+          quantity:     it.boxes,
+          remaining:    it.boxes,
+          expiry:       it.invMatch?.expiry ?? "",
+          source:       "RHU",
+          ownerType:    "midwife",
+          barangayName: barangayName.trim(),
+          fromRhuId:    userData?.rhuId  ?? "",
+          fromRhuName:  userData?.rhuName ?? "",
           distributionId: docRef.id,
-          createdAt:     serverTimestamp(),
-        });
-
-        // Notify barangay midwife
-        await addDoc(collection(db, "notifications"), {
-          type:           "distribution",
-          title:          "New Supply from RHU",
-          message:        `${userData?.rhuName} has allocated ${b.boxes} boxes of ${item.name} for ${b.name} barangay.`,
-          toBarangayName: b.name,
-          fromRhuId:      userData?.rhuId  ?? "",
-          fromRhuName:    userData?.rhuName ?? "",
-          distributionId: docRef.id,
-          read:           false,
-          createdAt:      serverTimestamp()
+          createdAt:    serverTimestamp(),
         });
       }
 
-      alert("Distribution plan saved! All barangays have been notified.");
+      // 3. Notify the barangay midwife once for the whole delivery
+      await addDoc(collection(db, "notifications"), {
+        type:           "distribution",
+        title:          "New Supply from RHU",
+        message:        `${userData?.rhuName} has sent ${totalBoxesAll} boxes (${itemDetails.map(it => it.name).join(", ")}) to ${barangayName.trim()} barangay.`,
+        toBarangayName: barangayName.trim(),
+        fromRhuId:      userData?.rhuId  ?? "",
+        fromRhuName:    userData?.rhuName ?? "",
+        distributionId: docRef.id,
+        read:           false,
+        createdAt:      serverTimestamp()
+      });
+
+      alert("Distribution added! The barangay has been notified.");
       setShowNewModal(false);
-      setSelectedInvId(""); setTotalBoxes(""); setCalculatedDist([]);
-      setBarangays(DEFAULT_BARANGAYS);
+      resetNewModal();
       loadDistributions();
       loadInventory();
     } catch (err) { alert("Error: " + err.message); }
@@ -455,115 +439,45 @@ export default function RHUDistribution() {
 
       {/* ── New Distribution Modal ── */}
       {showNewModal && (
-        <div className="rhu-modal-overlay" onClick={() => setShowNewModal(false)}>
-          <div className="rhu-modal rhu-modal--lg" onClick={e => e.stopPropagation()}>
+        <div className="rhu-modal-overlay" onClick={() => { setShowNewModal(false); resetNewModal(); }}>
+          <div className="rhu-modal" onClick={e => e.stopPropagation()}>
             <div className="rhu-modal-header">
-              <h2 className="rhu-modal-title">Auto Calculate Distribution</h2>
-              <button className="rhu-modal-close" onClick={() => setShowNewModal(false)}>×</button>
+              <h2 className="rhu-modal-title">New Distribution</h2>
+              <button className="rhu-modal-close" onClick={() => { setShowNewModal(false); resetNewModal(); }}>×</button>
             </div>
             <div className="rhu-modal-body">
 
-              {/* Medicine + Total Boxes */}
-              <div className="rhu-dist-calc-row">
-                <div className="rhu-form-field" style={{ flex: 2 }}>
-                  <label className="rhu-label">Select Medicine from Inventory</label>
-                  <select className="rhu-input" value={selectedInvId}
-                    onChange={e => { setSelectedInvId(e.target.value); setCalculatedDist([]); }}>
-                    <option value="">-- Select Medicine --</option>
-                    {inventory.map(item => (
-                      <option key={item.id} value={item.id}>
-                        {item.name} ({item.remaining ?? item.quantity} boxes available)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="rhu-form-field" style={{ flex: 1 }}>
-                  <label className="rhu-label">Total Boxes to Distribute</label>
-                  <input className="rhu-input" type="number" placeholder="e.g., 90"
-                    value={totalBoxes}
-                    onChange={e => { setTotalBoxes(e.target.value); setCalculatedDist([]); }} />
-                </div>
+              <div className="rhu-form-field">
+                <label className="rhu-label">Enter Barangay</label>
+                <input className="rhu-input" type="text" placeholder="e.g., Longos"
+                  value={barangayName} onChange={e => setBarangayName(e.target.value)} />
               </div>
 
-              {/* Editable Barangay % Table */}
-              <p className="rhu-dist-note" style={{ marginBottom: "8px" }}>
-                Edit population % per barangay if needed (total must equal 100%):
-              </p>
-              <div className="rhu-barangay-pct-table">
-                <div className="rhu-barangay-pct-header">
-                  <span>BARANGAY</span>
-                  <span>POPULATION %</span>
-                </div>
-                {barangays.map(b => (
-                  <div key={b.id} className="rhu-barangay-pct-row">
-                    <span>{b.name}</span>
-                    <div className="rhu-pct-input-wrap">
-                      <input
-                        className="rhu-input rhu-pct-input"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        value={(b.populationPercent * 100).toFixed(1)}
-                        onChange={e => updateBarangayPercent(b.id, e.target.value)}
-                      />
-                      <span className="rhu-pct-symbol">%</span>
-                    </div>
-                  </div>
-                ))}
-                <div className="rhu-barangay-pct-total">
-                  <span>Total</span>
-                  <span className={
-                    Math.abs(barangays.reduce((s, b) => s + b.populationPercent, 0) - 1) > 0.02
-                      ? "rhu-pct-total--warn"
-                      : "rhu-pct-total--ok"
-                  }>
-                    {(barangays.reduce((s, b) => s + b.populationPercent, 0) * 100).toFixed(1)}%
-                  </span>
-                </div>
+              <div className="rhu-new-dist-items-header">
+                <span>Item Name/s</span>
+                <span>Total Quantity</span>
               </div>
+              {items.map(it => (
+                <div key={it.id} className="rhu-new-dist-item-row">
+                  <input className="rhu-input" type="text" placeholder="e.g., Paracetamol 500mg Tablet"
+                    value={it.name} onChange={e => updateItemRow(it.id, "name", e.target.value)} />
+                  <input className="rhu-input" type="number" placeholder="e.g., 20"
+                    value={it.quantity} onChange={e => updateItemRow(it.id, "quantity", e.target.value)} />
+                  {items.length > 1 && (
+                    <button className="rhu-new-dist-remove-btn" onClick={() => removeItemRow(it.id)}>×</button>
+                  )}
+                </div>
+              ))}
 
-              <button className="rhu-btn-secondary" style={{ marginTop: "1rem", marginBottom: "1rem" }}
-                onClick={calculateDistribution}>
-                Calculate
+              <button className="rhu-add-item-btn" onClick={addItemRow}>
+                <span style={{ fontSize: "16px", lineHeight: 1 }}>+</span> Add Item
               </button>
-
-              {/* Calculated result table */}
-              {calculatedDist.length > 0 && (
-                <>
-                  <p className="rhu-dist-note">Calculated distribution:</p>
-                  <table className="rhu-inv-table">
-                    <thead>
-                      <tr>
-                        <th>BARANGAY</th>
-                        <th>POPULATION %</th>
-                        <th>BOXES TO RECEIVE</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {calculatedDist.map(b => (
-                        <tr key={b.id}>
-                          <td><strong>{b.name}</strong></td>
-                          <td>{(b.populationPercent * 100).toFixed(1)}%</td>
-                          <td><strong>{b.boxes} boxes</strong></td>
-                        </tr>
-                      ))}
-                      <tr className="rhu-table-total">
-                        <td colSpan={2}><strong>Total</strong></td>
-                        <td><strong>{calculatedDist.reduce((s, b) => s + b.boxes, 0)} boxes</strong></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </>
-              )}
             </div>
             <div className="rhu-modal-footer">
-              <button className="rhu-btn-secondary" onClick={() => setShowNewModal(false)}>Cancel</button>
-              {calculatedDist.length > 0 && (
-                <button className="rhu-btn-primary" onClick={saveDistributionPlan} disabled={saving}>
-                  {saving ? "Saving..." : "Save & Notify All Barangays"}
-                </button>
-              )}
+              <button className="rhu-btn-secondary" onClick={() => { setShowNewModal(false); resetNewModal(); }}>Cancel</button>
+              <button className="rhu-btn-primary" onClick={saveDistributionPlan} disabled={saving}>
+                {saving ? "Adding..." : "Add"}
+              </button>
             </div>
           </div>
         </div>
@@ -580,6 +494,17 @@ export default function RHUDistribution() {
             <div className="rhu-modal-body">
               <div className="rhu-review-row"><span>Medicine</span><strong>{reviewData.dist.medicineName}</strong></div>
               <div className="rhu-review-row"><span>Boxes Allocated</span><strong>{reviewData.b.boxes} boxes</strong></div>
+              {Array.isArray(reviewData.b.items) && reviewData.b.items.length > 1 && (
+                <div style={{ margin: "10px 0", padding: "10px 12px", background: "#f9fafb", borderRadius: "8px" }}>
+                  <p style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", margin: "0 0 6px" }}>ITEMS</p>
+                  {reviewData.b.items.map((it, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", padding: "3px 0" }}>
+                      <span>{it.name}</span>
+                      <strong>{it.boxes} boxes</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="rhu-review-row">
                 <span>Status</span>
                 <span className={`rhu-inv-status-badge ${reviewData.b.status === "Distributed" ? "rhu-status--completed" : "rhu-status--pending"}`}>
