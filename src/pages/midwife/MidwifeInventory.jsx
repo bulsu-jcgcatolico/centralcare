@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
-  collection, addDoc, getDocs, doc,
+  collection, addDoc, getDocs, doc, deleteDoc,
   serverTimestamp, query, where, updateDoc
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
@@ -90,26 +90,55 @@ export default function MidwifeInventory() {
     setSaving(true);
     try {
       const boxes = parseInt(shipBoxes);
-      await addDoc(collection(db, "inventory"), {
-        productKey:    generateProductKey(),
-        name:          shipProductName.trim(),
-        category:      shipCategory,
-        subCategory:   shipSubCategory.trim(),
-        quantity:      boxes,
-        remaining:     boxes,
-        expiry:        shipExpiry,
-        source:        shipSource,
-        ownerType:     "midwife",
-        barangayName:  userData?.barangayName ?? "",
-        createdAt:     serverTimestamp(),
-      });
-      alert("Shipment logged successfully!");
+      const trimmedName = shipProductName.trim();
+
+      // Check if an item with the exact same name already exists in this barangay's inventory
+      const existing = inventory.find(
+        i => i.name.trim().toLowerCase() === trimmedName.toLowerCase()
+      );
+
+      if (existing) {
+        // Merge: add the new boxes to the existing item instead of duplicating
+        const newQuantity  = (existing.quantity  ?? 0) + boxes;
+        const newRemaining = (existing.remaining ?? 0) + boxes;
+        await updateDoc(doc(db, "inventory", existing.id), {
+          quantity:  newQuantity,
+          remaining: newRemaining,
+          expiry: shipExpiry, source: shipSource,
+          category: shipCategory, subCategory: shipSubCategory.trim(),
+        });
+        alert(`${trimmedName} already exists — added ${boxes} boxes to existing stock (new total: ${newRemaining} boxes).`);
+      } else {
+        await addDoc(collection(db, "inventory"), {
+          productKey:    generateProductKey(),
+          name:          trimmedName,
+          category:      shipCategory,
+          subCategory:   shipSubCategory.trim(),
+          quantity:      boxes,
+          remaining:     boxes,
+          expiry:        shipExpiry,
+          source:        shipSource,
+          ownerType:     "midwife",
+          barangayName:  userData?.barangayName ?? "",
+          createdAt:     serverTimestamp(),
+        });
+        alert("Shipment logged successfully!");
+      }
+
       setShipProductName(""); setShipCategory("General Consumption");
       setShipSubCategory(""); setShipBoxes(""); setShipExpiry(""); setShipSource("");
       setShowShipmentModal(false);
       loadInventory();
     } catch (err) { alert("Error: " + err.message); }
     setSaving(false);
+  }
+
+  async function deleteItem(id) {
+    if (!confirm("Delete this item? This cannot be undone.")) return;
+    try {
+      await deleteDoc(doc(db, "inventory", id));
+      setInventory(inventory.filter(i => i.id !== id));
+    } catch (err) { alert("Error: " + err.message); }
   }
 
   // ── Dispense items ──────────────────────────────────────────────────────────
@@ -319,6 +348,7 @@ export default function MidwifeInventory() {
                     <th>REMAINING</th>
                     <th>EXPIRY</th>
                     <th>STATUS</th>
+                    <th>ACTION</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -342,6 +372,12 @@ export default function MidwifeInventory() {
                             <span className={`midwife-status-dot midwife-dot--${getStatus(remaining).toLowerCase()}`} />
                             {getStatus(remaining)}
                           </span>
+                        </td>
+                        <td>
+                          <button className="midwife-btn-icon midwife-btn-icon--danger"
+                            onClick={() => deleteItem(item.id)}>
+                            Delete
+                          </button>
                         </td>
                       </tr>
                     );

@@ -3,7 +3,7 @@ import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
   collection, addDoc, getDocs, deleteDoc, doc,
-  serverTimestamp, query, where
+  serverTimestamp, query, where, updateDoc
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import "./RHUInventory.css";
@@ -75,28 +75,49 @@ export default function RHUInventory() {
     setSaving(true);
     try {
       const qty = parseInt(quantity);
-      await addDoc(collection(db, "inventory"), {
-        productKey: generateProductKey(),
-        name: productName,
-        category,
-        subCategory,
-        quantity: qty,
-        remaining: qty,
-        tabletsPerBox: parseInt(tabletsPerBox) || 30,
-        source,
-        expiry,
-        ownerType: "rhu",
-        rhuId: userData?.rhuId,
-        rhuName: userData?.rhuName,
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
-      });
-      alert("✅ Item saved successfully!");
+      const trimmedName = productName.trim();
+
+      // Check if an item with the exact same name already exists in this RHU's inventory
+      const existing = inventory.find(
+        i => i.name.trim().toLowerCase() === trimmedName.toLowerCase()
+      );
+
+      if (existing) {
+        // Merge: add the new quantity to the existing item instead of duplicating
+        const newQuantity  = (existing.quantity  ?? 0) + qty;
+        const newRemaining = (existing.remaining ?? 0) + qty;
+        await updateDoc(doc(db, "inventory", existing.id), {
+          quantity:  newQuantity,
+          remaining: newRemaining,
+          tabletsPerBox: parseInt(tabletsPerBox) || existing.tabletsPerBox || 30,
+          expiry, source, category, subCategory,
+        });
+        alert(`${trimmedName} already exists — added ${qty} boxes to existing stock (new total: ${newRemaining} boxes).`);
+      } else {
+        await addDoc(collection(db, "inventory"), {
+          productKey: generateProductKey(),
+          name: trimmedName,
+          category,
+          subCategory,
+          quantity: qty,
+          remaining: qty,
+          tabletsPerBox: parseInt(tabletsPerBox) || 30,
+          source,
+          expiry,
+          ownerType: "rhu",
+          rhuId: userData?.rhuId,
+          rhuName: userData?.rhuName,
+          createdBy: user.uid,
+          createdAt: serverTimestamp(),
+        });
+        alert("Item saved successfully!");
+      }
+
       setProductName(""); setCategory("General Consumption");
       setSubCategory(""); setQuantity(""); setTabletsPerBox(""); setSource(""); setExpiry("");
       setShowAddModal(false);
       loadInventory();
-    } catch (err) { alert("❌ Error: " + err.message); }
+    } catch (err) { alert("Error: " + err.message); }
     setSaving(false);
   }
 
