@@ -22,91 +22,116 @@
   margin: 0;
 }
 
-/* ── Reports Card ────────────────────────────────────────────────────────────── */
-.midwife-reports-card {
+/* ── Stats Grid (4 columns, used by Reports page) ────────────────────────────── */
+.midwife-stats-grid--4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (max-width: 1100px) {
+  .midwife-stats-grid--4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .midwife-stats-grid--4 { grid-template-columns: 1fr; }
+}
+
+.midwife-stat-card-box {
   background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
+  border-radius: 12px;
+  padding: 1.1rem 1.4rem;
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
-
-.midwife-reports-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #0f172a;
-  margin: 0 0 1rem;
+.midwife-stat-icon-box {
+  width: 42px; height: 42px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
 }
+.midwife-stat-icon-box.blue   { background: #eff6ff; color: #1a56db; }
+.midwife-stat-icon-box.green  { background: #f0fdf4; color: #16a34a; }
+.midwife-stat-icon-box.orange { background: #fff7ed; color: #ea580c; }
+.midwife-stat-icon-box.purple { background: #f5f3ff; color: #7c3aed; }
+.midwife-stat-label-box { font-size: 12px; color: #6b7280; font-weight: 500; margin: 0 0 4px; }
+.midwife-stat-value-box { font-size: 26px; font-weight: 700; color: #0f172a; margin: 0; line-height: 1; }
 
-.midwife-reports-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.5rem;
-}
-
-.midwife-reports-item {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+/* ── Buttons ──────────────────────────────────────────────────────────────────── */
+.midwife-btn-secondary {
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
   border-radius: 8px;
-  padding: 1rem;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
 }
+.midwife-btn-secondary:hover { background: #f9fafb; border-color: #9ca3af; }
 
-.midwife-reports-item:hover {
-  border-color: #1a56db;
-  background: #eff6ff;
-  box-shadow: 0 2px 4px rgba(26, 86, 219, 0.1);
+/* ── Input (used for month filter dropdown) ──────────────────────────────────── */
+.midwife-input {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 14px;
+  color: #0f172a;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.2s;
 }
+.midwife-input:focus { border-color: #1a56db; box-shadow: 0 0 0 3px rgba(26,86,219,0.1); }
 
-.midwife-reports-item-icon {
-  font-size: 24px;
-  margin-bottom: 0.5rem;
-}
-
-.midwife-reports-item-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #374151;
-  margin: 0;
-}
-
-.midwife-reports-item-desc {
-  font-size: 11px;
-  color: #9ca3af;
-  margin: 4px 0 0;
+/* ── Section (table wrapper card) ────────────────────────────────────────────── */
+.midwife-section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 /* ── Reports Table ─────────────────────────────────────────────────────────── */
-.midwife-reports-table {
+.midwife-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
 }
-
-.midwife-reports-table thead {
-  background: #f3f4f6;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.midwife-reports-table th {
-  padding: 12px;
+.midwife-table thead { background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+.midwife-table th {
+  padding: 11px 14px;
   text-align: left;
   font-weight: 600;
-  color: #374151;
-}
-
-.midwife-reports-table td {
-  padding: 12px;
-  border-bottom: 1px solid #e5e7eb;
   color: #6b7280;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
 }
+.midwife-table tbody tr { border-bottom: 1px solid #f3f4f6; transition: background 0.15s; }
+.midwife-table tbody tr:hover { background: #f9fafb; }
+.midwife-table tbody tr:last-child { border-bottom: none; }
+.midwife-table td { padding: 14px; color: #374151; }
+.midwife-table td strong { color: #0f172a; font-weight: 600; }
 
-.midwife-reports-table tbody tr:hover {
-  background: #f9fafb;
+/* ── Empty State ───────────────────────────────────────────────────────────── */
+.midwife-empty-state {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 4rem 2rem;
+  text-align: center;
 }
+.midwife-empty-icon {
+  width: 80px; height: 80px; margin: 0 auto 1.5rem;
+  background: #f3f4f6; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; color: #9ca3af;
+}
+.midwife-empty-title { font-size: 20px; font-weight: 600; color: #0f172a; margin: 0 0 8px; }
+.midwife-empty-text  { font-size: 14px; color: #6b7280; max-width: 480px; margin: 0 auto 2rem; line-height: 1.6; }
 
-/* ── Status Badge ──────────────────────────────────────────────────────────── */
+/* ── Status Badge (used inline in table rows) ────────────────────────────────── */
 .midwife-status-badge {
   display: inline-block;
   padding: 4px 12px;
@@ -114,18 +139,38 @@
   font-size: 11px;
   font-weight: 600;
 }
+.midwife-status-badge.success { background: #dcfce7; color: #16a34a; }
+.midwife-status-badge.warning { background: #fef3c7; color: #d97706; }
+.midwife-status-badge.danger  { background: #fee2e2; color: #dc2626; }
 
-.midwife-status-badge.success {
-  background: #dcfce7;
-  color: #16a34a;
-}
-
-.midwife-status-badge.warning {
-  background: #fef3c7;
-  color: #d97706;
-}
-
-.midwife-status-badge.danger {
-  background: #fee2e2;
-  color: #dc2626;
+/* ── Print styles ───────────────────────────────────────────────────────────── */
+@media print {
+  .midwife-sidebar,
+  .midwife-topbar {
+    display: none !important;
+  }
+  .midwife-page-header select,
+  .midwife-page-header button {
+    display: none !important;
+  }
+  .midwife-layout {
+    display: block !important;
+    height: auto !important;
+  }
+  .midwife-main {
+    overflow: visible !important;
+  }
+  .midwife-content {
+    overflow: visible !important;
+    height: auto !important;
+    padding: 0 !important;
+  }
+  .midwife-section,
+  .midwife-stat-card-box {
+    border: 1px solid #000 !important;
+    box-shadow: none !important;
+  }
+  .midwife-table {
+    font-size: 11px;
+  }
 }

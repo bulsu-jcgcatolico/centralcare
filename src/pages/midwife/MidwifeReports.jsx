@@ -168,11 +168,16 @@ export default function MidwifeReports() {
                 Monthly summary for {userData?.barangayName} — patients, inventory, and dispensing.
               </p>
             </div>
-            <select className="midwife-input" style={{ width: "auto", minWidth: "160px" }}
-              value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
-              <option value="all">All Months</option>
-              {months.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <select className="midwife-input" style={{ width: "auto", minWidth: "160px" }}
+                value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
+                <option value="all">All Months</option>
+                {months.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+              <button className="midwife-btn-secondary" onClick={() => window.print()}>
+                Print / Export PDF
+              </button>
+            </div>
           </div>
 
           {/* Monthly Stats */}

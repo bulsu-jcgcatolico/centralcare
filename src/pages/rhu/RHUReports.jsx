@@ -131,11 +131,16 @@ export default function RHUReports() {
               <h1 className="rhu-page-title">Activity Reports</h1>
               <p className="rhu-page-sub">Monthly summary of inventory and distribution activities for {userData?.rhuName}.</p>
             </div>
-            <select className="rhu-input" style={{ width: "auto", minWidth: "160px" }}
-              value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
-              <option value="all">All Months</option>
-              {months.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <select className="rhu-input" style={{ width: "auto", minWidth: "160px" }}
+                value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
+                <option value="all">All Months</option>
+                {months.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+              <button className="rhu-btn-secondary" onClick={() => window.print()}>
+                Print / Export PDF
+              </button>
+            </div>
           </div>
 
           <div className="rhu-stats-grid rhu-stats-grid--3">

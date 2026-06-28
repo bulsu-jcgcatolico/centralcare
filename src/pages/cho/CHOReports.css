@@ -59,3 +59,35 @@
     white-space: nowrap;
   }
 }
+
+/* ── Print styles ───────────────────────────────────────────────────────────── */
+@media print {
+  .cho-sidebar,
+  .cho-topbar {
+    display: none !important;
+  }
+  .cho-page-header select,
+  .cho-page-header button {
+    display: none !important;
+  }
+  .cho-layout {
+    display: block !important;
+    height: auto !important;
+  }
+  .cho-main {
+    overflow: visible !important;
+  }
+  .cho-content {
+    overflow: visible !important;
+    height: auto !important;
+    padding: 0 !important;
+  }
+  .cho-section,
+  .cho-stat-card {
+    border: 1px solid #000 !important;
+    box-shadow: none !important;
+  }
+  .cho-table {
+    font-size: 11px;
+  }
+}

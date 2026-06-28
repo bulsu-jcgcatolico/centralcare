@@ -145,12 +145,17 @@ export default function CHOReports() {
               <h1 className="cho-page-title">Activity Reports</h1>
               <p className="cho-page-sub">Monthly summary of inventory additions and distributions.</p>
             </div>
-            {/* Month filter */}
-            <select className="cho-input" style={{ width: "auto", minWidth: "160px" }}
-              value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
-              <option value="all">All Months</option>
-              {months.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              {/* Month filter */}
+              <select className="cho-input" style={{ width: "auto", minWidth: "160px" }}
+                value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
+                <option value="all">All Months</option>
+                {months.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+              <button className="cho-btn-secondary" onClick={() => window.print()}>
+                Print / Export PDF
+              </button>
+            </div>
           </div>
 
           {/* Monthly Stats */}
