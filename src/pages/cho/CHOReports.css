@@ -62,6 +62,18 @@
 
 /* ── Print styles ───────────────────────────────────────────────────────────── */
 @media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  body, html {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
   .cho-sidebar,
   .cho-topbar {
     display: none !important;
@@ -70,24 +82,54 @@
   .cho-page-header button {
     display: none !important;
   }
+
   .cho-layout {
     display: block !important;
     height: auto !important;
-  }
-  .cho-main {
+    background: #fff !important;
     overflow: visible !important;
   }
+  .cho-main {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    width: 100% !important;
+  }
   .cho-content {
+    display: block !important;
     overflow: visible !important;
     height: auto !important;
     padding: 0 !important;
+    background: #fff !important;
+    gap: 1rem !important;
   }
+
+  .cho-page-header {
+    margin-bottom: 1rem !important;
+  }
+  .cho-page-title { color: #000 !important; }
+  .cho-page-sub   { color: #333 !important; }
+
   .cho-section,
-  .cho-stat-card {
-    border: 1px solid #000 !important;
+  .cho-stat-card,
+  .cho-stat-card-box {
+    border: 1px solid #999 !important;
     box-shadow: none !important;
+    background: #fff !important;
+    break-inside: avoid;
   }
-  .cho-table {
-    font-size: 11px;
+
+  .cho-table,
+  .cho-reports-table {
+    font-size: 11px !important;
+    width: 100% !important;
   }
+  .cho-table th,
+  .cho-table td {
+    border-color: #999 !important;
+    color: #000 !important;
+  }
+
+  /* Avoid splitting a table row across pages */
+  tr { break-inside: avoid; }
 }
