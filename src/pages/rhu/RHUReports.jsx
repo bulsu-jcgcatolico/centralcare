@@ -82,7 +82,7 @@ export default function RHUReports() {
 
   return (
     <div className="rhu-layout">
-      <aside className="rhu-sidebar">
+      <aside className="rhu-sidebar no-print">
         <div className="rhu-brand">
           <div className="rhu-brand-icon">
             <svg viewBox="0 0 24 24" fill="white" width="20" height="20">
@@ -112,7 +112,7 @@ export default function RHUReports() {
       </aside>
 
       <div className="rhu-main">
-        <header className="rhu-topbar">
+        <header className="rhu-topbar no-print">
           <input className="rhu-search" type="text" placeholder="Search reports..." />
           <div className="rhu-topbar-right">
             <div className="rhu-user">
@@ -131,7 +131,7 @@ export default function RHUReports() {
               <h1 className="rhu-page-title">Activity Reports</h1>
               <p className="rhu-page-sub">Monthly summary of inventory and distribution activities for {userData?.rhuName}.</p>
             </div>
-            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <div className="no-print" style={{ display: "flex", gap: "10px", alignItems: "center" }}>
               <select className="rhu-input" style={{ width: "auto", minWidth: "160px" }}
                 value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
                 <option value="all">All Months</option>

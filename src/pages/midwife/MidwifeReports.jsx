@@ -115,7 +115,7 @@ export default function MidwifeReports() {
 
   return (
     <div className="midwife-layout">
-      <aside className="midwife-sidebar">
+      <aside className="midwife-sidebar no-print">
         <div className="midwife-brand">
           <div className="midwife-brand-icon">
             <svg viewBox="0 0 24 24" fill="white" width="20" height="20">
@@ -147,7 +147,7 @@ export default function MidwifeReports() {
       </aside>
 
       <div className="midwife-main">
-        <header className="midwife-topbar">
+        <header className="midwife-topbar no-print">
           <input className="midwife-search" type="text" placeholder="Search reports..." />
           <div className="midwife-topbar-right">
             <div className="midwife-user">
@@ -168,7 +168,7 @@ export default function MidwifeReports() {
                 Monthly summary for {userData?.barangayName} — patients, inventory, and dispensing.
               </p>
             </div>
-            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <div className="no-print" style={{ display: "flex", gap: "10px", alignItems: "center" }}>
               <select className="midwife-input" style={{ width: "auto", minWidth: "160px" }}
                 value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
                 <option value="all">All Months</option>

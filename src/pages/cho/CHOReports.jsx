@@ -96,7 +96,7 @@ export default function CHOReports() {
 
   return (
     <div className="cho-layout">
-      <aside className="cho-sidebar">
+      <aside className="cho-sidebar no-print">
         <div className="cho-brand">
           <div className="cho-brand-icon">
             <svg viewBox="0 0 24 24" fill="white" width="20" height="20">
@@ -126,7 +126,7 @@ export default function CHOReports() {
       </aside>
 
       <div className="cho-main">
-        <header className="cho-topbar">
+        <header className="cho-topbar no-print">
           <input className="cho-search" type="text" placeholder="Search reports..." />
           <div className="cho-topbar-right">
             <div className="cho-user">
@@ -145,7 +145,7 @@ export default function CHOReports() {
               <h1 className="cho-page-title">Activity Reports</h1>
               <p className="cho-page-sub">Monthly summary of inventory additions and distributions.</p>
             </div>
-            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <div className="no-print" style={{ display: "flex", gap: "10px", alignItems: "center" }}>
               {/* Month filter */}
               <select className="cho-input" style={{ width: "auto", minWidth: "160px" }}
                 value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>

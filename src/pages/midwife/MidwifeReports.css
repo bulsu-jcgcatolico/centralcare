@@ -145,25 +145,20 @@
 
 /* ── Print styles ───────────────────────────────────────────────────────────── */
 @media print {
-  body, html {
-    background: #fff !important;
-    margin: 0 !important;
-    padding: 0 !important;
+  .no-print {
+    display: none !important;
   }
 
-  .midwife-sidebar,
-  .midwife-topbar {
-    display: none !important;
-  }
-  .midwife-page-header select,
-  .midwife-page-header button {
-    display: none !important;
+  body, html {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   .midwife-layout {
     display: block !important;
     height: auto !important;
-    background: #fff !important;
+    background: #ffffff !important;
     overflow: visible !important;
   }
   .midwife-main {
@@ -177,21 +172,21 @@
     overflow: visible !important;
     height: auto !important;
     padding: 0 !important;
-    background: #fff !important;
+    background: #ffffff !important;
   }
 
   .midwife-page-header {
     margin-bottom: 1rem !important;
   }
-  .midwife-page-title { color: #000 !important; }
-  .midwife-page-sub   { color: #333 !important; }
+  .midwife-page-title { color: #000000 !important; }
+  .midwife-page-sub   { color: #333333 !important; }
 
   .midwife-section,
   .midwife-stat-card,
   .midwife-stat-card-box {
-    border: 1px solid #999 !important;
+    border: 1px solid #999999 !important;
     box-shadow: none !important;
-    background: #fff !important;
+    background: #ffffff !important;
   }
 
   .midwife-table,
@@ -201,7 +196,7 @@
   }
   .midwife-table th,
   .midwife-table td {
-    border-color: #999 !important;
-    color: #000 !important;
+    border-color: #999999 !important;
+    color: #000000 !important;
   }
 }

@@ -62,25 +62,20 @@
 
 /* ── Print styles ───────────────────────────────────────────────────────────── */
 @media print {
-  body, html {
-    background: #fff !important;
-    margin: 0 !important;
-    padding: 0 !important;
+  .no-print {
+    display: none !important;
   }
 
-  .cho-sidebar,
-  .cho-topbar {
-    display: none !important;
-  }
-  .cho-page-header select,
-  .cho-page-header button {
-    display: none !important;
+  body, html {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   .cho-layout {
     display: block !important;
     height: auto !important;
-    background: #fff !important;
+    background: #ffffff !important;
     overflow: visible !important;
   }
   .cho-main {
@@ -94,21 +89,21 @@
     overflow: visible !important;
     height: auto !important;
     padding: 0 !important;
-    background: #fff !important;
+    background: #ffffff !important;
   }
 
   .cho-page-header {
     margin-bottom: 1rem !important;
   }
-  .cho-page-title { color: #000 !important; }
-  .cho-page-sub   { color: #333 !important; }
+  .cho-page-title { color: #000000 !important; }
+  .cho-page-sub   { color: #333333 !important; }
 
   .cho-section,
   .cho-stat-card,
   .cho-stat-card-box {
-    border: 1px solid #999 !important;
+    border: 1px solid #999999 !important;
     box-shadow: none !important;
-    background: #fff !important;
+    background: #ffffff !important;
   }
 
   .cho-table,
@@ -118,7 +113,7 @@
   }
   .cho-table th,
   .cho-table td {
-    border-color: #999 !important;
-    color: #000 !important;
+    border-color: #999999 !important;
+    color: #000000 !important;
   }
 }
