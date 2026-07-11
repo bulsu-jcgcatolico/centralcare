@@ -34,119 +34,179 @@ export default function Login() {
 
   return (
     <div className="login-page">
-      <div className="login-card">
 
-        {/* Logo */}
-        <div className="login-logo">
-          <div className="login-logo-icon">
-            <svg viewBox="0 0 24 24" fill="white" width="28" height="28">
-              <path d="M19 3H5C3.9 3 3 3.9 3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c.55 0 1 .45 1 1v3h3c.55 0 1 .45 1 1s-.45 1-1 1h-3v3c0 .55-.45 1-1 1s-1-.45-1-1v-3H8c-.55 0-1-.45-1-1s.45-1 1-1h3V7c0-.55.45-1 1-1z"/>
-            </svg>
-          </div>
-        </div>
+      {/* ── Left: Form ─────────────────────────────────────────── */}
+      <div className="login-form-side">
+        <div className="login-card">
 
-        <h1 className="login-title">CentralCare Health System</h1>
-        <p className="login-sub">Welcome back, please sign in to your account</p>
-
-        {/* Error */}
-        {error && <div className="login-error">{error}</div>}
-
-        {/* Form */}
-        <form onSubmit={handleLogin} className="login-form">
-
-          <div className="login-field">
-            <label>Email / Username</label>
-            <div className="login-input-wrap">
-              <span className="login-input-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
-                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                  <polyline points="22,6 12,13 2,6"/>
-                </svg>
-              </span>
-              <input
-                type="text"
-                placeholder="Enter your email or username"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+          {/* Logo */}
+          <div className="login-logo">
+            <div className="login-logo-icon">
+              <svg viewBox="0 0 24 24" fill="white" width="26" height="26">
+                <path d="M19 3H5C3.9 3 3 3.9 3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c.55 0 1 .45 1 1v3h3c.55 0 1 .45 1 1s-.45 1-1 1h-3v3c0 .55-.45 1-1 1s-1-.45-1-1v-3H8c-.55 0-1-.45-1-1s.45-1 1-1h3V7c0-.55.45-1 1-1z"/>
+              </svg>
             </div>
           </div>
 
-          <div className="login-field">
-            <div className="login-field-header">
-              <label>Password</label>
-            </div>
-            <div className="login-input-wrap">
-              <span className="login-input-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-              </span>
-              <input
-                type={showPassword ? "text" : "password"}
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-              <button
-                type="button"
-                className="login-eye-btn"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? (
+          <h1 className="login-title">CentralCare Health System</h1>
+          <p className="login-sub">Welcome back, please sign in to your account</p>
+
+          {/* Error */}
+          {error && <div className="login-error">{error}</div>}
+
+          {/* Form */}
+          <form onSubmit={handleLogin} className="login-form">
+
+            <div className="login-field">
+              <label>Email / Username</label>
+              <div className="login-input-wrap">
+                <span className="login-input-icon">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
-                    <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/>
-                    <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/>
-                    <line x1="1" y1="1" x2="23" y2="23"/>
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
                   </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                    <circle cx="12" cy="12" r="3"/>
-                  </svg>
-                )}
-              </button>
+                </span>
+                <input
+                  type="text"
+                  placeholder="Enter your email or username"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
             </div>
+
+            <div className="login-field">
+              <div className="login-field-header">
+                <label>Password</label>
+              </div>
+              <div className="login-input-wrap">
+                <span className="login-input-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                </span>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  className="login-eye-btn"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/>
+                      <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/>
+                      <line x1="1" y1="1" x2="23" y2="23"/>
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Keep me signed in */}
+            <div className="login-row">
+              <label className="login-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={keepSignedIn}
+                  onChange={(e) => setKeepSignedIn(e.target.checked)}
+                />
+                <span>Keep me signed in</span>
+              </label>
+            </div>
+
+            <button type="submit" className="login-btn" disabled={loading}>
+              {loading ? "Signing in..." : (
+                <>
+                  Sign In
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16">
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                    <polyline points="12 5 19 12 12 19"/>
+                  </svg>
+                </>
+              )}
+            </button>
+
+          </form>
+
+          <div className="login-footer">
+            <p>Don't have an Account? <a href="mailto:it@centralcare.com">Contact IT Support</a></p>
           </div>
 
-          {/* Keep me signed in */}
-          <div className="login-keep">
-            <label className="login-checkbox-label">
-              <input
-                type="checkbox"
-                checked={keepSignedIn}
-                onChange={(e) => setKeepSignedIn(e.target.checked)}
-              />
-              <span>Keep me signed in</span>
-            </label>
+          <div className="login-copyright">
+            <p>© 2024 CentralCare Health System. All rights reserved.</p>
           </div>
 
-          <button type="submit" className="login-btn" disabled={loading}>
-            {loading ? "Signing in..." : (
-              <>
-                Sign In
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16">
-                  <line x1="5" y1="12" x2="19" y2="12"/>
-                  <polyline points="12 5 19 12 12 19"/>
-                </svg>
-              </>
-            )}
-          </button>
-
-        </form>
-
-        <div className="login-footer">
-          <p>Don't have an Account? <a href="mailto:it@centralcare.com">Contact IT Support</a></p>
         </div>
-
-        <div className="login-copyright">
-          <p>© 2024 CentralCare Health System. All rights reserved.</p>
-        </div>
-
       </div>
+
+      {/* ── Right: Referral pathway panel ─────────────────────────── */}
+      <div className="login-visual-side">
+        <div className="login-visual-inner">
+          <p className="login-visual-eyebrow">Welcome to</p>
+          <h2 className="login-visual-title">CentralCare Health System</h2>
+          <p className="login-visual-desc">
+            A shared record system connecting the City Health Office, Rural
+            Health Units, and Barangay Midwives across Malolos City so patient
+            care follows the resident, not the paperwork.
+          </p>
+
+          <div className="login-pathway" role="list" aria-label="Care coordination levels">
+            <div className="login-pathway-item" role="listitem">
+              <span className="login-pathway-node">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                  <path d="M3 21h18"/>
+                  <path d="M5 21V7l7-4 7 4v14"/>
+                  <path d="M9 21v-6h6v6"/>
+                  <path d="M9 11h.01M15 11h.01M9 15h.01M15 15h.01"/>
+                </svg>
+              </span>
+              <div className="login-pathway-text">
+                <h3>City Health Office</h3>
+                <p>Citywide oversight, records, and reporting for Malolos</p>
+              </div>
+            </div>
+
+            <div className="login-pathway-item" role="listitem">
+              <span className="login-pathway-node">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                </svg>
+              </span>
+              <div className="login-pathway-text">
+                <h3>Rural Health Unit</h3>
+                <p>Consultations, referrals, and follow-up care by district</p>
+              </div>
+            </div>
+
+            <div className="login-pathway-item" role="listitem">
+              <span className="login-pathway-node">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                  <path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0112 5.5 5.5 5.5 0 0121.5 12c-2.5 4.5-9.5 9-9.5 9z"/>
+                </svg>
+              </span>
+              <div className="login-pathway-text">
+                <h3>Barangay Midwife</h3>
+                <p>Home visits, maternal care, and first-line records</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }

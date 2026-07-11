@@ -1,22 +1,26 @@
-/* ── Page ───────────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+/* ── Page: split screen ────────────────────────────────────────────────────── */
 .login-page {
   min-height: 100vh;
-  background: #f1f5f9;
+  display: flex;
+  font-family: 'DM Sans', sans-serif;
+  background: #fff;
+}
+
+/* ── Left: form side ───────────────────────────────────────────────────────── */
+.login-form-side {
+  flex: 1 1 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'DM Sans', sans-serif;
-  padding: 1rem;
+  padding: 2.5rem 1.5rem;
+  min-width: 0;
 }
 
-/* ── Card ───────────────────────────────────────────────────────────────────── */
 .login-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 2.5rem 2rem;
   width: 100%;
-  max-width: 460px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  max-width: 400px;
   text-align: center;
 }
 
@@ -28,8 +32,8 @@
 }
 
 .login-logo-icon {
-  width: 64px;
-  height: 64px;
+  width: 60px;
+  height: 60px;
   background: #1a56db;
   border-radius: 16px;
   display: flex;
@@ -39,6 +43,7 @@
 
 /* ── Titles ─────────────────────────────────────────────────────────────────── */
 .login-title {
+  font-family: 'Outfit', 'DM Sans', sans-serif;
   font-size: 22px;
   font-weight: 700;
   color: #0f172a;
@@ -146,10 +151,11 @@
   color: #374151;
 }
 
-/* ── Keep Signed In ─────────────────────────────────────────────────────────── */
-.login-keep {
+/* ── Keep Signed In row ─────────────────────────────────────────────────────── */
+.login-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
 }
 
 .login-checkbox-label {
@@ -221,4 +227,124 @@
   margin-top: 1rem;
   font-size: 12px;
   color: #9ca3af;
+}
+
+/* ── Right: visual side ────────────────────────────────────────────────────── */
+.login-visual-side {
+  flex: 1 1 50%;
+  background:
+    radial-gradient(circle at 85% 12%, rgba(45, 212, 191, 0.16), transparent 45%),
+    linear-gradient(160deg, #0b3d91 0%, #0a3172 55%, #062148 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 3.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-visual-inner {
+  max-width: 460px;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.login-visual-eyebrow {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #7dd3ea;
+  margin: 0 0 6px;
+}
+
+.login-visual-title {
+  font-family: 'Outfit', 'DM Sans', sans-serif;
+  font-size: 34px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.15;
+  margin: 0 0 16px;
+}
+
+.login-visual-desc {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #cbd9f0;
+  margin: 0 0 2.5rem;
+  max-width: 420px;
+}
+
+/* ── Referral pathway (signature element) ─────────────────────────────────── */
+.login-pathway {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.login-pathway::before {
+  content: "";
+  position: absolute;
+  left: 21px;
+  top: 24px;
+  bottom: 24px;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(45, 212, 191, 0.7), rgba(45, 212, 191, 0.15));
+}
+
+.login-pathway-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  position: relative;
+}
+
+.login-pathway-node {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(45, 212, 191, 0.12);
+  border: 1.5px solid rgba(45, 212, 191, 0.5);
+  color: #5eead4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+
+.login-pathway-text h3 {
+  font-family: 'Outfit', 'DM Sans', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  margin: 6px 0 4px;
+}
+
+.login-pathway-text p {
+  font-size: 13.5px;
+  color: #a9bdde;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .login-visual-side {
+    display: none;
+  }
+  .login-form-side {
+    flex: 1 1 100%;
+    padding: 2.5rem 1.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-btn,
+  .login-eye-btn {
+    transition: none;
+  }
 }
