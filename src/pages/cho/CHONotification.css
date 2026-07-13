@@ -1,6 +1,11 @@
 /* Reuse CHODashboard layout styles */
 @import './CHODashboard.css';
 
+/* ── Font (explicit, in case this file loads without the Dashboard import) ── */
+.cho-layout {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
 /* ── Header Actions ─────────────────────────────────────────────────────────── */
 .cho-header-actions {
   display: flex;

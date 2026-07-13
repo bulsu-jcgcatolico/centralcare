@@ -1,6 +1,11 @@
 /* Reuse CHODashboard layout styles */
 @import './CHODashboard.css';
 
+/* ── Font (explicit, in case this file loads without the Dashboard import) ── */
+.cho-layout {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
 /* ── Buttons (shared, in case not in Dashboard CSS) ─────────────────────────── */
 .cho-btn-primary {
   background: #1a56db;
@@ -320,4 +325,256 @@
 .cho-btn-sm {
   padding: 7px 14px !important;
   font-size: 13px !important;
+}
+/* ── Page Header Actions (multiple buttons) ───────────────────────────────── */
+.cho-page-header-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ── RHU Population % Config ──────────────────────────────────────────────── */
+.cho-rhu-config-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.cho-rhu-config-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.cho-rhu-config-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.cho-rhu-config-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cho-rhu-pct-input {
+  width: 84px;
+  text-align: right;
+  padding: 10px 12px !important;
+}
+
+.cho-rhu-pct-sign {
+  font-size: 15px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.cho-rhu-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1rem;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.cho-rhu-total--ok   { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+.cho-rhu-total--warn { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+
+/* ── Multi-medicine Selection ─────────────────────────────────────────────── */
+.cho-med-select-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-bottom: 1rem;
+}
+
+.cho-med-select-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  flex-wrap: wrap;
+  transition: border-color 0.15s, background 0.15s;
+}
+.cho-med-select-row--active {
+  border-color: #1a56db;
+  background: #f5f8ff;
+}
+
+.cho-med-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  flex: 1;
+  min-width: 200px;
+}
+.cho-med-checkbox-label input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  accent-color: #1a56db;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.cho-med-checkbox-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 15px;
+  color: #0f172a;
+}
+.cho-med-checkbox-sub {
+  font-size: 13px;
+  font-weight: 400;
+  color: #6b7280;
+}
+
+.cho-med-boxes-input {
+  width: 110px !important;
+  flex-shrink: 0;
+}
+
+.cho-calc-btn {
+  margin-bottom: 1.25rem;
+}
+
+.cho-plan-preview {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+.cho-plan-preview:last-of-type {
+  border-bottom: none;
+}
+.cho-plan-preview-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 8px;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
+   ACCESSIBILITY IMPROVEMENTS
+   Larger text, bigger touch targets, stronger contrast, visible focus
+   states — scoped to this page so other screens are unaffected.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* Larger base text and comfortable line-height throughout this page */
+.cho-content { font-size: 15px; line-height: 1.55; }
+
+.cho-page-title { font-size: 24px; }
+.cho-page-sub   { font-size: 14.5px; color: #4b5563; }
+
+/* Bigger, easier-to-hit buttons everywhere on this page */
+.cho-btn-primary,
+.cho-btn-secondary {
+  min-height: 44px;
+  padding: 11px 20px;
+  font-size: 15px;
+}
+.cho-btn-action {
+  min-height: 40px;
+  padding: 8px 16px;
+  font-size: 13.5px;
+}
+.cho-btn-sm {
+  min-height: 40px !important;
+  padding: 8px 16px !important;
+  font-size: 14px !important;
+}
+.cho-btn-danger-sm {
+  min-height: 36px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+/* Inputs: bigger tap area, clearer focus ring */
+.cho-input {
+  min-height: 44px;
+  font-size: 15px;
+  padding: 10px 14px;
+}
+.cho-input:focus {
+  box-shadow: 0 0 0 4px rgba(26, 86, 219, 0.18);
+}
+
+/* Higher-contrast table text and roomier rows */
+.cho-table th {
+  font-size: 12px;
+  color: #374151;
+}
+.cho-table td {
+  font-size: 14.5px;
+  padding: 16px 14px;
+  color: #1f2937;
+}
+
+/* Status badges: bigger and higher contrast */
+.cho-status-badge {
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+/* Modal: larger title, roomier padding, easier-to-hit close button */
+.cho-modal-title { font-size: 20px; }
+.cho-modal-body  { font-size: 15px; }
+.cho-label       { font-size: 14px; }
+.cho-modal-close {
+  width: 40px;
+  height: 40px;
+  font-size: 30px;
+}
+
+/* Visible keyboard focus outline on every interactive element */
+.cho-btn-primary:focus-visible,
+.cho-btn-secondary:focus-visible,
+.cho-btn-action:focus-visible,
+.cho-btn-sm:focus-visible,
+.cho-btn-danger-sm:focus-visible,
+.cho-input:focus-visible,
+.cho-modal-close:focus-visible,
+.cho-med-checkbox-label input:focus-visible,
+.cho-nav-item:focus-visible {
+  outline: 3px solid #1a56db;
+  outline-offset: 2px;
+}
+
+/* Slightly larger nav items in the sidebar for easier reading/tapping */
+.cho-nav-item {
+  font-size: 14.5px;
+  padding: 11px 12px;
+  min-height: 44px;
+}
+
+@media (max-width: 900px) {
+  .cho-rhu-config-list,
+  .cho-med-select-list {
+    max-height: none;
+  }
+  .cho-med-select-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cho-med-boxes-input {
+    width: 100% !important;
+  }
 }

@@ -7,6 +7,8 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { checkAndNotifyLowStock } from "../../utils/lowStockNotifier";
+import { runExpiryChecks } from "../../utils/expiryNotifier";
+import { useUnreadCount } from "../../hooks/useUnreadCount";
 import "./MidwifeInventory.css";
 
 const navItems = [
@@ -37,6 +39,7 @@ function getStatusClass(remaining) {
 export default function MidwifeInventory() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
+  const unreadCount = useUnreadCount();
 
 
   const [inventory, setInventory]   = useState([]);
@@ -47,6 +50,7 @@ export default function MidwifeInventory() {
   // Log New Shipment modal
   const [showShipmentModal, setShowShipmentModal] = useState(false);
   const [shipProductName, setShipProductName]     = useState("");
+  const [shipLotNumber, setShipLotNumber]         = useState("");
   const [shipCategory, setShipCategory]           = useState("General Consumption");
   const [shipSubCategory, setShipSubCategory]     = useState("");
   const [shipBoxes, setShipBoxes]                 = useState("");
@@ -76,7 +80,9 @@ export default function MidwifeInventory() {
         where("barangayName", "==", userData?.barangayName ?? "")
       );
       const snap = await getDocs(q);
-      setInventory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setInventory(list);
+      runExpiryChecks(list, "midwife", { barangayName: userData?.barangayName });
     } catch (err) { console.error(err); }
     setLoading(false);
   }
@@ -106,12 +112,14 @@ export default function MidwifeInventory() {
           remaining: newRemaining,
           expiry: shipExpiry, source: shipSource,
           category: shipCategory, subCategory: shipSubCategory.trim(),
+          lotNumber: shipLotNumber.trim(),
         });
         alert(`${trimmedName} already exists — added ${boxes} boxes to existing stock (new total: ${newRemaining} boxes).`);
       } else {
         await addDoc(collection(db, "inventory"), {
           productKey:    generateProductKey(),
           name:          trimmedName,
+          lotNumber:     shipLotNumber.trim(),
           category:      shipCategory,
           subCategory:   shipSubCategory.trim(),
           quantity:      boxes,
@@ -125,7 +133,7 @@ export default function MidwifeInventory() {
         alert("Shipment logged successfully!");
       }
 
-      setShipProductName(""); setShipCategory("General Consumption");
+      setShipProductName(""); setShipLotNumber(""); setShipCategory("General Consumption");
       setShipSubCategory(""); setShipBoxes(""); setShipExpiry(""); setShipSource("");
       setShowShipmentModal(false);
       loadInventory();
@@ -210,7 +218,10 @@ export default function MidwifeInventory() {
           {navItems.map(item => (
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "midwife-nav-item" + (isActive ? " active" : "")}>
-              {item.label}
+              <span>{item.label}</span>
+              {item.label === "Notifications" && unreadCount > 0 && (
+                <span className="nav-badge">{unreadCount}</span>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -342,6 +353,7 @@ export default function MidwifeInventory() {
                   <tr>
                     <th>PRODUCT KEY</th>
                     <th>PRODUCT NAME</th>
+                    <th>LOT #</th>
                     <th>CATEGORY</th>
                     <th>SUB-CATEGORY</th>
                     <th>QUANTITY</th>
@@ -358,6 +370,7 @@ export default function MidwifeInventory() {
                       <tr key={item.id}>
                         <td className="midwife-product-key">{item.productKey || "—"}</td>
                         <td><strong>{item.name}</strong></td>
+                        <td className="midwife-product-key">{item.lotNumber || "—"}</td>
                         <td>{item.category}</td>
                         <td>
                           {item.subCategory
@@ -392,18 +405,20 @@ export default function MidwifeInventory() {
       {/* ── Log New Shipment Modal ── */}
       {showShipmentModal && (
         <div className="midwife-modal-overlay" onClick={() => setShowShipmentModal(false)}>
-          <div className="midwife-modal" onClick={e => e.stopPropagation()}>
+          <div className="midwife-modal midwife-modal--wide" onClick={e => e.stopPropagation()}>
             <div className="midwife-modal-header">
               <h2 className="midwife-modal-title">Log New Shipment</h2>
-              <button className="midwife-modal-close" onClick={() => setShowShipmentModal(false)}>x</button>
+              <button className="midwife-modal-close" aria-label="Close" onClick={() => setShowShipmentModal(false)}>×</button>
             </div>
             <div className="midwife-modal-body">
+
+              <h3 className="midwife-form-section-title">Basic Information</h3>
               <div className="midwife-form-field">
-                <label className="midwife-label">Product Name *</label>
+                <label className="midwife-label">Product Name <span className="midwife-required">*</span></label>
                 <input className="midwife-input" type="text" placeholder="e.g., Amoxicillin 500mg Tablet"
                   value={shipProductName} onChange={e => setShipProductName(e.target.value)} />
               </div>
-              <div className="midwife-form-row">
+              <div className="midwife-form-row midwife-form-row--3">
                 <div className="midwife-form-field">
                   <label className="midwife-label">Category</label>
                   <select className="midwife-input" value={shipCategory} onChange={e => setShipCategory(e.target.value)}>
@@ -416,11 +431,18 @@ export default function MidwifeInventory() {
                   <input className="midwife-input" type="text" placeholder="e.g., Antibiotic"
                     value={shipSubCategory} onChange={e => setShipSubCategory(e.target.value)} />
                 </div>
-              </div>
-              <div className="midwife-form-row">
                 <div className="midwife-form-field">
-                  <label className="midwife-label">Boxes Received (30's) *</label>
-                  <input className="midwife-input" type="number" placeholder="0"
+                  <label className="midwife-label">Lot Number</label>
+                  <input className="midwife-input" type="text" placeholder="e.g., LOT-2026-0143"
+                    value={shipLotNumber} onChange={e => setShipLotNumber(e.target.value)} />
+                </div>
+              </div>
+
+              <h3 className="midwife-form-section-title">Stock Details</h3>
+              <div className="midwife-form-row midwife-form-row--3">
+                <div className="midwife-form-field">
+                  <label className="midwife-label">Boxes Received (30's) <span className="midwife-required">*</span></label>
+                  <input className="midwife-input" type="number" placeholder="e.g., 20"
                     value={shipBoxes} onChange={e => setShipBoxes(e.target.value)} />
                 </div>
                 <div className="midwife-form-field">
@@ -433,11 +455,12 @@ export default function MidwifeInventory() {
                   </select>
                 </div>
                 <div className="midwife-form-field">
-                  <label className="midwife-label">Expiry Date *</label>
+                  <label className="midwife-label">Expiry Date <span className="midwife-required">*</span></label>
                   <input className="midwife-input" type="date"
                     value={shipExpiry} onChange={e => setShipExpiry(e.target.value)} />
                 </div>
               </div>
+              <p className="midwife-form-hint"><span className="midwife-required">*</span> Required fields</p>
             </div>
             <div className="midwife-modal-footer">
               <button className="midwife-btn-secondary" onClick={() => setShowShipmentModal(false)}>Cancel</button>
@@ -455,7 +478,7 @@ export default function MidwifeInventory() {
           <div className="midwife-modal" onClick={e => e.stopPropagation()}>
             <div className="midwife-modal-header">
               <h2 className="midwife-modal-title">Dispense Items</h2>
-              <button className="midwife-modal-close" onClick={() => setShowDispenseModal(false)}>x</button>
+              <button className="midwife-modal-close" aria-label="Close" onClick={() => setShowDispenseModal(false)}>×</button>
             </div>
             <div className="midwife-modal-body">
               <div className="midwife-form-field">

@@ -338,3 +338,103 @@
   background: #fef2f2;
 }
 .midwife-btn-icon--danger:hover { background: #fee2e2; }
+/* ═════════════════════════════════════════════════════════════════════════
+   ADD ITEM (LOG SHIPMENT) MODAL — improved grouping, sizing, accessibility
+   ═════════════════════════════════════════════════════════════════════════ */
+
+.midwife-form-section-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 12px;
+  padding-top: 4px;
+}
+.midwife-form-section-title:not(:first-child) {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.midwife-required { color: #dc2626; }
+
+.midwife-form-hint {
+  font-size: 12.5px;
+  color: #9ca3af;
+  margin: 0.75rem 0 0;
+}
+
+/* Fix: a 3-field row was being squeezed into a 2-column grid */
+.midwife-form-row--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+@media (max-width: 600px) {
+  .midwife-form-row--3 { grid-template-columns: 1fr; }
+}
+
+.midwife-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+.midwife-input {
+  min-height: 46px;
+  font-size: 15px;
+  padding: 10px 14px;
+}
+.midwife-input:focus {
+  box-shadow: 0 0 0 4px rgba(26, 86, 219, 0.15);
+}
+
+select.midwife-input {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px;
+  padding-right: 40px;
+  cursor: pointer;
+}
+
+.midwife-modal-title { font-size: 20px; }
+.midwife-modal-body  { font-size: 15px; }
+
+.midwife-btn-primary,
+.midwife-btn-secondary {
+  min-height: 44px;
+  padding: 11px 20px;
+  font-size: 15px;
+}
+.midwife-modal-close {
+  width: 40px;
+  height: 40px;
+  font-size: 30px;
+}
+
+.midwife-btn-primary:focus-visible,
+.midwife-btn-secondary:focus-visible,
+.midwife-input:focus-visible,
+.midwife-modal-close:focus-visible {
+  outline: 3px solid #1a56db;
+  outline-offset: 2px;
+}
+
+/* ── Nav Notification Badge ──────────────────────────────────────────────────── */
+.midwife-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-badge {
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 99px;
+  min-width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}

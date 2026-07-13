@@ -1,6 +1,11 @@
 /* Reuse RHUDashboard layout styles */
 @import './RHUDashboard.css';
 
+/* ── Font (explicit, in case this file loads without the Dashboard import) ── */
+.rhu-layout {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
 /* ── Header Actions ─────────────────────────────────────────────────────────── */
 .rhu-header-actions {
   display: flex;

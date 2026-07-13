@@ -1,10 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
-
 /* ── Page: split screen ────────────────────────────────────────────────────── */
 .login-page {
   min-height: 100vh;
   display: flex;
-  font-family: 'DM Sans', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   background: #fff;
 }
 
@@ -20,7 +18,7 @@
 
 .login-card {
   width: 100%;
-  max-width: 400px;
+  max-width: 440px;
   text-align: center;
 }
 
@@ -32,10 +30,10 @@
 }
 
 .login-logo-icon {
-  width: 60px;
-  height: 60px;
+  width: 68px;
+  height: 68px;
   background: #1a56db;
-  border-radius: 16px;
+  border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -43,16 +41,16 @@
 
 /* ── Titles ─────────────────────────────────────────────────────────────────── */
 .login-title {
-  font-family: 'Outfit', 'DM Sans', sans-serif;
-  font-size: 22px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 26px;
   font-weight: 700;
   color: #0f172a;
   margin: 0 0 8px;
 }
 
 .login-sub {
-  font-size: 14px;
-  color: #6b7280;
+  font-size: 16px;
+  color: #4b5563;
   margin: 0 0 1.75rem;
 }
 
@@ -61,8 +59,8 @@
   background: #fef2f2;
   border: 1px solid #fecaca;
   border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 13px;
+  padding: 12px 16px;
+  font-size: 14.5px;
   color: #dc2626;
   margin-bottom: 1.25rem;
   text-align: left;
@@ -83,8 +81,8 @@
 }
 
 .login-field label {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14.5px;
+  font-weight: 600;
   color: #374151;
 }
 
@@ -103,7 +101,7 @@
 
 .login-input-icon {
   position: absolute;
-  left: 12px;
+  left: 14px;
   color: #9ca3af;
   display: flex;
   align-items: center;
@@ -113,21 +111,22 @@
 .login-input-wrap input {
   width: 100%;
   box-sizing: border-box;
-  padding: 11px 44px;
+  min-height: 52px;
+  padding: 14px 48px;
   border: 1.5px solid #e5e7eb;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 16px;
   color: #0f172a;
   background: #f9fafb;
   outline: none;
   transition: border-color 0.2s, background 0.2s;
-  font-family: 'DM Sans', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 .login-input-wrap input:focus {
   border-color: #1a56db;
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.1);
+  box-shadow: 0 0 0 4px rgba(26, 86, 219, 0.15);
 }
 
 .login-input-wrap input::placeholder {
@@ -136,14 +135,15 @@
 
 .login-eye-btn {
   position: absolute;
-  right: 12px;
+  right: 10px;
   background: none;
   border: none;
   cursor: pointer;
   color: #9ca3af;
   display: flex;
   align-items: center;
-  padding: 0;
+  justify-content: center;
+  padding: 8px;
   transition: color 0.2s;
 }
 
@@ -161,15 +161,15 @@
 .login-checkbox-label {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: 10px;
+  font-size: 15px;
   color: #374151;
   cursor: pointer;
 }
 
 .login-checkbox-label input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   accent-color: #1a56db;
   cursor: pointer;
 }
@@ -180,16 +180,17 @@
   color: #fff;
   border: none;
   border-radius: 10px;
-  padding: 13px;
-  font-size: 15px;
-  font-weight: 600;
+  min-height: 52px;
+  padding: 14px;
+  font-size: 16.5px;
+  font-weight: 700;
   cursor: pointer;
   transition: background 0.2s, transform 0.1s;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-family: 'DM Sans', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   margin-top: 4px;
 }
 
@@ -209,13 +210,13 @@
 /* ── Footer ─────────────────────────────────────────────────────────────────── */
 .login-footer {
   margin-top: 1.5rem;
-  font-size: 14px;
-  color: #6b7280;
+  font-size: 15px;
+  color: #4b5563;
 }
 
 .login-footer a {
   color: #1a56db;
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
 }
 
@@ -225,7 +226,7 @@
 
 .login-copyright {
   margin-top: 1rem;
-  font-size: 12px;
+  font-size: 12.5px;
   color: #9ca3af;
 }
 
@@ -251,7 +252,7 @@
 }
 
 .login-visual-eyebrow {
-  font-family: 'DM Sans', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -260,7 +261,7 @@
 }
 
 .login-visual-title {
-  font-family: 'Outfit', 'DM Sans', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   font-size: 34px;
   font-weight: 700;
   color: #fff;
@@ -317,9 +318,10 @@
 }
 
 .login-pathway-text h3 {
-  font-family: 'Outfit', 'DM Sans', sans-serif;
-  font-size: 16px;
+  font-family: 'SF Mono', 'Consolas', 'Menlo', 'Courier New', monospace;
+  font-size: 15px;
   font-weight: 600;
+  letter-spacing: 0.02em;
   color: #fff;
   margin: 6px 0 4px;
 }
@@ -347,4 +349,14 @@
   .login-eye-btn {
     transition: none;
   }
+}
+
+/* ── Accessibility: visible keyboard focus ring on every interactive element ── */
+.login-btn:focus-visible,
+.login-eye-btn:focus-visible,
+.login-input-wrap input:focus-visible,
+.login-checkbox-label input:focus-visible,
+.login-footer a:focus-visible {
+  outline: 3px solid #1a56db;
+  outline-offset: 2px;
 }

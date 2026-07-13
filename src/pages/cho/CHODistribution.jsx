@@ -3,7 +3,7 @@ import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
   collection, addDoc, getDocs, deleteDoc, doc,
-  serverTimestamp, query, where, updateDoc
+  serverTimestamp, query, where, updateDoc, setDoc
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import "./CHODistribution.css";
@@ -16,7 +16,10 @@ const navItems = [
   { label: "Notifications",to: "/cho/notifications"},
 ];
 
-const RHU_DATA = [
+// Default RHU list + starting population share. CHO can update the
+// percentage for each RHU from the "Manage Population %" panel; the
+// RHU names/rows themselves are fixed (CHO does not add or remove RHUs).
+const DEFAULT_RHU_DATA = [
   { id: 1,  name: "RHU 1",  populationPercent: 0.11 },
   { id: 2,  name: "RHU 2",  populationPercent: 0.07 },
   { id: 3,  name: "RHU 3",  populationPercent: 0.14 },
@@ -29,6 +32,8 @@ const RHU_DATA = [
   { id: 10, name: "RHU 10", populationPercent: 0.17 },
 ];
 
+const RHU_CONFIG_COLLECTION = "choRhuConfig";
+
 export default function CHODistribution() {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
@@ -37,11 +42,16 @@ export default function CHODistribution() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // New Distribution modal
+  // RHU population percentages (editable by CHO)
+  const [rhuData, setRhuData] = useState(DEFAULT_RHU_DATA);
+  const [showRhuModal, setShowRhuModal] = useState(false);
+  const [editRhuData, setEditRhuData] = useState([]);
+  const [savingRhuConfig, setSavingRhuConfig] = useState(false);
+
+  // New Distribution modal — multi-medicine selection
   const [showNewModal, setShowNewModal] = useState(false);
-  const [selectedInventoryId, setSelectedInventoryId] = useState("");
-  const [totalBoxes, setTotalBoxes] = useState("");
-  const [calculatedDist, setCalculatedDist] = useState([]);
+  const [selectedItems, setSelectedItems] = useState({}); // { [inventoryId]: "boxes string" }
+  const [calculatedPlans, setCalculatedPlans] = useState([]); // [{ inventoryId, item, totalBoxes, dist }]
 
   // Review modal
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -55,6 +65,7 @@ export default function CHODistribution() {
   useEffect(() => {
     loadDistributions();
     loadInventory();
+    loadRhuConfig();
   }, []);
 
   async function loadInventory() {
@@ -75,67 +86,145 @@ export default function CHODistribution() {
     setLoading(false);
   }
 
-  // Calculate distribution across all RHUs
-  function calculateDist() {
-    const total = parseInt(totalBoxes);
-    if (!total || total <= 0) { alert("Enter valid total boxes"); return; }
-    const item = inventory.find(i => i.id === selectedInventoryId);
-    if (!item) { alert("Please select a medicine"); return; }
-    const avail = item.remaining ?? item.quantity;
-    if (total > avail) { alert(`Only ${avail} boxes available!`); return; }
-    let rem = total;
-    const result = RHU_DATA.map((rhu, i) => {
-      const boxes = i === RHU_DATA.length - 1
-        ? rem
-        : Math.round(total * rhu.populationPercent);
-      rem -= boxes;
-      return { ...rhu, boxes, status: "Pending" };
-    });
-    setCalculatedDist(result);
+  // Load saved RHU population percentages, falling back to defaults
+  async function loadRhuConfig() {
+    try {
+      const snap = await getDocs(collection(db, RHU_CONFIG_COLLECTION));
+      if (snap.empty) {
+        setRhuData(DEFAULT_RHU_DATA);
+        return;
+      }
+      const saved = {};
+      snap.docs.forEach(d => { saved[d.id] = d.data(); });
+      const merged = DEFAULT_RHU_DATA.map(rhu => ({
+        ...rhu,
+        populationPercent: saved[rhu.id]?.populationPercent ?? rhu.populationPercent,
+      }));
+      setRhuData(merged);
+    } catch (err) {
+      console.error(err);
+      setRhuData(DEFAULT_RHU_DATA);
+    }
   }
 
-  // Save full distribution plan to Firebase
-  async function saveDistributionPlan() {
-    if (calculatedDist.length === 0) return;
-    setSaving(true);
+  function openRhuModal() {
+    setEditRhuData(rhuData.map(r => ({ ...r })));
+    setShowRhuModal(true);
+  }
+
+  function updatePercentDraft(id, percentValue) {
+    const fraction = isNaN(percentValue) ? 0 : percentValue / 100;
+    setEditRhuData(prev => prev.map(r => (r.id === id ? { ...r, populationPercent: fraction } : r)));
+  }
+
+  const editTotalPercent = editRhuData.reduce((s, r) => s + r.populationPercent, 0) * 100;
+
+  async function saveRhuConfig() {
+    setSavingRhuConfig(true);
     try {
-      const item = inventory.find(i => i.id === selectedInventoryId);
-      const total = parseInt(totalBoxes);
-
-      const docRef = await addDoc(collection(db, "distributions"), {
-        fromType: "cho",
-        inventoryId: selectedInventoryId,
-        medicineName: item.name,
-        totalBoxes: total,
-        rhuDistribution: calculatedDist,
-        status: "Pending",
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
-        date: new Date().toLocaleDateString()
-      });
-
-      // Deduct from inventory
-      const newRemaining = (item.remaining ?? item.quantity) - total;
-      await updateDoc(doc(db, "inventory", selectedInventoryId), { remaining: newRemaining });
-
-      // Notify all RHUs
-      for (const rhu of calculatedDist) {
-        await addDoc(collection(db, "notifications"), {
-          type: "distribution",
-          title: "New Supply from CHO",
-          message: `CHO has allocated ${rhu.boxes} boxes of ${item.name} for ${rhu.name}. Awaiting distribution.`,
-          toRhuId: rhu.id,
-          toRhuName: rhu.name,
-          fromType: "cho",
-          distributionId: docRef.id,
-          read: false,
-          createdAt: serverTimestamp()
+      for (const rhu of editRhuData) {
+        await setDoc(doc(db, RHU_CONFIG_COLLECTION, String(rhu.id)), {
+          name: rhu.name,
+          populationPercent: rhu.populationPercent,
+          updatedBy: user?.uid || null,
+          updatedAt: serverTimestamp(),
         });
       }
+      setRhuData(editRhuData);
+      setShowRhuModal(false);
+    } catch (err) { alert("Error saving population percentages: " + err.message); }
+    setSavingRhuConfig(false);
+  }
 
-      alert("Distribution plan created! All RHUs have been notified.");
+  // ── Multi-medicine selection ──────────────────────────────────────────────
+  function toggleMedicine(id, checked) {
+    setSelectedItems(prev => {
+      const next = { ...prev };
+      if (checked) next[id] = next[id] ?? "";
+      else delete next[id];
+      return next;
+    });
+    setCalculatedPlans([]);
+  }
+
+  function updateMedicineBoxes(id, value) {
+    setSelectedItems(prev => ({ ...prev, [id]: value }));
+    setCalculatedPlans([]);
+  }
+
+  // Calculate distribution across all RHUs for every selected medicine
+  function calculatePlans() {
+    const entries = Object.entries(selectedItems);
+    if (entries.length === 0) { alert("Select at least one medicine to distribute."); return; }
+
+    const plans = [];
+    for (const [invId, boxesStr] of entries) {
+      const total = parseInt(boxesStr);
+      const item = inventory.find(i => i.id === invId);
+      if (!item) continue;
+      if (!total || total <= 0) {
+        alert(`Enter a valid number of boxes for ${item.name}.`);
+        return;
+      }
+      const avail = item.remaining ?? item.quantity;
+      if (total > avail) {
+        alert(`Only ${avail} boxes of ${item.name} available!`);
+        return;
+      }
+      let rem = total;
+      const dist = rhuData.map((rhu, i) => {
+        const boxes = i === rhuData.length - 1
+          ? rem
+          : Math.round(total * rhu.populationPercent);
+        rem -= boxes;
+        return { ...rhu, boxes, status: "Pending" };
+      });
+      plans.push({ inventoryId: invId, item, totalBoxes: total, dist });
+    }
+    setCalculatedPlans(plans);
+  }
+
+  // Save all calculated plans (one distribution doc per medicine) to Firebase
+  async function saveDistributionPlan() {
+    if (calculatedPlans.length === 0) return;
+    setSaving(true);
+    try {
+      for (const plan of calculatedPlans) {
+        const docRef = await addDoc(collection(db, "distributions"), {
+          fromType: "cho",
+          inventoryId: plan.inventoryId,
+          medicineName: plan.item.name,
+          totalBoxes: plan.totalBoxes,
+          rhuDistribution: plan.dist,
+          status: "Pending",
+          createdBy: user.uid,
+          createdAt: serverTimestamp(),
+          date: new Date().toLocaleDateString()
+        });
+
+        // Deduct from inventory
+        const newRemaining = (plan.item.remaining ?? plan.item.quantity) - plan.totalBoxes;
+        await updateDoc(doc(db, "inventory", plan.inventoryId), { remaining: newRemaining });
+
+        // Notify all RHUs
+        for (const rhu of plan.dist) {
+          await addDoc(collection(db, "notifications"), {
+            type: "distribution",
+            title: "New Supply from CHO",
+            message: `CHO has allocated ${rhu.boxes} boxes of ${plan.item.name} for ${rhu.name}. Awaiting distribution.`,
+            toRhuId: rhu.id,
+            toRhuName: rhu.name,
+            fromType: "cho",
+            distributionId: docRef.id,
+            read: false,
+            createdAt: serverTimestamp()
+          });
+        }
+      }
+
+      alert(`Distribution plan${calculatedPlans.length > 1 ? "s" : ""} created! All RHUs have been notified.`);
       setShowNewModal(false);
-      setSelectedInventoryId(""); setTotalBoxes(""); setCalculatedDist([]);
+      setSelectedItems({}); setCalculatedPlans([]);
       loadDistributions();
       loadInventory();
     } catch (err) { alert("Error: " + err.message); }
@@ -218,6 +307,7 @@ export default function CHODistribution() {
 
   const pendingCount = distributions.filter(d => d.status === "Pending" || d.status === "Partial").length;
   const totalDistributed = distributions.reduce((s, d) => s + (d.totalBoxes || 0), 0);
+  const grandTotalBoxes = calculatedPlans.reduce((s, p) => s + p.totalBoxes, 0);
 
   return (
     <div className="cho-layout">
@@ -249,7 +339,7 @@ export default function CHODistribution() {
 
       <div className="cho-main">
         <header className="cho-topbar">
-          <input className="cho-search" type="text" placeholder="Search facilities, inventory, or logs..." />
+          <input className="cho-search" type="text" placeholder="Search facilities, inventory, or logs..." aria-label="Search" />
           <div className="cho-topbar-right">
             <div className="cho-user">
               <div className="cho-user-info">
@@ -267,9 +357,14 @@ export default function CHODistribution() {
               <h1 className="cho-page-title">Distribution Management</h1>
               <p className="cho-page-sub">Review RHU supply requests and distribute medical supplies to Rural Health Units.</p>
             </div>
-            <button className="cho-btn-primary" onClick={() => setShowNewModal(true)}>
-              New Distribution
-            </button>
+            <div className="cho-page-header-actions">
+              <button className="cho-btn-secondary" onClick={openRhuModal}>
+                Manage Population %
+              </button>
+              <button className="cho-btn-primary" onClick={() => setShowNewModal(true)}>
+                New Distribution
+              </button>
+            </div>
           </div>
 
           {/* Stats */}
@@ -389,68 +484,140 @@ export default function CHODistribution() {
         </main>
       </div>
 
-      {/* ── New Distribution Modal ── */}
+      {/* ── Manage RHU Population % Modal ── */}
+      {showRhuModal && (
+        <div className="cho-modal-overlay" onClick={() => setShowRhuModal(false)}>
+          <div className="cho-modal cho-modal--wide" onClick={e => e.stopPropagation()}>
+            <div className="cho-modal-header">
+              <h2 className="cho-modal-title">Manage RHU Population %</h2>
+              <button className="cho-modal-close" aria-label="Close" onClick={() => setShowRhuModal(false)}>×</button>
+            </div>
+            <div className="cho-modal-body">
+              <p className="cho-dist-note">
+                These percentages decide how each new distribution is auto-split across the 10 RHUs.
+                They should add up to 100%.
+              </p>
+              <div className="cho-rhu-config-list">
+                {editRhuData.map(rhu => (
+                  <div className="cho-rhu-config-row" key={rhu.id}>
+                    <label htmlFor={`rhu-pct-${rhu.id}`} className="cho-rhu-config-name">{rhu.name}</label>
+                    <div className="cho-rhu-config-input-wrap">
+                      <input
+                        id={`rhu-pct-${rhu.id}`}
+                        className="cho-input cho-rhu-pct-input"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.5"
+                        value={(rhu.populationPercent * 100).toFixed(2).replace(/\.00$/, "")}
+                        onChange={e => updatePercentDraft(rhu.id, parseFloat(e.target.value))}
+                        aria-label={`${rhu.name} population percentage`}
+                      />
+                      <span className="cho-rhu-pct-sign">%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className={`cho-rhu-total-row ${Math.abs(editTotalPercent - 100) < 0.01 ? "cho-rhu-total--ok" : "cho-rhu-total--warn"}`}>
+                <span>Total</span>
+                <strong>{editTotalPercent.toFixed(2)}%</strong>
+              </div>
+            </div>
+            <div className="cho-modal-footer">
+              <button className="cho-btn-secondary" onClick={() => setShowRhuModal(false)}>Cancel</button>
+              <button className="cho-btn-primary" onClick={saveRhuConfig} disabled={savingRhuConfig}>
+                {savingRhuConfig ? "Saving..." : "Save Percentages"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── New Distribution Modal (multi-medicine) ── */}
       {showNewModal && (
         <div className="cho-modal-overlay" onClick={() => setShowNewModal(false)}>
           <div className="cho-modal cho-modal--wide" onClick={e => e.stopPropagation()}>
             <div className="cho-modal-header">
               <h2 className="cho-modal-title">New Distribution Plan</h2>
-              <button className="cho-modal-close" onClick={() => setShowNewModal(false)}>×</button>
+              <button className="cho-modal-close" aria-label="Close" onClick={() => setShowNewModal(false)}>×</button>
             </div>
             <div className="cho-modal-body">
-              <div className="cho-calc-inputs">
-                <div className="cho-form-field">
-                  <label className="cho-label">Select Medicine from Inventory</label>
-                  <select className="cho-input" value={selectedInventoryId}
-                    onChange={e => { setSelectedInventoryId(e.target.value); setCalculatedDist([]); }}>
-                    <option value="">-- Select Medicine --</option>
-                    {inventory.map(item => (
-                      <option key={item.id} value={item.id}>
-                        {item.name} ({item.remaining ?? item.quantity} boxes available)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="cho-form-field">
-                  <label className="cho-label">Total Boxes to Distribute</label>
-                  <input className="cho-input" type="number" placeholder="e.g., 180"
-                    value={totalBoxes}
-                    onChange={e => { setTotalBoxes(e.target.value); setCalculatedDist([]); }} />
-                </div>
-                <button className="cho-btn-secondary" onClick={calculateDist}>Calculate</button>
+              <p className="cho-dist-note">Select one or more medicines and enter how many boxes of each to distribute.</p>
+
+              <div className="cho-med-select-list">
+                {inventory.map(item => {
+                  const checked = item.id in selectedItems;
+                  const avail = item.remaining ?? item.quantity;
+                  return (
+                    <div className={`cho-med-select-row ${checked ? "cho-med-select-row--active" : ""}`} key={item.id}>
+                      <label className="cho-med-checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={e => toggleMedicine(item.id, e.target.checked)}
+                        />
+                        <span className="cho-med-checkbox-text">
+                          <strong>{item.name}</strong>
+                          <span className="cho-med-checkbox-sub">{avail} boxes available</span>
+                        </span>
+                      </label>
+                      {checked && (
+                        <input
+                          className="cho-input cho-med-boxes-input"
+                          type="number"
+                          min="1"
+                          placeholder="Boxes"
+                          value={selectedItems[item.id]}
+                          onChange={e => updateMedicineBoxes(item.id, e.target.value)}
+                          aria-label={`Boxes of ${item.name} to distribute`}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+                {inventory.length === 0 && (
+                  <p className="cho-dist-note">No medicines in inventory yet.</p>
+                )}
               </div>
 
-              {calculatedDist.length > 0 && (
+              <button className="cho-btn-secondary cho-calc-btn" onClick={calculatePlans}>Calculate</button>
+
+              {calculatedPlans.length > 0 && (
                 <>
                   <p className="cho-dist-note">Auto-distributed by RHU population percentage:</p>
-                  <table className="cho-table">
-                    <thead>
-                      <tr>
-                        <th>RHU</th>
-                        <th>POPULATION %</th>
-                        <th>BOXES</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {calculatedDist.map(rhu => (
-                        <tr key={rhu.id}>
-                          <td><strong>{rhu.name}</strong></td>
-                          <td>{(rhu.populationPercent * 100).toFixed(0)}%</td>
-                          <td><strong>{rhu.boxes} boxes</strong></td>
-                        </tr>
-                      ))}
-                      <tr className="cho-table-total">
-                        <td colSpan={2}><strong>Total</strong></td>
-                        <td><strong>{calculatedDist.reduce((s, r) => s + r.boxes, 0)} boxes</strong></td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  {calculatedPlans.map(plan => (
+                    <div className="cho-plan-preview" key={plan.inventoryId}>
+                      <p className="cho-plan-preview-title">{plan.item.name} — {plan.totalBoxes} boxes</p>
+                      <table className="cho-table">
+                        <thead>
+                          <tr>
+                            <th>RHU</th>
+                            <th>POPULATION %</th>
+                            <th>BOXES</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {plan.dist.map(rhu => (
+                            <tr key={rhu.id}>
+                              <td><strong>{rhu.name}</strong></td>
+                              <td>{(rhu.populationPercent * 100).toFixed(0)}%</td>
+                              <td><strong>{rhu.boxes} boxes</strong></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                  <div className="cho-rhu-total-row cho-rhu-total--ok">
+                    <span>Grand Total</span>
+                    <strong>{grandTotalBoxes} boxes across {calculatedPlans.length} medicine{calculatedPlans.length > 1 ? "s" : ""}</strong>
+                  </div>
                 </>
               )}
             </div>
             <div className="cho-modal-footer">
               <button className="cho-btn-secondary" onClick={() => setShowNewModal(false)}>Cancel</button>
-              {calculatedDist.length > 0 && (
+              {calculatedPlans.length > 0 && (
                 <button className="cho-btn-primary" onClick={saveDistributionPlan} disabled={saving}>
                   {saving ? "Saving..." : "Save & Notify All RHUs"}
                 </button>
@@ -466,7 +633,7 @@ export default function CHODistribution() {
           <div className="cho-modal" onClick={e => e.stopPropagation()}>
             <div className="cho-modal-header">
               <h2 className="cho-modal-title">Review — {reviewDist.rhu.name}</h2>
-              <button className="cho-modal-close" onClick={() => setShowReviewModal(false)}>×</button>
+              <button className="cho-modal-close" aria-label="Close" onClick={() => setShowReviewModal(false)}>×</button>
             </div>
             <div className="cho-modal-body">
               <div className="cho-review-row"><span>Medicine</span><strong>{reviewDist.dist.medicineName}</strong></div>

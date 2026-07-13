@@ -6,6 +6,8 @@ import {
   serverTimestamp, query, where, updateDoc
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
+import { runExpiryChecks } from "../../utils/expiryNotifier";
+import { useUnreadCount } from "../../hooks/useUnreadCount";
 import "./CHOInventory.css";
 
 const navItems = [
@@ -35,12 +37,14 @@ function getStatusClass(remaining) {
 export default function CHOInventory() {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
+  const unreadCount = useUnreadCount();
   const [search, setSearch] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [productName, setProductName] = useState("");
+  const [lotNumber, setLotNumber] = useState("");
   const [category, setCategory] = useState("General Consumption");
   const [subCategory, setSubCategory] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -56,7 +60,9 @@ export default function CHOInventory() {
     try {
       const q = query(collection(db, "inventory"), where("ownerType", "==", "cho"));
       const snapshot = await getDocs(q);
-      setInventory(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setInventory(list);
+      runExpiryChecks(list, "cho", {});
     } catch (err) { console.error(err); }
     setLoading(false);
   }
@@ -83,14 +89,16 @@ export default function CHOInventory() {
         await updateDoc(doc(db, "inventory", existing.id), {
           quantity:  newQuantity,
           remaining: newRemaining,
-          // Keep the most recent expiry/source/category/subCategory entered
+          // Keep the most recent expiry/source/category/subCategory/lotNumber entered
           expiry, source, category, subCategory,
+          lotNumber: lotNumber.trim(),
         });
         alert(`${trimmedName} already exists — added ${qty} boxes to existing stock (new total: ${newRemaining} boxes).`);
       } else {
         await addDoc(collection(db, "inventory"), {
           productKey: generateProductKey(),
           name: trimmedName,
+          lotNumber: lotNumber.trim(),
           category,
           subCategory,
           quantity: qty,
@@ -104,7 +112,7 @@ export default function CHOInventory() {
         alert("Item saved successfully!");
       }
 
-      setProductName(""); setCategory("General Consumption");
+      setProductName(""); setLotNumber(""); setCategory("General Consumption");
       setSubCategory(""); setQuantity(""); setSource(""); setExpiry("");
       setShowAddModal(false);
       loadInventory();
@@ -148,7 +156,10 @@ export default function CHOInventory() {
           {navItems.map((item) => (
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "cho-nav-item" + (isActive ? " active" : "")}>
-              {item.label}
+              <span>{item.label}</span>
+              {item.label === "Notifications" && unreadCount > 0 && (
+                <span className="nav-badge">{unreadCount}</span>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -224,6 +235,7 @@ export default function CHOInventory() {
                   <tr>
                     <th>PRODUCT KEY</th>
                     <th>ITEM NAME</th>
+                    <th>LOT #</th>
                     <th>CATEGORY</th>
                     <th>SUB-CATEGORY</th>
                     <th>QUANTITY</th>
@@ -240,6 +252,7 @@ export default function CHOInventory() {
                       <tr key={item.id}>
                         <td className="cho-product-key">{item.productKey || "—"}</td>
                         <td><strong>{item.name}</strong></td>
+                        <td className="cho-product-key">{item.lotNumber || "—"}</td>
                         <td>{item.category}</td>
                         <td>
                           {item.subCategory
@@ -275,18 +288,20 @@ export default function CHOInventory() {
       {/* ── Add Item Modal ── */}
       {showAddModal && (
         <div className="cho-modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div className="cho-modal" onClick={e => e.stopPropagation()}>
+          <div className="cho-modal cho-modal--wide" onClick={e => e.stopPropagation()}>
             <div className="cho-modal-header">
               <h2 className="cho-modal-title">Add New Inventory Item</h2>
-              <button className="cho-modal-close" onClick={() => setShowAddModal(false)}>×</button>
+              <button className="cho-modal-close" aria-label="Close" onClick={() => setShowAddModal(false)}>×</button>
             </div>
             <div className="cho-modal-body">
+
+              <h3 className="cho-form-section-title">Basic Information</h3>
               <div className="cho-form-field">
-                <label className="cho-label">Product Name *</label>
+                <label className="cho-label">Product Name <span className="cho-required">*</span></label>
                 <input className="cho-input" type="text" placeholder="e.g., Amoxicillin 500mg Tablet"
                   value={productName} onChange={e => setProductName(e.target.value)} />
               </div>
-              <div className="cho-form-row">
+              <div className="cho-form-row cho-form-row--3">
                 <div className="cho-form-field">
                   <label className="cho-label">Category</label>
                   <select className="cho-input" value={category} onChange={e => setCategory(e.target.value)}>
@@ -299,11 +314,18 @@ export default function CHOInventory() {
                   <input className="cho-input" type="text" placeholder="e.g., Antibiotic"
                     value={subCategory} onChange={e => setSubCategory(e.target.value)} />
                 </div>
-              </div>
-              <div className="cho-form-row">
                 <div className="cho-form-field">
-                  <label className="cho-label">Quantity (boxes) *</label>
-                  <input className="cho-input" type="number" placeholder="0"
+                  <label className="cho-label">Lot Number</label>
+                  <input className="cho-input" type="text" placeholder="e.g., LOT-2026-0143"
+                    value={lotNumber} onChange={e => setLotNumber(e.target.value)} />
+                </div>
+              </div>
+
+              <h3 className="cho-form-section-title">Stock Details</h3>
+              <div className="cho-form-row cho-form-row--3">
+                <div className="cho-form-field">
+                  <label className="cho-label">Quantity (boxes) <span className="cho-required">*</span></label>
+                  <input className="cho-input" type="number" placeholder="e.g., 100"
                     value={quantity} onChange={e => setQuantity(e.target.value)} />
                 </div>
                 <div className="cho-form-field">
@@ -315,11 +337,12 @@ export default function CHOInventory() {
                   </select>
                 </div>
                 <div className="cho-form-field">
-                  <label className="cho-label">Expiry Date *</label>
+                  <label className="cho-label">Expiry Date <span className="cho-required">*</span></label>
                   <input className="cho-input" type="date"
                     value={expiry} onChange={e => setExpiry(e.target.value)} />
                 </div>
               </div>
+              <p className="cho-form-hint"><span className="cho-required">*</span> Required fields</p>
             </div>
             <div className="cho-modal-footer">
               <button className="cho-btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>

@@ -6,6 +6,8 @@ import {
   serverTimestamp, query, where, updateDoc
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
+import { runExpiryChecks } from "../../utils/expiryNotifier";
+import { useUnreadCount } from "../../hooks/useUnreadCount";
 import "./RHUInventory.css";
 
 const navItems = [
@@ -34,6 +36,7 @@ function getStatusClass(remaining) {
 export default function RHUInventory() {
   const { logout, user, userData } = useAuth();
   const navigate = useNavigate();
+  const unreadCount = useUnreadCount();
   const [search, setSearch] = useState("");
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -42,6 +45,7 @@ export default function RHUInventory() {
   // Add modal
   const [showAddModal, setShowAddModal] = useState(false);
   const [productName, setProductName] = useState("");
+  const [lotNumber, setLotNumber] = useState("");
   const [category, setCategory] = useState("General Consumption");
   const [subCategory, setSubCategory] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -62,7 +66,9 @@ export default function RHUInventory() {
         where("rhuId", "==", userData?.rhuId)
       );
       const snap = await getDocs(q);
-      setInventory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setInventory(list);
+      runExpiryChecks(list, "rhu", { rhuId: userData?.rhuId, rhuName: userData?.rhuName });
     } catch (err) { console.error(err); }
     setLoading(false);
   }
@@ -91,12 +97,14 @@ export default function RHUInventory() {
           remaining: newRemaining,
           tabletsPerBox: parseInt(tabletsPerBox) || existing.tabletsPerBox || 30,
           expiry, source, category, subCategory,
+          lotNumber: lotNumber.trim(),
         });
         alert(`${trimmedName} already exists — added ${qty} boxes to existing stock (new total: ${newRemaining} boxes).`);
       } else {
         await addDoc(collection(db, "inventory"), {
           productKey: generateProductKey(),
           name: trimmedName,
+          lotNumber: lotNumber.trim(),
           category,
           subCategory,
           quantity: qty,
@@ -113,7 +121,7 @@ export default function RHUInventory() {
         alert("Item saved successfully!");
       }
 
-      setProductName(""); setCategory("General Consumption");
+      setProductName(""); setLotNumber(""); setCategory("General Consumption");
       setSubCategory(""); setQuantity(""); setTabletsPerBox(""); setSource(""); setExpiry("");
       setShowAddModal(false);
       loadInventory();
@@ -157,7 +165,10 @@ export default function RHUInventory() {
           {navItems.map(item => (
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "rhu-nav-item" + (isActive ? " active" : "")}>
-              {item.label}
+              <span>{item.label}</span>
+              {item.label === "Notifications" && unreadCount > 0 && (
+                <span className="nav-badge">{unreadCount}</span>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -236,6 +247,7 @@ export default function RHUInventory() {
                   <tr>
                     <th>PRODUCT KEY</th>
                     <th>ITEM NAME</th>
+                    <th>LOT #</th>
                     <th>CATEGORY</th>
                     <th>SUB-CATEGORY</th>
                     <th>QUANTITY</th>
@@ -252,6 +264,7 @@ export default function RHUInventory() {
                       <tr key={item.id}>
                         <td className="rhu-product-key">{item.productKey || "—"}</td>
                         <td><strong>{item.name}</strong></td>
+                        <td className="rhu-product-key">{item.lotNumber || "—"}</td>
                         <td>{item.category}</td>
                         <td>
                           {item.subCategory
@@ -288,18 +301,20 @@ export default function RHUInventory() {
       {/* ── Add Item Modal ── */}
       {showAddModal && (
         <div className="rhu-modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div className="rhu-modal" onClick={e => e.stopPropagation()}>
+          <div className="rhu-modal rhu-modal--lg" onClick={e => e.stopPropagation()}>
             <div className="rhu-modal-header">
               <h2 className="rhu-modal-title">Add New Inventory Item</h2>
-              <button className="rhu-modal-close" onClick={() => setShowAddModal(false)}>×</button>
+              <button className="rhu-modal-close" aria-label="Close" onClick={() => setShowAddModal(false)}>×</button>
             </div>
             <div className="rhu-modal-body">
+
+              <h3 className="rhu-form-section-title">Basic Information</h3>
               <div className="rhu-form-field">
-                <label className="rhu-label">Product Name *</label>
+                <label className="rhu-label">Product Name <span className="rhu-required">*</span></label>
                 <input className="rhu-input" type="text" placeholder="e.g., Amoxicillin 500mg Tablet"
                   value={productName} onChange={e => setProductName(e.target.value)} />
               </div>
-              <div className="rhu-form-row">
+              <div className="rhu-form-row rhu-form-row--3">
                 <div className="rhu-form-field">
                   <label className="rhu-label">Category</label>
                   <select className="rhu-input" value={category} onChange={e => setCategory(e.target.value)}>
@@ -312,15 +327,22 @@ export default function RHUInventory() {
                   <input className="rhu-input" type="text" placeholder="e.g., Antibiotic"
                     value={subCategory} onChange={e => setSubCategory(e.target.value)} />
                 </div>
+                <div className="rhu-form-field">
+                  <label className="rhu-label">Lot Number</label>
+                  <input className="rhu-input" type="text" placeholder="e.g., LOT-2026-0143"
+                    value={lotNumber} onChange={e => setLotNumber(e.target.value)} />
+                </div>
               </div>
+
+              <h3 className="rhu-form-section-title">Stock Details</h3>
               <div className="rhu-form-row">
                 <div className="rhu-form-field">
-                  <label className="rhu-label">Quantity (boxes) *</label>
-                  <input className="rhu-input" type="number" placeholder="0"
+                  <label className="rhu-label">Quantity (boxes) <span className="rhu-required">*</span></label>
+                  <input className="rhu-input" type="number" placeholder="e.g., 100"
                     value={quantity} onChange={e => setQuantity(e.target.value)} />
                 </div>
                 <div className="rhu-form-field">
-                  <label className="rhu-label">Tablets per Box *</label>
+                  <label className="rhu-label">Tablets per Box <span className="rhu-required">*</span></label>
                   <input className="rhu-input" type="number" placeholder="e.g., 30"
                     value={tabletsPerBox} onChange={e => setTabletsPerBox(e.target.value)} />
                 </div>
@@ -336,11 +358,12 @@ export default function RHUInventory() {
                   </select>
                 </div>
                 <div className="rhu-form-field">
-                  <label className="rhu-label">Expiry Date *</label>
+                  <label className="rhu-label">Expiry Date <span className="rhu-required">*</span></label>
                   <input className="rhu-input" type="date"
                     value={expiry} onChange={e => setExpiry(e.target.value)} />
                 </div>
               </div>
+              <p className="rhu-form-hint"><span className="rhu-required">*</span> Required fields</p>
             </div>
             <div className="rhu-modal-footer">
               <button className="rhu-btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>

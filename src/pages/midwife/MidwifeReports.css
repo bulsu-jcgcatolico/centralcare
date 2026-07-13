@@ -1,6 +1,11 @@
 /* ── Reuse MidwifeDashboard layout styles ── */
 @import './MidwifeDashboard.css';
 
+/* ── Font (explicit, in case this file loads without the Dashboard import) ── */
+.midwife-layout {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
 /* ── Page Header ────────────────────────────────────────────────────────────── */
 .midwife-page-header {
   display: flex;

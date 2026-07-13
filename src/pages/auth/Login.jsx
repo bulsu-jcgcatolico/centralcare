@@ -164,46 +164,7 @@ export default function Login() {
             care follows the resident, not the paperwork.
           </p>
 
-          <div className="login-pathway" role="list" aria-label="Care coordination levels">
-            <div className="login-pathway-item" role="listitem">
-              <span className="login-pathway-node">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
-                  <path d="M3 21h18"/>
-                  <path d="M5 21V7l7-4 7 4v14"/>
-                  <path d="M9 21v-6h6v6"/>
-                  <path d="M9 11h.01M15 11h.01M9 15h.01M15 15h.01"/>
-                </svg>
-              </span>
-              <div className="login-pathway-text">
-                <h3>City Health Office</h3>
-                <p>Citywide oversight, records, and reporting for Malolos</p>
-              </div>
-            </div>
-
-            <div className="login-pathway-item" role="listitem">
-              <span className="login-pathway-node">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
-                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-                </svg>
-              </span>
-              <div className="login-pathway-text">
-                <h3>Rural Health Unit</h3>
-                <p>Consultations, referrals, and follow-up care by district</p>
-              </div>
-            </div>
-
-            <div className="login-pathway-item" role="listitem">
-              <span className="login-pathway-node">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
-                  <path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0112 5.5 5.5 5.5 0 0121.5 12c-2.5 4.5-9.5 9-9.5 9z"/>
-                </svg>
-              </span>
-              <div className="login-pathway-text">
-                <h3>Barangay Midwife</h3>
-                <p>Home visits, maternal care, and first-line records</p>
-              </div>
-            </div>
-          </div>
+          
         </div>
       </div>
 
