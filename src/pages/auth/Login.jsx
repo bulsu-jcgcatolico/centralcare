@@ -35,7 +35,7 @@ export default function Login() {
   return (
     <div className="login-page">
 
-      {/* ── Left: Form ─────────────────────────────────────────── */}
+      {/* ── Left: Form (now full width) ─────────────────────────── */}
       <div className="login-form-side">
         <div className="login-card">
 
@@ -153,21 +153,7 @@ export default function Login() {
         </div>
       </div>
 
-      {/* ── Right: Referral pathway panel ─────────────────────────── */}
-      <div className="login-visual-side">
-        <div className="login-visual-inner">
-          <p className="login-visual-eyebrow">Welcome to</p>
-          <h2 className="login-visual-title">CentralCare Health System</h2>
-          <p className="login-visual-desc">
-            A shared record system connecting the City Health Office, Rural
-            Health Units, and Barangay Midwives across Malolos City so patient
-            care follows the resident, not the paperwork.
-          </p>
-
-          
-        </div>
-      </div>
-
+      {/* Right visual panel removed */}
     </div>
   );
 }
