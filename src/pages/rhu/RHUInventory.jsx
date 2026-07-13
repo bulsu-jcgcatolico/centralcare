@@ -301,7 +301,7 @@ export default function RHUInventory() {
       {/* ── Add Item Modal ── */}
       {showAddModal && (
         <div className="rhu-modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div className="rhu-modal rhu-modal--lg" onClick={e => e.stopPropagation()}>
+          <div className="rhu-modal rhu-modal--md" onClick={e => e.stopPropagation()}>
             <div className="rhu-modal-header">
               <h2 className="rhu-modal-title">Add New Inventory Item</h2>
               <button className="rhu-modal-close" aria-label="Close" onClick={() => setShowAddModal(false)}>×</button>

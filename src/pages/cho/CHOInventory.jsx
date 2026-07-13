@@ -288,7 +288,7 @@ export default function CHOInventory() {
       {/* ── Add Item Modal ── */}
       {showAddModal && (
         <div className="cho-modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div className="cho-modal cho-modal--wide" onClick={e => e.stopPropagation()}>
+          <div className="cho-modal cho-modal--md" onClick={e => e.stopPropagation()}>
             <div className="cho-modal-header">
               <h2 className="cho-modal-title">Add New Inventory Item</h2>
               <button className="cho-modal-close" aria-label="Close" onClick={() => setShowAddModal(false)}>×</button>

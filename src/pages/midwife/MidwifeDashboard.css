@@ -66,13 +66,14 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 12px;
+  padding: 11px 12px;
   border-radius: 8px;
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 500;
   color: #374151;
   text-decoration: none;
   transition: background 0.15s, color 0.15s;
+  min-height: 44px;
 }
 
 .midwife-nav-item:hover {
@@ -533,4 +534,21 @@
   color: #9ca3af;
   font-size: 13px;
   line-height: 1.6;
+}
+/* ── Nav Notification Badge ──────────────────────────────────────────────────── */
+.midwife-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-badge {
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 99px;
+  min-width: 18px;
+  text-align: center;
+  flex-shrink: 0;
 }

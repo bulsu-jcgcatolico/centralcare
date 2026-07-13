@@ -309,6 +309,9 @@
   .cho-calc-inputs { flex-direction: column; }
   .cho-table th, .cho-table td { padding: 10px; }
 }
+/* Add Item modal width — matches Midwife's Log Shipment modal for consistency */
+.cho-modal--md { max-width: 780px; }
+
 /* ═════════════════════════════════════════════════════════════════════════
    ADD ITEM MODAL — improved grouping, sizing, and accessibility
    ═════════════════════════════════════════════════════════════════════════ */

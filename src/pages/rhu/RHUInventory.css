@@ -239,6 +239,9 @@
 @media (max-width: 1024px) {
   .rhu-form-row { grid-template-columns: 1fr; }
 }
+/* Add Item modal width — matches Midwife's Log Shipment modal for consistency */
+.rhu-modal--md { max-width: 780px; }
+
 /* ═════════════════════════════════════════════════════════════════════════
    ADD ITEM MODAL — improved grouping, sizing, and accessibility
    ═════════════════════════════════════════════════════════════════════════ */
