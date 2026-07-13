@@ -568,8 +568,7 @@ export default function RHUDistribution() {
             <div className="rhu-modal-body">
               <p className="rhu-dist-note">
                 List every barangay your RHU covers and its share of the population.
-                Add or remove rows as needed — these percentages just need to reflect
-                each barangay's relative share, so they don't need to add up to 100%.
+                Add or remove Barangays if needed.
               </p>
 
               <div className="rhu-barangay-manage-list">
@@ -608,7 +607,7 @@ export default function RHUDistribution() {
                   </div>
                 ))}
                 {editBarangays.length === 0 && (
-                  <p className="rhu-dist-note">No barangays yet — add your first one below.</p>
+                  <p className="rhu-dist-note">No barangays yet, add barangay below.</p>
                 )}
               </div>
 
