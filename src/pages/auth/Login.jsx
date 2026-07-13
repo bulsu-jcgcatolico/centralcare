@@ -35,7 +35,7 @@ export default function Login() {
   return (
     <div className="login-page">
 
-      {/* ── Left: Form (now full width) ─────────────────────────── */}
+      {/* ── Left: Form ─────────────────────────────────────────── */}
       <div className="login-form-side">
         <div className="login-card">
 
@@ -153,7 +153,21 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Right visual panel removed */}
+      {/* ── Right: Image panel with heading ─────────────────────────── */}
+      <div className="login-visual-side">
+        {/* Swap this src for your own image (e.g. import it or put it in /public).
+            Adjust the opacity in Login.css under .login-visual-image */}
+        <img
+          className="login-visual-image"
+          src="/login-visual.jpg"
+          alt="CentralCare — Malolos City Health System"
+        />
+        <div className="login-visual-content">
+          <p className="login-visual-eyebrow">Welcome to</p>
+          <h2 className="login-visual-title">CentralCare Health System</h2>
+        </div>
+      </div>
+
     </div>
   );
 }
