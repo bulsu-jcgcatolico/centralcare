@@ -153,9 +153,18 @@ export default function CHODistribution() {
   }
 
   // Calculate distribution across all RHUs for every selected medicine
+  // Percentages are treated as relative weights, so they don't need to
+  // add up to exactly 100% — e.g. 20% + 15% still splits proportionally.
   function calculatePlans() {
     const entries = Object.entries(selectedItems);
     if (entries.length === 0) { alert("Select at least one medicine to distribute."); return; }
+
+    const activeRhus = rhuData.filter(r => r.populationPercent > 0);
+    const weightSum = activeRhus.reduce((s, r) => s + r.populationPercent, 0);
+    if (activeRhus.length === 0 || weightSum <= 0) {
+      alert('Set a population % for at least one RHU first — use "Manage Population %".');
+      return;
+    }
 
     const plans = [];
     for (const [invId, boxesStr] of entries) {
@@ -172,10 +181,11 @@ export default function CHODistribution() {
         return;
       }
       let rem = total;
-      const dist = rhuData.map((rhu, i) => {
-        const boxes = i === rhuData.length - 1
+      const dist = activeRhus.map((rhu, i) => {
+        const share = rhu.populationPercent / weightSum;
+        const boxes = i === activeRhus.length - 1
           ? rem
-          : Math.round(total * rhu.populationPercent);
+          : Math.round(total * share);
         rem -= boxes;
         return { ...rhu, boxes, status: "Pending" };
       });
@@ -494,8 +504,9 @@ export default function CHODistribution() {
             </div>
             <div className="cho-modal-body">
               <p className="cho-dist-note">
-                These percentages decide how each new distribution is auto-split across the 10 RHUs.
-                They should add up to 100%.
+                These percentages decide how each new distribution is auto-split across RHUs —
+                treated as relative shares, so they don't need to add up to 100%. An RHU set to 0%
+                won't receive any of the new distribution.
               </p>
               <div className="cho-rhu-config-list">
                 {editRhuData.map(rhu => (
@@ -518,7 +529,7 @@ export default function CHODistribution() {
                   </div>
                 ))}
               </div>
-              <div className={`cho-rhu-total-row ${Math.abs(editTotalPercent - 100) < 0.01 ? "cho-rhu-total--ok" : "cho-rhu-total--warn"}`}>
+              <div className="cho-rhu-total-row cho-rhu-total--neutral">
                 <span>Total</span>
                 <strong>{editTotalPercent.toFixed(2)}%</strong>
               </div>

@@ -183,22 +183,20 @@ export default function RHUDistribution() {
     setCalculatedPlans([]);
   }
 
-  // Auto-calculate boxes per barangay, for every selected medicine
+  // Auto-calculate boxes per barangay, for every selected medicine.
+  // Percentages are treated as relative weights, so they don't need to
+  // add up to exactly 100% — e.g. 20% + 15% still splits proportionally.
   function calculatePlans() {
     const entries = Object.entries(selectedItems);
     if (entries.length === 0) { alert("Select at least one medicine to distribute."); return; }
 
-    const totalPercent = barangays.reduce((s, b) => s + b.populationPercent, 0);
-    if (totalPercent <= 0) {
-      alert('Set a population % for your barangays first — use "Manage Barangays".');
-      return;
-    }
-    if (Math.abs(totalPercent - 1) > 0.02) {
-      alert(`Barangay population % totals ${(totalPercent * 100).toFixed(0)}% — should equal 100%. Adjust it in "Manage Barangays".`);
+    const activeBarangays = barangays.filter(b => b.populationPercent > 0);
+    const weightSum = activeBarangays.reduce((s, b) => s + b.populationPercent, 0);
+    if (activeBarangays.length === 0 || weightSum <= 0) {
+      alert('Set a population % for at least one barangay first — use "Manage Barangays".');
       return;
     }
 
-    const activeBarangays = barangays.filter(b => b.populationPercent > 0);
     const plans = [];
     for (const [invId, boxesStr] of entries) {
       const total = parseInt(boxesStr);
@@ -215,9 +213,10 @@ export default function RHUDistribution() {
       }
       let rem = total;
       const dist = activeBarangays.map((b, i) => {
+        const share = b.populationPercent / weightSum;
         const boxes = i === activeBarangays.length - 1
           ? rem
-          : Math.round(total * b.populationPercent);
+          : Math.round(total * share);
         rem -= boxes;
         return { ...b, boxes, status: "Pending" };
       });
@@ -369,7 +368,6 @@ export default function RHUDistribution() {
     (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)
   );
   const grandTotalBoxes   = calculatedPlans.reduce((s, p) => s + p.totalBoxes, 0);
-  const barangayPercentTotal = barangays.reduce((s, b) => s + b.populationPercent, 0) * 100;
 
   return (
     <div className="rhu-layout">
@@ -439,13 +437,6 @@ export default function RHUDistribution() {
               </button>
             </div>
           </div>
-
-          {barangaysLoaded && Math.abs(barangayPercentTotal - 100) > 0.5 && (
-            <div className="rhu-barangay-warning">
-              Your barangay population % currently totals <strong>{barangayPercentTotal.toFixed(1)}%</strong> — it should add up to 100%.
-              Use "Manage Barangays" to fix this before creating a new distribution.
-            </div>
-          )}
 
           {/* Stats */}
           <div className="rhu-dist-stats-row">
@@ -577,7 +568,8 @@ export default function RHUDistribution() {
             <div className="rhu-modal-body">
               <p className="rhu-dist-note">
                 List every barangay your RHU covers and its share of the population.
-                Add or remove rows as needed — percentages should total 100%.
+                Add or remove rows as needed — these percentages just need to reflect
+                each barangay's relative share, so they don't need to add up to 100%.
               </p>
 
               <div className="rhu-barangay-manage-list">
@@ -624,7 +616,7 @@ export default function RHUDistribution() {
                 + Add Barangay
               </button>
 
-              <div className={`rhu-barangay-total-row ${Math.abs(editTotalPercent - 100) < 0.5 ? "rhu-pct-total--ok" : "rhu-pct-total--warn"}`}>
+              <div className="rhu-barangay-total-row rhu-pct-total--neutral">
                 <span>Total</span>
                 <strong>{editTotalPercent.toFixed(1)}%</strong>
               </div>

@@ -390,6 +390,7 @@
 }
 .cho-rhu-total--ok   { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
 .cho-rhu-total--warn { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.cho-rhu-total--neutral { background: #f8fafc; color: #374151; border: 1px solid #e2e8f0; }
 
 /* ── Multi-medicine Selection ─────────────────────────────────────────────── */
 .cho-med-select-list {
