@@ -6,7 +6,7 @@ import {
   serverTimestamp, query, where, updateDoc
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
-import { runExpiryChecks } from "../../utils/expiryNotifier";
+import { runExpiryChecks } from "../../utils/expiryNotifier2";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
 import "./RHUInventory.css";
 
