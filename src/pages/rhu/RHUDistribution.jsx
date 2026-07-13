@@ -18,21 +18,6 @@ const navItems = [
   { label: "Notifications", to: "/rhu/notifications"  },
 ];
 
-// Starter list shown only the first time an RHU sets up its barangays
-// (before anything has been saved to Firestore). The RHU can add,
-// rename, or remove any of these — this is not a fixed list.
-const STARTER_BARANGAYS = [
-  { id: "starter-1", name: "Longos",    populationPercent: 0 },
-  { id: "starter-2", name: "Caingin",   populationPercent: 0 },
-  { id: "starter-3", name: "Catmon",    populationPercent: 0 },
-  { id: "starter-4", name: "Bulihan",   populationPercent: 0 },
-  { id: "starter-5", name: "Guinihawa", populationPercent: 0 },
-  { id: "starter-6", name: "Liang",     populationPercent: 0 },
-  { id: "starter-7", name: "Lugam",     populationPercent: 0 },
-  { id: "starter-8", name: "Mojon",     populationPercent: 0 },
-  { id: "starter-9", name: "Bangkal",   populationPercent: 0 },
-];
-
 const BARANGAY_CONFIG_COLLECTION = "rhuBarangayConfig";
 
 export default function RHUDistribution() {
@@ -96,8 +81,9 @@ export default function RHUDistribution() {
     setLoading(false);
   }
 
-  // Load this RHU's saved barangay list; fall back to the starter list
-  // if this RHU hasn't set one up yet.
+  // Load this RHU's saved barangay list, scoped to this account's rhuId.
+  // If this RHU hasn't set any up yet, the list stays empty — nothing is
+  // shared or defaulted from any other RHU account.
   async function loadBarangayConfig() {
     try {
       const q = query(
@@ -106,13 +92,13 @@ export default function RHUDistribution() {
       );
       const snap = await getDocs(q);
       if (snap.empty) {
-        setBarangays(STARTER_BARANGAYS);
+        setBarangays([]);
       } else {
         setBarangays(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       }
     } catch (err) {
       console.error(err);
-      setBarangays(STARTER_BARANGAYS);
+      setBarangays([]);
     }
     setBarangaysLoaded(true);
   }
