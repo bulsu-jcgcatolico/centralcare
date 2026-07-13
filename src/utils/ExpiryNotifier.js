@@ -61,11 +61,7 @@ export async function checkAndNotifyExpiry(item, ownerType, contextData = {}) {
   }
 }
 
-/**
- * Runs checkAndNotifyExpiry over a full inventory list. Call this after
- * loading inventory so items are re-checked every time the page loads
- * (not just when an item is first added).
- */
+
 export async function runExpiryChecks(items, ownerType, contextData = {}) {
   for (const item of items) {
     await checkAndNotifyExpiry(item, ownerType, contextData);
