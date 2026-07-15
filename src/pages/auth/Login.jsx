@@ -155,13 +155,8 @@ export default function Login() {
 
       {/* ── Right: Image panel with heading ─────────────────────────── */}
       <div className="login-visual-side">
-        {/* Swap this src for your own image (e.g. import it or put it in /public).
-            Adjust the opacity in Login.css under .login-visual-image */}
-        <img
-          className="login-visual-image"
-          src="/login-visual.jpg"
-          alt="CentralCare — Malolos City Health System"
-        />
+        {<img className="login-visual-image" src="/city-hall.jpg" alt="..." />}
+        
         <div className="login-visual-content">
           <p className="login-visual-eyebrow">Welcome to</p>
           <h2 className="login-visual-title">CentralCare Health System</h2>
