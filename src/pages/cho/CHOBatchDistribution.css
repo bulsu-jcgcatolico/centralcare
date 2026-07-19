@@ -1,0 +1,596 @@
+/* Reuse CHODashboard layout styles */
+@import './CHODashboard.css';
+
+/* ── Font (explicit, in case this file loads without the Dashboard import) ── */
+.cho-layout {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* ── Buttons (shared, in case not in Dashboard CSS) ─────────────────────────── */
+.cho-btn-primary {
+  background: #1a56db;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.cho-btn-primary:hover    { background: #1447c0; }
+.cho-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.cho-btn-secondary {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.cho-btn-secondary:hover { background: #e5e7eb; }
+
+/* ── Stats Grid 2 & 3 columns ──────────────────────────────────────────────── */
+.cho-stats-grid--2 { grid-template-columns: repeat(2, 1fr); }
+.cho-stats-grid--3 { grid-template-columns: repeat(3, 1fr); }
+
+/* ── Distribution Stats Row (icon cards) ───────────────────────────────────── */
+.cho-dist-stats-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.cho-dist-stat-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 220px;
+  flex: 1;
+}
+
+.cho-dist-stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.cho-dist-icon--orange { background: #fff7ed; color: #ea580c; }
+.cho-dist-icon--blue   { background: #eff6ff; color: #1a56db; }
+
+.cho-dist-stat-label { font-size: 12px; color: #6b7280; font-weight: 500; margin: 0 0 4px; }
+.cho-dist-stat-value { font-size: 26px; font-weight: 700; color: #0f172a; margin: 0; line-height: 1; }
+
+/* ── Distribution Plan Card ─────────────────────────────────────────────────── */
+.cho-dist-plan {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  overflow: visible !important;
+}
+
+/* Self-contained scroll box for tables — bounded height with its own
+   scrollbar, so it works regardless of the outer page's flex/overflow
+   chain. This is the actual thing that lets you reach rows below the fold. */
+.cho-table-wrapper {
+  width: 100%;
+  max-height: 50vh;
+  overflow-y: auto;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.cho-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f9fafb;
+  z-index: 1;
+}
+
+.cho-dist-plan-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+.cho-dist-plan-title { font-size: 16px; font-weight: 600; color: #0f172a; margin: 0 0 4px; }
+.cho-dist-plan-sub   { font-size: 13px; color: #6b7280; margin: 0; }
+
+.cho-btn-danger-sm {
+  background: none;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.cho-btn-danger-sm:hover { background: #fef2f2; }
+
+/* ── Table ──────────────────────────────────────────────────────────────────── */
+.cho-table {
+  width: 100%;
+  min-width: 700px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.cho-table thead {
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+.cho-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.cho-table tbody tr { border-bottom: 1px solid #f3f4f6; transition: background 0.15s; }
+.cho-table tbody tr:hover { background: #f9fafb; }
+.cho-table tbody tr:last-child { border-bottom: none; }
+.cho-table td { padding: 14px; color: #374151; }
+.cho-table td strong { color: #0f172a; font-weight: 600; }
+
+.cho-table-total td {
+  background: #f9fafb;
+  border-top: 2px solid #e5e7eb;
+  font-size: 13px;
+  padding: 12px 14px;
+}
+
+/* ── Status Badges ──────────────────────────────────────────────────────────── */
+.cho-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.cho-status--completed { background: #d1fae5; color: #065f46; }
+.cho-status--pending   { background: #fef3c7; color: #92400e; }
+.cho-status--partial   { background: #eff6ff; color: #1a56db; }
+
+/* ── Action Group ───────────────────────────────────────────────────────────── */
+.cho-action-group {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.cho-btn-action {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.cho-btn-distribute {
+  background: #1a56db; color: #fff; border-color: #1a56db;
+}
+.cho-btn-distribute:hover:not(:disabled) { background: #1648c0; }
+.cho-btn-distribute:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.cho-btn-review {
+  background: #fff; color: #374151; border-color: #d1d5db;
+}
+.cho-btn-review:hover { background: #f9fafb; }
+
+.cho-distributed-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #16a34a;
+}
+
+/* ── New Distribution Modal ─────────────────────────────────────────────────── */
+.cho-modal--md { max-width: 860px; }
+
+.cho-calc-inputs {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.cho-dist-note { font-size: 13px; color: #6b7280; margin: 0 0 0.75rem; }
+
+/* ── Review Modal Rows ──────────────────────────────────────────────────────── */
+.cho-review-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 14px;
+  color: #374151;
+}
+.cho-review-row:last-child { border-bottom: none; }
+.cho-review-row span:first-child { color: #6b7280; font-weight: 500; }
+
+/* ── Shared Modal Styles ────────────────────────────────────────────────────── */
+.cho-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+.cho-modal {
+  background: #fff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 540px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+}
+.cho-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem 1.5rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+.cho-modal-title { font-size: 18px; font-weight: 600; color: #0f172a; margin: 0; }
+.cho-modal-close {
+  background: none; border: none; font-size: 28px; color: #9ca3af;
+  cursor: pointer; line-height: 1; padding: 0; width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+}
+.cho-modal-close:hover { color: #6b7280; }
+.cho-modal-body   { padding: 1.5rem; }
+.cho-modal-footer { display: flex; gap: 10px; justify-content: flex-end; padding: 1rem 1.5rem 1.5rem; border-top: 1px solid #e5e7eb; }
+
+/* ── Form ───────────────────────────────────────────────────────────────────── */
+.cho-form-field { margin-bottom: 1rem; }
+.cho-form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.cho-label { display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px; }
+.cho-input {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid #d1d5db; border-radius: 8px;
+  padding: 9px 12px; font-size: 14px; color: #0f172a;
+  background: #fff; outline: none; transition: border-color 0.2s;
+}
+.cho-input:focus { border-color: #1a56db; box-shadow: 0 0 0 3px rgba(26,86,219,0.1); }
+.cho-input::placeholder { color: #9ca3af; }
+
+/* ── Empty State ────────────────────────────────────────────────────────────── */
+.cho-empty-state {
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+  padding: 4rem 2rem; text-align: center; margin-top: 2rem;
+}
+.cho-empty-icon {
+  width: 80px; height: 80px; margin: 0 auto 1.5rem;
+  background: #f3f4f6; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; color: #9ca3af;
+}
+.cho-empty-title { font-size: 20px; font-weight: 600; color: #0f172a; margin: 0 0 8px; }
+.cho-empty-text  { font-size: 14px; color: #6b7280; max-width: 480px; margin: 0 auto 2rem; line-height: 1.6; }
+
+/* ── Responsive ─────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .cho-modal--md { max-width: 100%; }
+  .cho-calc-inputs { flex-direction: column; }
+  .cho-dist-stats-row { flex-direction: column; }
+  .cho-table th, .cho-table td { padding: 10px; font-size: 12px; }
+  .cho-dist-plan-header { flex-direction: column; gap: 8px; }
+}
+@media (max-width: 600px) {
+  .cho-stats-grid--2, .cho-stats-grid--3 { grid-template-columns: 1fr; }
+  .cho-form-row { grid-template-columns: 1fr; }
+}
+
+/* ── Nav Notification Badge ──────────────────────────────────────────────────── */
+.cho-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-badge {
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 99px;
+  min-width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* ── Plan header actions (Distribute All + Delete Plan) ──────────────────────── */
+.cho-plan-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.cho-btn-sm {
+  padding: 7px 14px !important;
+  font-size: 13px !important;
+}
+/* ── Page Header Actions (multiple buttons) ───────────────────────────────── */
+.cho-page-header-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ── RHU Population % Config ──────────────────────────────────────────────── */
+.cho-rhu-config-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.cho-rhu-config-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.cho-rhu-config-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.cho-rhu-config-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cho-rhu-pct-input {
+  width: 84px;
+  text-align: right;
+  padding: 10px 12px !important;
+}
+
+.cho-rhu-pct-sign {
+  font-size: 15px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.cho-rhu-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1rem;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.cho-rhu-total--ok   { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+.cho-rhu-total--warn { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.cho-rhu-total--neutral { background: #f8fafc; color: #374151; border: 1px solid #e2e8f0; }
+
+/* ── Multi-medicine Selection ─────────────────────────────────────────────── */
+.cho-med-select-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-bottom: 1rem;
+}
+
+.cho-med-select-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  flex-wrap: wrap;
+  transition: border-color 0.15s, background 0.15s;
+}
+.cho-med-select-row--active {
+  border-color: #1a56db;
+  background: #f5f8ff;
+}
+
+.cho-med-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  flex: 1;
+  min-width: 200px;
+}
+.cho-med-checkbox-label input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  accent-color: #1a56db;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.cho-med-checkbox-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 15px;
+  color: #0f172a;
+}
+.cho-med-checkbox-sub {
+  font-size: 13px;
+  font-weight: 400;
+  color: #6b7280;
+}
+
+.cho-med-boxes-input {
+  width: 110px !important;
+  flex-shrink: 0;
+}
+
+.cho-calc-btn {
+  margin-bottom: 1.25rem;
+}
+
+.cho-plan-preview {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+.cho-plan-preview:last-of-type {
+  border-bottom: none;
+}
+.cho-plan-preview-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 8px;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
+   ACCESSIBILITY IMPROVEMENTS
+   Larger text, bigger touch targets, stronger contrast, visible focus
+   states — scoped to this page so other screens are unaffected.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* Larger base text and comfortable line-height throughout this page */
+.cho-content { font-size: 15px; line-height: 1.55; min-width: 0; min-height: 0; }
+.cho-content section,
+.cho-content .cho-dist-plan { min-width: 0; }
+.cho-main { min-height: 0; }
+
+.cho-page-title { font-size: 24px; }
+.cho-page-sub   { font-size: 14.5px; color: #4b5563; }
+
+/* Bigger, easier-to-hit buttons everywhere on this page */
+.cho-btn-primary,
+.cho-btn-secondary {
+  min-height: 44px;
+  padding: 11px 20px;
+  font-size: 15px;
+}
+.cho-btn-action {
+  min-height: 40px;
+  padding: 8px 16px;
+  font-size: 13.5px;
+}
+.cho-btn-sm {
+  min-height: 40px !important;
+  padding: 8px 16px !important;
+  font-size: 14px !important;
+}
+.cho-btn-danger-sm {
+  min-height: 36px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+/* Inputs: bigger tap area, clearer focus ring */
+.cho-input {
+  min-height: 44px;
+  font-size: 15px;
+  padding: 10px 14px;
+}
+.cho-input:focus {
+  box-shadow: 0 0 0 4px rgba(26, 86, 219, 0.18);
+}
+
+/* Higher-contrast table text and roomier rows */
+.cho-table th {
+  font-size: 12px;
+  color: #374151;
+}
+.cho-table td {
+  font-size: 14.5px;
+  padding: 16px 14px;
+  color: #1f2937;
+}
+
+/* Status badges: bigger and higher contrast */
+.cho-status-badge {
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+/* Modal: larger title, roomier padding, easier-to-hit close button */
+.cho-modal-title { font-size: 20px; }
+.cho-modal-body  { font-size: 15px; }
+.cho-label       { font-size: 14px; }
+.cho-modal-close {
+  width: 40px;
+  height: 40px;
+  font-size: 30px;
+}
+
+/* Visible keyboard focus outline on every interactive element */
+.cho-btn-primary:focus-visible,
+.cho-btn-secondary:focus-visible,
+.cho-btn-action:focus-visible,
+.cho-btn-sm:focus-visible,
+.cho-btn-danger-sm:focus-visible,
+.cho-input:focus-visible,
+.cho-modal-close:focus-visible,
+.cho-med-checkbox-label input:focus-visible,
+.cho-nav-item:focus-visible {
+  outline: 3px solid #1a56db;
+  outline-offset: 2px;
+}
+
+/* Slightly larger nav items in the sidebar for easier reading/tapping */
+.cho-nav-item {
+  font-size: 14.5px;
+  padding: 11px 12px;
+  min-height: 44px;
+}
+
+@media (max-width: 900px) {
+  .cho-rhu-config-list,
+  .cho-med-select-list {
+    max-height: none;
+  }
+  .cho-med-select-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cho-med-boxes-input {
+    width: 100% !important;
+  }
+}

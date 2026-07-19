@@ -4,8 +4,11 @@ import PrivateRoute from "./components/shared/PrivateRoute";
 
 import Login from "./pages/auth/Login";
 import CHODashboard from "./pages/cho/CHODashboard";
-import CHOInventory from "./pages/cho/CHOInventory";
-import CHODistribution from "./pages/cho/CHODistribution";
+import CHOItemManagement from "./pages/cho/CHOItemManagement";
+import CHOBatchInventory from "./pages/cho/CHOBatchInventory";
+import CHOBarangay from "./pages/cho/CHOBarangay";
+import CHORHUManagement from "./pages/cho/CHORHUManagement";
+import CHOBatchDistribution from "./pages/cho/CHOBatchDistribution";
 import CHOReports from "./pages/cho/CHOReports";
 import CHONotification from "./pages/cho/CHONotification";
 import RHUDashboard from "./pages/rhu/RHUDashboard";
@@ -33,9 +36,12 @@ export default function App() {
           <Route path="/" element={<Login />} />
 
           {/* CHO */}
-          <Route path="/cho/dashboard"     element={<PR roles={["cho"]}><CHODashboard /></PR>} />
-          <Route path="/cho/inventory"     element={<PR roles={["cho"]}><CHOInventory /></PR>} />
-          <Route path="/cho/distribution"  element={<PR roles={["cho"]}><CHODistribution /></PR>} />
+          <Route path="/cho/dashboard"          element={<PR roles={["cho"]}><CHODashboard /></PR>} />
+          <Route path="/cho/item-management"    element={<PR roles={["cho"]}><CHOItemManagement /></PR>} />
+          <Route path="/cho/batch-inventory"    element={<PR roles={["cho"]}><CHOBatchInventory /></PR>} />
+          <Route path="/cho/barangay"           element={<PR roles={["cho"]}><CHOBarangay /></PR>} />
+          <Route path="/cho/rhu-management"     element={<PR roles={["cho"]}><CHORHUManagement /></PR>} />
+          <Route path="/cho/batch-distribution" element={<PR roles={["cho"]}><CHOBatchDistribution /></PR>} />
           <Route path="/cho/reports"       element={<PR roles={["cho"]}><CHOReports /></PR>} />
           <Route path="/cho/notifications" element={<PR roles={["cho"]}><CHONotification /></PR>} />
 

@@ -3,6 +3,7 @@ import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebase/config";
+import { useUnreadCount } from "../../hooks/useUnreadCount";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -10,11 +11,14 @@ import {
 import "./CHODashboard.css";
 
 const navItems = [
-  { label: "Dashboard",    to: "/cho/dashboard"    },
-  { label: "Inventory",    to: "/cho/inventory"    },
-  { label: "Distribution", to: "/cho/distribution" },
-  { label: "Reports",      to: "/cho/reports"      },
-  { label: "Notifications",to: "/cho/notifications"},
+  { label: "Dashboard",        to: "/cho/dashboard"        },
+  { label: "Item Management",  to: "/cho/item-management"  },
+  { label: "Batch Inventory",  to: "/cho/batch-inventory"  },
+  { label: "Barangay",         to: "/cho/barangay"           },
+  { label: "RHU Management",   to: "/cho/rhu-management"    },
+  { label: "Batch Distribution",to: "/cho/batch-distribution" },
+  { label: "Reports",          to: "/cho/reports"          },
+  { label: "Notifications",    to: "/cho/notifications"    },
 ];
 
 const PIE_COLORS = ["#1a56db", "#93c5fd", "#dbeafe", "#bfdbfe", "#eff6ff"];
@@ -22,6 +26,7 @@ const PIE_COLORS = ["#1a56db", "#93c5fd", "#dbeafe", "#bfdbfe", "#eff6ff"];
 export default function CHODashboard() {
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const unreadCount = useUnreadCount();
   const [search, setSearch] = useState("");
   const [inventory, setInventory] = useState([]);
   const [distributions, setDistributions] = useState([]);
@@ -109,7 +114,10 @@ export default function CHODashboard() {
           {navItems.map(item => (
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "cho-nav-item" + (isActive ? " active" : "")}>
-              {item.label}
+              <span>{item.label}</span>
+              {item.label === "Notifications" && unreadCount > 0 && (
+                <span className="nav-badge">{unreadCount}</span>
+              )}
             </NavLink>
           ))}
         </nav>

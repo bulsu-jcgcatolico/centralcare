@@ -6,11 +6,14 @@ import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
 
 const navItems = [
-  { label: "Dashboard",    to: "/cho/dashboard"    },
-  { label: "Inventory",    to: "/cho/inventory"    },
-  { label: "Distribution", to: "/cho/distribution" },
-  { label: "Reports",      to: "/cho/reports"      },
-  { label: "Notifications",to: "/cho/notifications"},
+  { label: "Dashboard",        to: "/cho/dashboard"        },
+  { label: "Item Management",  to: "/cho/item-management"  },
+  { label: "Batch Inventory",  to: "/cho/batch-inventory"  },
+  { label: "Barangay",         to: "/cho/barangay"           },
+  { label: "RHU Management",   to: "/cho/rhu-management"    },
+  { label: "Batch Distribution",to: "/cho/batch-distribution" },
+  { label: "Reports",          to: "/cho/reports"          },
+  { label: "Notifications",    to: "/cho/notifications"    },
 ];
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];

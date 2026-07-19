@@ -83,7 +83,7 @@
   overflow: visible !important;
 }
 
-.cho-dist-plan .cho-table-wrapper {
+.cho-table-wrapper {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -116,6 +116,7 @@
 /* ── Table ──────────────────────────────────────────────────────────────────── */
 .cho-table {
   width: 100%;
+  min-width: 700px;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -196,7 +197,7 @@
 }
 
 /* ── New Distribution Modal ─────────────────────────────────────────────────── */
-.cho-modal--wide { max-width: 860px; }
+.cho-modal--md { max-width: 860px; }
 
 .cho-calc-inputs {
   display: flex;
@@ -286,7 +287,7 @@
 
 /* ── Responsive ─────────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
-  .cho-modal--wide { max-width: 100%; }
+  .cho-modal--md { max-width: 100%; }
   .cho-calc-inputs { flex-direction: column; }
   .cho-dist-stats-row { flex-direction: column; }
   .cho-table th, .cho-table td { padding: 10px; font-size: 12px; }
@@ -480,7 +481,9 @@
    ═════════════════════════════════════════════════════════════════════════ */
 
 /* Larger base text and comfortable line-height throughout this page */
-.cho-content { font-size: 15px; line-height: 1.55; }
+.cho-content { font-size: 15px; line-height: 1.55; min-width: 0; }
+.cho-content section,
+.cho-content .cho-dist-plan { min-width: 0; }
 
 .cho-page-title { font-size: 24px; }
 .cho-page-sub   { font-size: 14.5px; color: #4b5563; }
