@@ -1,11 +1,6 @@
 /* Reuse RHUDashboard layout styles */
 @import './RHUDashboard.css';
 
-/* ── Font (explicit, in case this file loads without the Dashboard import) ── */
-.rhu-layout {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-}
-
 /* ── Stats Grid 3 columns ──────────────────────────────────────────────────── */
 .rhu-stats-grid--3 {
   grid-template-columns: repeat(3, 1fr);
@@ -121,4 +116,21 @@
     border-color: #999999 !important;
     color: #000000 !important;
   }
+}
+/* ── Nav Notification Badge ──────────────────────────────────────────────────── */
+.rhu-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-badge {
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 99px;
+  min-width: 18px;
+  text-align: center;
+  flex-shrink: 0;
 }

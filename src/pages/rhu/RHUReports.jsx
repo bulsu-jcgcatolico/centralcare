@@ -8,6 +8,7 @@ import { useUnreadCount } from "../../hooks/useUnreadCount";
 const navItems = [
   { label: "Dashboard",     to: "/rhu/dashboard"      },
   { label: "Inventory",     to: "/rhu/inventory"      },
+  { label: "Barangay",      to: "/rhu/barangay"       },
   { label: "Distribution",  to: "/rhu/distribution"   },
   { label: "Reports",       to: "/rhu/reports"        },
   { label: "Notifications", to: "/rhu/notifications"  },
@@ -39,14 +40,18 @@ export default function RHUReports() {
     setLoading(true);
     try {
       const [invSnap, distSnap] = await Promise.all([
-        getDocs(query(collection(db, "inventory"),
+        getDocs(query(
+          collection(db, "inventory"),
           where("ownerType", "==", "rhu"),
-          where("rhuId", "==", userData?.rhuId ?? ""))),
-        getDocs(query(collection(db, "rhu_distributions"),
-          where("fromRhuId", "==", userData?.rhuId ?? "")))
+          where("rhuId", "==", userData?.rhuId ?? "")
+        )),
+        getDocs(query(
+          collection(db, "rhu_distributions"),
+          where("fromRhuId", "==", userData?.rhuId ?? "")
+        ))
       ]);
-      setInventory(invSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setDistributions(distSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setInventory(invSnap.docs.map(d => ({ id: d.id, ...d.data(), actType: "inventory" })));
+      setDistributions(distSnap.docs.map(d => ({ id: d.id, ...d.data(), actType: "distribution" })));
     } catch (err) { console.error(err); }
     setLoading(false);
   }
@@ -55,14 +60,14 @@ export default function RHUReports() {
     ...inventory.map(i => ({
       ...i, actType: "inventory",
       displayName: i.name,
-      displayQty:  `${i.quantity} boxes added`,
-      displayDate: i.date || (i.createdAt?.seconds ? new Date(i.createdAt.seconds * 1000).toLocaleDateString() : "—"),
+      displayQty:  `${i.quantity} boxes`,
+      displayDate: i.date || new Date(i.createdAt?.seconds * 1000).toLocaleDateString() || "—",
       month: getMonthYear(i.date || (i.createdAt?.seconds ? new Date(i.createdAt.seconds * 1000).toLocaleDateString() : null))
     })),
     ...distributions.map(d => ({
       ...d, actType: "distribution",
       displayName: d.medicineName,
-      displayQty:  `${d.totalBoxes} boxes to ${d.barangayDistribution?.length || 0} barangays`,
+      displayQty:  `${d.totalBoxes} boxes to all barangays`,
       displayDate: d.date || "—",
       month: getMonthYear(d.date)
     }))
@@ -74,19 +79,17 @@ export default function RHUReports() {
     ? allActivities
     : allActivities.filter(a => a.month === selectedMonth);
 
-  const monthlyInvCount   = displayed.filter(a => a.actType === "inventory").length;
-  const monthlyDistCount  = displayed.filter(a => a.actType === "distribution").length;
+  const monthlyInvCount  = displayed.filter(a => a.actType === "inventory").length;
+  const monthlyDistCount = displayed.filter(a => a.actType === "distribution").length;
   const monthlyTotalBoxes = distributions
     .filter(d => selectedMonth === "all" || getMonthYear(d.date) === selectedMonth)
     .reduce((s, d) => s + (d.totalBoxes || 0), 0);
 
-  const periodLabel = selectedMonth === "all" ? "All Time" : selectedMonth;
+  const periodLabel = selectedMonth === "all" ? "All time" : selectedMonth;
 
   return (
     <div>
-      {/* ════════════════════════════════════════════════════════════════════
-          NORMAL SCREEN VIEW — hidden entirely when printing
-          ════════════════════════════════════════════════════════════════════ */}
+      {/* ════════════════════ NORMAL SCREEN VIEW ════════════════════ */}
       <div className="rhu-screen-only">
         <div className="rhu-layout">
           <aside className="rhu-sidebar">
@@ -106,7 +109,7 @@ export default function RHUReports() {
                 <NavLink key={item.to} to={item.to}
                   className={({ isActive }) => "rhu-nav-item" + (isActive ? " active" : "")}>
                   <span>{item.label}</span>
-                  {item.label === "Notifications" && unreadCount && (
+                  {item.label === "Notifications" && unreadCount > 0 && (
                     <span className="nav-badge">{unreadCount}</span>
                   )}
                 </NavLink>
@@ -136,7 +139,7 @@ export default function RHUReports() {
               <div className="rhu-page-header">
                 <div>
                   <h1 className="rhu-page-title">Activity Reports</h1>
-                  <p className="rhu-page-sub">Monthly summary of inventory and distribution activities for {userData?.rhuName}.</p>
+                  <p className="rhu-page-sub">Monthly summary of inventory additions and distributions.</p>
                 </div>
                 <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                   <select className="rhu-input" style={{ width: "auto", minWidth: "160px" }}
@@ -169,7 +172,7 @@ export default function RHUReports() {
               </div>
 
               {loading ? (
-                <div className="rhu-empty-small"><p>Loading...</p></div>
+                <div className="rhu-empty-state"><p>Loading...</p></div>
               ) : displayed.length === 0 ? (
                 <div className="rhu-empty-state">
                   <div className="rhu-empty-icon">
@@ -182,44 +185,41 @@ export default function RHUReports() {
                 </div>
               ) : (
                 <section className="rhu-section">
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-                      <thead style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                        <tr>
-                          {["TYPE","NAME","QUANTITY / DETAILS","MONTH","DATE","STATUS"].map(h => (
-                            <th key={h} style={{ padding: "10px 14px", textAlign: "left",
-                              fontSize: "11px", fontWeight: "600", color: "#6b7280",
-                              textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
-                          ))}
+                  <table className="rhu-table">
+                    <thead>
+                      <tr>
+                        <th>TYPE</th>
+                        <th>NAME</th>
+                        <th>QUANTITY / DETAILS</th>
+                        <th>MONTH</th>
+                        <th>DATE</th>
+                        <th>STATUS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayed.map(item => (
+                        <tr key={item.id}>
+                          <td>
+                            <span style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "600",
+                              background: item.actType === "distribution" ? "#eff6ff" : "#f0fdf4",
+                              color: item.actType === "distribution" ? "#1a56db" : "#065f46" }}>
+                              {item.actType === "distribution" ? "Distribution" : "Inventory"}
+                            </span>
+                          </td>
+                          <td><strong>{item.displayName}</strong></td>
+                          <td style={{ fontSize: "12px", color: "#6b7280" }}>{item.displayQty}</td>
+                          <td style={{ fontSize: "12px", color: "#6b7280" }}>{item.month || "—"}</td>
+                          <td>{item.displayDate}</td>
+                          <td>
+                            <span style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px",
+                              fontWeight: "600", background: "#d1fae5", color: "#065f46" }}>
+                              {item.status || "Active"}
+                            </span>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {displayed.map(item => (
-                          <tr key={item.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                            <td style={{ padding: "13px 14px" }}>
-                              <span style={{ padding: "4px 10px", borderRadius: "6px",
-                                fontSize: "11px", fontWeight: "600",
-                                background: item.actType === "distribution" ? "#eff6ff" : "#f0fdf4",
-                                color: item.actType === "distribution" ? "#1a56db" : "#065f46" }}>
-                                {item.actType === "distribution" ? "Distribution" : "Inventory"}
-                              </span>
-                            </td>
-                            <td style={{ padding: "13px 14px" }}><strong>{item.displayName}</strong></td>
-                            <td style={{ padding: "13px 14px", color: "#6b7280", fontSize: "12px" }}>{item.displayQty}</td>
-                            <td style={{ padding: "13px 14px", color: "#6b7280", fontSize: "12px" }}>{item.month || "—"}</td>
-                            <td style={{ padding: "13px 14px" }}>{item.displayDate}</td>
-                            <td style={{ padding: "13px 14px" }}>
-                              <span style={{ padding: "4px 10px", borderRadius: "6px",
-                                fontSize: "11px", fontWeight: "600",
-                                background: "#d1fae5", color: "#065f46" }}>
-                                {item.status || "Active"}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))}
+                    </tbody>
+                  </table>
                 </section>
               )}
             </main>
@@ -227,16 +227,12 @@ export default function RHUReports() {
         </div>
       </div>
 
-      {/* ════════════════════════════════════════════════════════════════════
-          PRINT-ONLY VIEW — invisible on screen, only shows when printing.
-          Built with plain inline styles so it never depends on any
-          external CSS file or class being correctly loaded.
-          ════════════════════════════════════════════════════════════════════ */}
+      {/* ════════════════════ PRINT-ONLY VIEW ════════════════════ */}
       <div className="rhu-print-only" style={{ display: "none" }}>
         <div style={{ fontFamily: "Arial, sans-serif", color: "#000", padding: "20px" }}>
           <h1 style={{ fontSize: "20px", margin: "0 0 4px" }}>Activity Reports</h1>
           <p style={{ fontSize: "12px", color: "#333", margin: "0 0 16px" }}>
-            {userData?.rhuName} — {periodLabel}
+            {userData?.rhuName || "RHU"} — {periodLabel}
           </p>
 
           <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "20px" }}>

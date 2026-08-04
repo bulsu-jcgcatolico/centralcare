@@ -15,6 +15,7 @@ const navItems = [
   { label: "Dashboard",     to: "/midwife/dashboard"     },
   { label: "Patients",      to: "/midwife/patients"      },
   { label: "Inventory",     to: "/midwife/inventory"     },
+  { label: "Dispense",      to: "/midwife/dispense"      },
   { label: "Reports",       to: "/midwife/reports"       },
   { label: "Notifications", to: "/midwife/notifications" },
 ];
@@ -57,13 +58,12 @@ export default function MidwifeInventory() {
   const [shipExpiry, setShipExpiry]               = useState("");
   const [shipSource, setShipSource]               = useState("");
 
-  // Dispense modal
-  const [showDispenseModal, setShowDispenseModal] = useState(false);
-  const [dispenseItem, setDispenseItem]           = useState(null);
-  const [patientName, setPatientName]             = useState("");
-  const [boxesToDispense, setBoxesToDispense]     = useState("");
-  const [diagnosis, setDiagnosis]                 = useState("");
-  const [dispensing, setDispensing]               = useState(false);
+  // Confirm Receipt modal (for items RHU sent that are awaiting confirmation)
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [receivingItem, setReceivingItem]       = useState(null);
+  const [receivedBy, setReceivedBy]             = useState("");
+  const [dateReceived, setDateReceived]         = useState("");
+  const [receiving, setReceiving]               = useState(false);
 
 
 
@@ -149,42 +149,33 @@ export default function MidwifeInventory() {
     } catch (err) { alert("Error: " + err.message); }
   }
 
-  // ── Dispense items ──────────────────────────────────────────────────────────
-  function openDispense(item) {
-    setDispenseItem(item);
-    setPatientName(""); setBoxesToDispense(""); setDiagnosis("");
-    setShowDispenseModal(true);
+  function openReceiveModal(item) {
+    setReceivingItem(item);
+    setReceivedBy("");
+    setDateReceived(new Date().toISOString().split("T")[0]);
+    setShowReceiveModal(true);
   }
 
-  async function saveDispense() {
-    const boxes = parseInt(boxesToDispense);
-    if (!patientName.trim()) { alert("Please enter patient name"); return; }
-    if (!boxes || boxes <= 0) { alert("Please enter boxes to dispense"); return; }
-    if (boxes > dispenseItem.remaining) {
-      alert(`Only ${dispenseItem.remaining} boxes remaining!`); return;
+  async function confirmReceipt() {
+    if (!receivedBy.trim()) {
+      alert("Please enter the name of the person confirming receipt.");
+      return;
     }
-    setDispensing(true);
+    setReceiving(true);
     try {
-      const newRemaining = dispenseItem.remaining - boxes;
-      await updateDoc(doc(db, "inventory", dispenseItem.id), { remaining: newRemaining });
-      await checkAndNotifyLowStock({ id: dispenseItem.id, name: dispenseItem.name, remaining: newRemaining }, "midwife", userData);
-
-      await addDoc(collection(db, "dispense_logs"), {
-        barangayName:    userData?.barangayName ?? "",
-        medicineName:    dispenseItem.name,
-        patientName:     patientName.trim(),
-        boxesDispensed:  boxes,
-        tabletsDispensed: boxes * TABLETS_PER_BOX,
-        diagnosis:       diagnosis.trim(),
-        dispensedAt:     serverTimestamp(),
-        date:            new Date().toLocaleDateString()
+      await updateDoc(doc(db, "inventory", receivingItem.id), {
+        receivedStatus: "Received",
+        receivedBy: receivedBy.trim(),
+        receivedAt: dateReceived,
       });
-
-      alert(`Dispensed ${boxes} box(es) (${boxes * TABLETS_PER_BOX} tablets) of ${dispenseItem.name} to ${patientName}.`);
-      setShowDispenseModal(false);
-      loadInventory();
+      setInventory(prev => prev.map(i => i.id === receivingItem.id
+        ? { ...i, receivedStatus: "Received", receivedBy: receivedBy.trim(), receivedAt: dateReceived }
+        : i
+      ));
+      setShowReceiveModal(false);
+      alert("Receipt confirmed — thank you!");
     } catch (err) { alert("Error: " + err.message); }
-    setDispensing(false);
+    setReceiving(false);
   }
 
   const filtered = inventory.filter(i =>
@@ -193,6 +184,7 @@ export default function MidwifeInventory() {
 
   const lowStockCount   = inventory.filter(i => (i.remaining ?? 0) <= 50 && (i.remaining ?? 0) > 20).length;
   const criticalCount   = inventory.filter(i => (i.remaining ?? 0) <= 20).length;
+  const pendingReceiptCount = inventory.filter(i => i.receivedStatus === "Pending").length;
   const expiringCount   = inventory.filter(i => {
     if (!i.expiry) return false;
     const days = (new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24);
@@ -260,7 +252,7 @@ export default function MidwifeInventory() {
             </div>
           </div>
 
-          {/* Stats — 3 cards */}
+          {/* Stats — 4 cards */}
           <div className="midwife-inv-stats-row">
             <div className="midwife-inv-stat-card">
               <div className="midwife-inv-stat-icon midwife-inv-icon--blue">
@@ -271,6 +263,17 @@ export default function MidwifeInventory() {
               <div>
                 <p className="midwife-inv-stat-label">Total Items</p>
                 <p className="midwife-inv-stat-value">{inventory.length}</p>
+              </div>
+            </div>
+            <div className="midwife-inv-stat-card">
+              <div className="midwife-inv-stat-icon midwife-inv-icon--blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+                  <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+              <div>
+                <p className="midwife-inv-stat-label">Pending Receipt</p>
+                <p className="midwife-inv-stat-value">{pendingReceiptCount}</p>
               </div>
             </div>
             <div className="midwife-inv-stat-card">
@@ -313,7 +316,7 @@ export default function MidwifeInventory() {
               />
             </div>
             <div className="midwife-inv-toolbar-right">
-              <button className="midwife-btn-primary" onClick={() => setShowDispenseModal(true)}>
+              <button className="midwife-btn-primary" onClick={() => navigate("/midwife/dispense")}>
                 Dispense Items
               </button>
               <button className="midwife-btn-primary midwife-btn--outline" onClick={() => navigate("/midwife/request-letter")}>
@@ -360,6 +363,7 @@ export default function MidwifeInventory() {
                     <th>REMAINING</th>
                     <th>EXPIRY</th>
                     <th>STATUS</th>
+                    <th>RECEIPT</th>
                     <th>ACTION</th>
                   </tr>
                 </thead>
@@ -387,10 +391,26 @@ export default function MidwifeInventory() {
                           </span>
                         </td>
                         <td>
-                          <button className="midwife-btn-icon midwife-btn-icon--danger"
-                            onClick={() => deleteItem(item.id)}>
-                            Delete
-                          </button>
+                          {item.receivedStatus === "Pending" ? (
+                            <span className="midwife-status-badge midwife-status--low">Pending</span>
+                          ) : item.receivedStatus === "Received" ? (
+                            <span className="midwife-status-badge midwife-status--good">Received</span>
+                          ) : (
+                            <span className="midwife-product-key">—</span>
+                          )}
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            {item.receivedStatus === "Pending" && (
+                              <button className="midwife-btn-icon" onClick={() => openReceiveModal(item)}>
+                                Receive
+                              </button>
+                            )}
+                            <button className="midwife-btn-icon midwife-btn-icon--danger"
+                              onClick={() => deleteItem(item.id)}>
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -472,64 +492,40 @@ export default function MidwifeInventory() {
         </div>
       )}
 
-      {/* ── Dispense Modal ── */}
-      {showDispenseModal && (
-        <div className="midwife-modal-overlay" onClick={() => setShowDispenseModal(false)}>
+      {/* ── Confirm Receipt Modal ── */}
+      {showReceiveModal && receivingItem && (
+        <div className="midwife-modal-overlay" onClick={() => setShowReceiveModal(false)}>
           <div className="midwife-modal" onClick={e => e.stopPropagation()}>
             <div className="midwife-modal-header">
-              <h2 className="midwife-modal-title">Dispense Items</h2>
-              <button className="midwife-modal-close" aria-label="Close" onClick={() => setShowDispenseModal(false)}>×</button>
+              <h2 className="midwife-modal-title">Confirm Receipt</h2>
+              <button className="midwife-modal-close" aria-label="Close" onClick={() => setShowReceiveModal(false)}>×</button>
             </div>
             <div className="midwife-modal-body">
+              <p className="midwife-input-hint" style={{ marginBottom: "1rem" }}>
+                Confirming that <strong>{receivingItem.quantity} boxes</strong> of <strong>{receivingItem.name}</strong>
+                {receivingItem.lotNumber ? ` (Lot ${receivingItem.lotNumber})` : ""} were physically received from {receivingItem.source === "RHU" ? receivingItem.fromRhuName || "RHU" : receivingItem.source}.
+              </p>
               <div className="midwife-form-field">
-                <label className="midwife-label">Select Medicine *</label>
-                <select className="midwife-input" value={dispenseItem?.id || ""}
-                  onChange={e => {
-                    const found = inventory.find(i => i.id === e.target.value);
-                    setDispenseItem(found || null);
-                  }}>
-                  <option value="">-- Select Medicine --</option>
-                  {inventory.filter(i => (i.remaining ?? 0) > 0).map(item => (
-                    <option key={item.id} value={item.id}>
-                      {item.name} — {item.remaining} boxes remaining
-                    </option>
-                  ))}
-                </select>
+                <label className="midwife-label">Received By <span className="midwife-required">*</span></label>
+                <input className="midwife-input" type="text" placeholder="Name of person confirming receipt"
+                  value={receivedBy} onChange={e => setReceivedBy(e.target.value)} />
               </div>
               <div className="midwife-form-field">
-                <label className="midwife-label">Patient Name *</label>
-                <input className="midwife-input" type="text" placeholder="Enter patient full name"
-                  value={patientName} onChange={e => setPatientName(e.target.value)} />
+                <label className="midwife-label">Date Received</label>
+                <input className="midwife-input" type="date"
+                  value={dateReceived} onChange={e => setDateReceived(e.target.value)} />
               </div>
-              <div className="midwife-form-field">
-                <label className="midwife-label">Boxes to Dispense (30's) *</label>
-                <input className="midwife-input" type="number" min="1"
-                  placeholder={dispenseItem ? `Max: ${dispenseItem.remaining} boxes` : "Select medicine first"}
-                  value={boxesToDispense} onChange={e => setBoxesToDispense(e.target.value)} />
-                {boxesToDispense && dispenseItem && (
-                  <p className="midwife-input-hint">
-                    = {parseInt(boxesToDispense || 0) * TABLETS_PER_BOX} tablets dispensed.
-                    Remaining after: {dispenseItem.remaining - parseInt(boxesToDispense || 0)} boxes
-                  </p>
-                )}
-              </div>
-              <div className="midwife-form-field">
-                <label className="midwife-label">Diagnosis / Reason</label>
-                <input className="midwife-input" type="text"
-                  placeholder="e.g., Upper Respiratory Tract Infection"
-                  value={diagnosis} onChange={e => setDiagnosis(e.target.value)} />
-              </div>
+              <p className="midwife-form-hint"><span className="midwife-required">*</span> Required fields</p>
             </div>
             <div className="midwife-modal-footer">
-              <button className="midwife-btn-secondary" onClick={() => setShowDispenseModal(false)}>Cancel</button>
-              <button className="midwife-btn-primary" onClick={saveDispense} disabled={dispensing}>
-                {dispensing ? "Dispensing..." : "Confirm Dispense"}
+              <button className="midwife-btn-secondary" onClick={() => setShowReceiveModal(false)}>Cancel</button>
+              <button className="midwife-btn-primary" onClick={confirmReceipt} disabled={receiving}>
+                {receiving ? "Confirming..." : "Confirm Receipt"}
               </button>
             </div>
           </div>
         </div>
       )}
-
 
     </div>
   );

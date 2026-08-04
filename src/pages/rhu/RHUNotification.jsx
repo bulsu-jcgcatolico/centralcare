@@ -8,6 +8,7 @@ import { useUnreadCount } from "../../hooks/useUnreadCount";
 const navItems = [
   { label: "Dashboard",     to: "/rhu/dashboard"      },
   { label: "Inventory",     to: "/rhu/inventory"      },
+  { label: "Barangay",      to: "/rhu/barangay"       },
   { label: "Distribution",  to: "/rhu/distribution"   },
   { label: "Reports",       to: "/rhu/reports"        },
   { label: "Notifications", to: "/rhu/notifications"  },

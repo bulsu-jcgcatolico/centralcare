@@ -9,19 +9,20 @@ import { useUnreadCount } from "../../hooks/useUnreadCount";
 import "./CHOItemManagement.css";
 
 const navItems = [
-  { label: "Dashboard",        to: "/cho/dashboard"         },
-  { label: "Item Management",  to: "/cho/item-management"   },
-  { label: "Batch Inventory",  to: "/cho/batch-inventory"   },
-  { label: "Barangay",         to: "/cho/barangay"           },
-  { label: "RHU Management",   to: "/cho/rhu-management"    },
+  { label: "Dashboard",         to: "/cho/dashboard"          },
+  { label: "Item Management",   to: "/cho/item-management"    },
+  { label: "Batch Inventory",   to: "/cho/batch-inventory"    },
+  { label: "Barangay",          to: "/cho/barangay"           },
+  { label: "RHU Management",    to: "/cho/rhu-management"     },
+  { label: "Population Report", to: "/cho/population-report"  },
   { label: "Batch Distribution",to: "/cho/batch-distribution" },
-  { label: "Reports",          to: "/cho/reports"           },
-  { label: "Notifications",    to: "/cho/notifications"     },
+  { label: "Reports",           to: "/cho/reports"            },
+  { label: "Notifications",     to: "/cho/notifications"      },
 ];
 
 const PRODUCTS_COLLECTION = "cho_products";
 
-// Prefix used when auto-generating a Product ID based on medicine form
+// Prefix used when auto-generating a Product ID based on dosage form
 const FORM_PREFIXES = {
   Tablet:     "TAB",
   Capsule:    "CAP",
@@ -45,7 +46,7 @@ export default function CHOItemManagement() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState(null); // productId being edited, or null for new
   const [productId, setProductId] = useState("");
-  const [medicineForm, setMedicineForm] = useState("Tablet");
+  const [dosageForm, setDosageForm] = useState("Tablet");
   const [name, setName] = useState("");
   const [category, setCategory] = useState("General Consumption");
   const [subCategory, setSubCategory] = useState("");
@@ -69,7 +70,7 @@ export default function CHOItemManagement() {
   function openAddModal() {
     setEditingId(null);
     setProductId(""); setName(""); setCategory("General Consumption");
-    setSubCategory(""); setBrand(""); setMedicineForm("Tablet");
+    setSubCategory(""); setBrand(""); setDosageForm("Tablet");
     setShowAddModal(true);
   }
 
@@ -80,14 +81,14 @@ export default function CHOItemManagement() {
     setCategory(p.category || "General Consumption");
     setSubCategory(p.subCategory || "");
     setBrand(p.brand || "");
-    setMedicineForm(p.medicineForm || "Tablet");
+    setDosageForm(p.dosageForm || "Tablet");
     setShowAddModal(true);
   }
 
   // Auto-generate the next available ID for the selected medicine form,
   // e.g. Tablet -> TAB001, TAB002... based on what's already in the catalog.
   function autoGenerateProductId() {
-    const prefix = FORM_PREFIXES[medicineForm] || "GEN";
+    const prefix = FORM_PREFIXES[dosageForm] || "GEN";
     const usedNumbers = products
       .map(p => p.productId || "")
       .filter(id => id.toUpperCase().startsWith(prefix))
@@ -122,7 +123,7 @@ export default function CHOItemManagement() {
         category,
         subCategory: subCategory.trim(),
         brand: brand.trim(),
-        medicineForm,
+        dosageForm,
         createdBy: user?.uid ?? "",
         updatedAt: serverTimestamp(),
       }, { merge: true });
@@ -231,7 +232,7 @@ export default function CHOItemManagement() {
                 <thead>
                   <tr>
                     <th>PRODUCT ID</th>
-                    <th>FORM</th>
+                    <th>DOSAGE FORM</th>
                     <th>NAME</th>
                     <th>CATEGORY</th>
                     <th>SUB-CATEGORY</th>
@@ -243,7 +244,7 @@ export default function CHOItemManagement() {
                   {filteredProducts.map(p => (
                     <tr key={p.id}>
                       <td className="cho-product-key"><strong>{p.productId}</strong></td>
-                      <td>{p.medicineForm || "—"}</td>
+                      <td>{p.dosageForm || "—"}</td>
                       <td><strong>{p.name}</strong></td>
                       <td>{p.category}</td>
                       <td>
@@ -281,8 +282,8 @@ export default function CHOItemManagement() {
               <h3 className="cho-form-section-title">Product Details</h3>
               <div className="cho-form-row cho-form-row--3">
                 <div className="cho-form-field">
-                  <label className="cho-label">Medicine Form</label>
-                  <select className="cho-input" value={medicineForm} onChange={e => setMedicineForm(e.target.value)}>
+                  <label className="cho-label">Dosage Form</label>
+                  <select className="cho-input" value={dosageForm} onChange={e => setDosageForm(e.target.value)}>
                     {Object.keys(FORM_PREFIXES).map(f => <option key={f}>{f}</option>)}
                   </select>
                 </div>
@@ -328,7 +329,7 @@ export default function CHOItemManagement() {
               </div>
 
               {!editingId && (
-                <p className="cho-form-hint">Pick a Medicine Form, then click "Auto" to generate the next available ID for that form — or type your own.</p>
+                <p className="cho-form-hint">Pick a Dosage Form, then click "Auto" to generate the next available ID for that form — or type your own.</p>
               )}
               {editingId && (
                 <p className="cho-form-hint">Product ID can't be changed after creation — delete and re-add if you need a different ID.</p>

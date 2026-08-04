@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
-  collection, doc, setDoc, getDocs, serverTimestamp
+  collection, addDoc, doc, setDoc, getDocs, serverTimestamp
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
@@ -12,8 +12,9 @@ const navItems = [
   { label: "Dashboard",         to: "/cho/dashboard"          },
   { label: "Item Management",   to: "/cho/item-management"    },
   { label: "Batch Inventory",   to: "/cho/batch-inventory"    },
-  { label: "Barangay",         to: "/cho/barangay"           },
+  { label: "Barangay",          to: "/cho/barangay"           },
   { label: "RHU Management",    to: "/cho/rhu-management"     },
+  { label: "Population Report", to: "/cho/population-report"  },
   { label: "Batch Distribution",to: "/cho/batch-distribution" },
   { label: "Reports",           to: "/cho/reports"            },
   { label: "Notifications",     to: "/cho/notifications"      },
@@ -29,6 +30,7 @@ function defaultRhuList() {
     rhuName: `RHU ${i + 1}`,
     address: "",
     contactPerson: "",
+    totalPopulation: 0,
     assignedBarangays: [],
   }));
 }
@@ -47,6 +49,7 @@ export default function CHORHUManagement() {
   const [editingRhu, setEditingRhu] = useState(null);
   const [editAddress, setEditAddress] = useState("");
   const [editContactPerson, setEditContactPerson] = useState("");
+  const [editTotalPopulation, setEditTotalPopulation] = useState("");
   const [editBarangays, setEditBarangays] = useState([]);
   const [selectedBarangayToAdd, setSelectedBarangayToAdd] = useState("");
 
@@ -89,13 +92,12 @@ export default function CHORHUManagement() {
     setEditingRhu(rhu);
     setEditAddress(rhu.address || "");
     setEditContactPerson(rhu.contactPerson || "");
+    setEditTotalPopulation(rhu.totalPopulation ? String(rhu.totalPopulation) : "");
     setEditBarangays([...(rhu.assignedBarangays || [])]);
     setSelectedBarangayToAdd("");
     setShowEditModal(true);
   }
 
-  // Barangays already claimed by a DIFFERENT RHU shouldn't be selectable here,
-  // so the same barangay can't accidentally end up assigned to two RHUs.
   const takenByOtherRhus = new Set(
     rhus
       .filter(r => editingRhu && r.id !== editingRhu.id)
@@ -107,27 +109,60 @@ export default function CHORHUManagement() {
 
   function addBarangayToEdit() {
     if (!selectedBarangayToAdd) return;
-    setEditBarangays(prev => [...prev, selectedBarangayToAdd]);
+    const newBarangays = [...editBarangays, selectedBarangayToAdd];
+    setEditBarangays(newBarangays);
     setSelectedBarangayToAdd("");
+
+    const addedPop = recalculatePopFromBarangays(newBarangays);
+    if (addedPop > 0) setEditTotalPopulation(String(addedPop));
   }
 
   function removeBarangayFromEdit(name) {
-    setEditBarangays(prev => prev.filter(b => b !== name));
+    const newBarangays = editBarangays.filter(b => b !== name);
+    setEditBarangays(newBarangays);
+
+    const addedPop = recalculatePopFromBarangays(newBarangays);
+    if (addedPop > 0) setEditTotalPopulation(String(addedPop));
+  }
+
+  function recalculatePopFromBarangays(assignedList) {
+    return assignedList.reduce((sum, bName) => {
+      const match = barangayCatalog.find(b => b.barangayName === bName);
+      return sum + (Number(match?.population) || 0);
+    }, 0);
   }
 
   async function saveRhu() {
     setSaving(true);
     try {
+      const popVal = parseInt(editTotalPopulation, 10) || 0;
+
       await setDoc(doc(db, RHU_REGISTRY_COLLECTION, editingRhu.id), {
         rhuName: editingRhu.rhuName,
         address: editAddress.trim(),
         contactPerson: editContactPerson.trim(),
+        totalPopulation: popVal,
         assignedBarangays: editBarangays,
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
+      const previouslyAssigned = editingRhu.assignedBarangays || [];
+      const newlyAssigned = editBarangays.filter(b => !previouslyAssigned.includes(b));
+      for (const barangayName of newlyAssigned) {
+        await addDoc(collection(db, "notifications"), {
+          type: "barangay-assignment",
+          title: "New Barangay Assigned",
+          message: `CHO has assigned Barangay ${barangayName} to your RHU.`,
+          toRhuId: editingRhu.id,
+          toRhuName: editingRhu.rhuName,
+          fromType: "cho",
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      }
+
       setRhus(prev => prev.map(r => r.id === editingRhu.id
-        ? { ...r, address: editAddress.trim(), contactPerson: editContactPerson.trim(), assignedBarangays: editBarangays }
+        ? { ...r, address: editAddress.trim(), contactPerson: editContactPerson.trim(), totalPopulation: popVal, assignedBarangays: editBarangays }
         : r
       ));
       setShowEditModal(false);
@@ -135,7 +170,7 @@ export default function CHORHUManagement() {
     setSaving(false);
   }
 
-  const rhusWithBarangays = rhus.filter(r => (r.assignedBarangays || []).length > 0).length;
+  const overallTotalPopulation = rhus.reduce((sum, r) => sum + (Number(r.totalPopulation) || 0), 0);
 
   return (
     <div className="cho-layout">
@@ -186,18 +221,18 @@ export default function CHORHUManagement() {
           <div className="cho-page-header">
             <div>
               <h1 className="cho-page-title">RHU Management</h1>
-              <p className="cho-page-sub">Manage RHU details and assign which barangays each RHU covers.</p>
+              <p className="cho-page-sub">Manage RHU details, set total population, and assign barangays.</p>
             </div>
           </div>
 
           <div className="cho-stats-grid cho-stats-grid--2">
             <div className="cho-stat-card">
-              <p className="cho-stat-label">TOTAL RHUS</p>
+              <p className="cho-stat-label">TOTAL REGISTERED RHUS</p>
               <div className="cho-stat-row"><span className="cho-stat-value">{rhus.length}</span></div>
             </div>
             <div className="cho-stat-card">
-              <p className="cho-stat-label">RHUS WITH BARANGAYS ASSIGNED</p>
-              <div className="cho-stat-row"><span className="cho-stat-value">{rhusWithBarangays}</span></div>
+              <p className="cho-stat-label">COMBINED TOTAL POPULATION</p>
+              <div className="cho-stat-row"><span className="cho-stat-value">{overallTotalPopulation.toLocaleString()}</span></div>
             </div>
           </div>
 
@@ -205,48 +240,53 @@ export default function CHORHUManagement() {
             <div className="cho-empty-state"><p>Loading RHU registry...</p></div>
           ) : (
             <section className="cho-section">
+              <div className="cho-section-header">
+                <h2 className="cho-section-title">RHU Registry</h2>
+              </div>
               <div className="cho-table-wrapper">
-              <table className="cho-table">
-                <thead>
-                  <tr>
-                    <th>RHU</th>
-                    <th>ADDRESS</th>
-                    <th>CONTACT PERSON</th>
-                    <th>ASSIGNED BARANGAYS</th>
-                    <th>ACTION</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rhus.map(rhu => (
-                    <tr key={rhu.id}>
-                      <td><strong>{rhu.rhuName}</strong></td>
-                      <td>{rhu.address || "—"}</td>
-                      <td>{rhu.contactPerson || "—"}</td>
-                      <td>
-                        {(rhu.assignedBarangays || []).length === 0 ? (
-                          <span className="cho-product-key">No barangays assigned</span>
-                        ) : (
-                          <div className="cho-barangay-chip-list">
-                            {rhu.assignedBarangays.map(b => (
-                              <span className="cho-barangay-chip" key={b}>{b}</span>
-                            ))}
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        <button className="cho-btn-action cho-btn-review" onClick={() => openEditModal(rhu)}>Edit</button>
-                      </td>
+                <table className="cho-table">
+                  <thead>
+                    <tr>
+                      <th>RHU</th>
+                      <th>ADDRESS</th>
+                      <th>CONTACT PERSON</th>
+                      <th>ASSIGNED BARANGAYS</th>
+                      <th>TOTAL POPULATION</th>
+                      <th className="text-right">ACTION</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {rhus.map(rhu => (
+                      <tr key={rhu.id}>
+                        <td><strong>{rhu.rhuName}</strong></td>
+                        <td>{rhu.address || "—"}</td>
+                        <td>{rhu.contactPerson || "—"}</td>
+                        <td>
+                          {(rhu.assignedBarangays || []).length === 0 ? (
+                            <span className="cho-product-key">No barangays assigned</span>
+                          ) : (
+                            <div className="cho-barangay-chip-list">
+                              {rhu.assignedBarangays.map(b => (
+                                <span className="cho-barangay-chip" key={b}>{b}</span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td><strong>{(Number(rhu.totalPopulation) || 0).toLocaleString()}</strong></td>
+                        <td className="text-right">
+                          <button className="cho-btn-action cho-btn-review" onClick={() => openEditModal(rhu)}>Edit</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </section>
           )}
         </main>
       </div>
 
-      {/* ── Edit RHU Modal ── */}
+      {/* Edit RHU Modal */}
       {showEditModal && editingRhu && (
         <div className="cho-modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="cho-modal cho-modal--md" onClick={e => e.stopPropagation()}>
@@ -255,9 +295,8 @@ export default function CHORHUManagement() {
               <button className="cho-modal-close" aria-label="Close" onClick={() => setShowEditModal(false)}>×</button>
             </div>
             <div className="cho-modal-body">
-
               <h3 className="cho-form-section-title">RHU Details</h3>
-              <div className="cho-form-row">
+              <div className="cho-form-row cho-form-row--3">
                 <div className="cho-form-field">
                   <label className="cho-label">Address</label>
                   <input className="cho-input" type="text" placeholder="e.g., Barangay Longos, Malolos City"
@@ -267,6 +306,11 @@ export default function CHORHUManagement() {
                   <label className="cho-label">Contact Person</label>
                   <input className="cho-input" type="text" placeholder="e.g., Dr. Juan Dela Cruz"
                     value={editContactPerson} onChange={e => setEditContactPerson(e.target.value)} />
+                </div>
+                <div className="cho-form-field">
+                  <label className="cho-label">Total Population</label>
+                  <input className="cho-input" type="number" min="0" placeholder="e.g., 15000"
+                    value={editTotalPopulation} onChange={e => setEditTotalPopulation(e.target.value)} />
                 </div>
               </div>
 

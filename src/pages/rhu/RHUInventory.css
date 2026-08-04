@@ -56,6 +56,22 @@
   .rhu-stats-grid--4 { grid-template-columns: 1fr; }
 }
 
+/* ── Stats Grid 5 columns (Inventory page with Pending Receipt) ───────────── */
+.rhu-stats-grid--5 {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+@media (max-width: 1100px) {
+  .rhu-stats-grid--5 { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 600px) {
+  .rhu-stats-grid--5 { grid-template-columns: 1fr; }
+}
+
+.rhu-stat--blue .rhu-stat-label { color: #3b82f6; }
+.rhu-stat--blue .rhu-stat-value { color: #2563eb; }
+
 /* ── Buttons ───────────────────────────────────────────────────────────────── */
 .rhu-btn-primary {
   background: #1a56db;
@@ -239,92 +255,6 @@
 @media (max-width: 1024px) {
   .rhu-form-row { grid-template-columns: 1fr; }
 }
-/* Add Item modal width — matches Midwife's Log Shipment modal for consistency */
-.rhu-modal--md { max-width: 780px; }
-
-/* ═════════════════════════════════════════════════════════════════════════
-   ADD ITEM MODAL — improved grouping, sizing, and accessibility
-   ═════════════════════════════════════════════════════════════════════════ */
-
-.rhu-form-section-title {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin: 0 0 12px;
-  padding-top: 4px;
-}
-.rhu-form-section-title:not(:first-child) {
-  margin-top: 1.5rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid #f1f5f9;
-}
-
-.rhu-required { color: #dc2626; }
-
-/* 3-field row (category / sub-category / lot number) */
-.rhu-form-row--3 {
-  grid-template-columns: repeat(3, 1fr);
-}
-@media (max-width: 600px) {
-  .rhu-form-row--3 { grid-template-columns: 1fr; }
-}
-
-.rhu-form-hint {
-  font-size: 12.5px;
-  color: #9ca3af;
-  margin: 0.75rem 0 0;
-}
-
-.rhu-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #374151;
-}
-.rhu-input {
-  min-height: 46px;
-  font-size: 15px;
-  padding: 10px 14px;
-}
-.rhu-input:focus {
-  box-shadow: 0 0 0 4px rgba(26, 86, 219, 0.15);
-}
-
-select.rhu-input {
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e");
-  background-repeat: no-repeat;
-  background-position: right 14px center;
-  background-size: 16px;
-  padding-right: 40px;
-  cursor: pointer;
-}
-
-.rhu-modal-title { font-size: 20px; }
-.rhu-modal-body  { font-size: 15px; }
-
-.rhu-btn-primary,
-.rhu-btn-secondary {
-  min-height: 44px;
-  padding: 11px 20px;
-  font-size: 15px;
-}
-.rhu-modal-close {
-  width: 40px;
-  height: 40px;
-  font-size: 30px;
-}
-
-.rhu-btn-primary:focus-visible,
-.rhu-btn-secondary:focus-visible,
-.rhu-input:focus-visible,
-.rhu-modal-close:focus-visible {
-  outline: 3px solid #1a56db;
-  outline-offset: 2px;
-}
-
 /* ── Nav Notification Badge ──────────────────────────────────────────────────── */
 .rhu-nav-item {
   display: flex;

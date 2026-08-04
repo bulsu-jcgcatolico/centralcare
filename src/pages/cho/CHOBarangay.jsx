@@ -14,6 +14,7 @@ const navItems = [
   { label: "Batch Inventory",   to: "/cho/batch-inventory"    },
   { label: "Barangay",          to: "/cho/barangay"           },
   { label: "RHU Management",    to: "/cho/rhu-management"     },
+  { label: "Population Report", to: "/cho/population-report"  },
   { label: "Batch Distribution",to: "/cho/batch-distribution" },
   { label: "Reports",           to: "/cho/reports"            },
   { label: "Notifications",     to: "/cho/notifications"      },
@@ -36,6 +37,9 @@ export default function CHOBarangay() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [barangayName, setBarangayName] = useState("");
+  const [totalPopulation, setTotalPopulation] = useState("");
+  const [address, setAddress] = useState("");
+  const [midwifeName, setMidwifeName] = useState("");
   const [notes, setNotes] = useState("");
 
   function handleLogout() { logout(); navigate("/"); }
@@ -53,8 +57,7 @@ export default function CHOBarangay() {
     setLoading(false);
   }
 
-  // Figure out which RHU (if any) each barangay is currently assigned to,
-  // so this page can show it and warn before deleting an assigned barangay.
+  // Figure out which RHU (if any) each barangay is currently assigned to
   async function loadAssignments() {
     try {
       const snap = await getDocs(collection(db, RHU_REGISTRY_COLLECTION));
@@ -69,13 +72,20 @@ export default function CHOBarangay() {
 
   function openAddModal() {
     setEditingId(null);
-    setBarangayName(""); setNotes("");
+    setBarangayName(""); 
+    setTotalPopulation("");
+    setAddress(""); 
+    setMidwifeName(""); 
+    setNotes("");
     setShowAddModal(true);
   }
 
   function openEditModal(b) {
     setEditingId(b.id);
     setBarangayName(b.barangayName || b.id);
+    setTotalPopulation(b.totalPopulation ?? "");
+    setAddress(b.address || "");
+    setMidwifeName(b.midwifeName || "");
     setNotes(b.notes || "");
     setShowAddModal(true);
   }
@@ -99,6 +109,9 @@ export default function CHOBarangay() {
 
       await setDoc(doc(db, BARANGAYS_COLLECTION, trimmed), {
         barangayName: trimmed,
+        totalPopulation: Number(totalPopulation) || 0,
+        address: address.trim(),
+        midwifeName: midwifeName.trim(),
         notes: notes.trim(),
         createdBy: user?.uid ?? "",
         updatedAt: serverTimestamp(),
@@ -215,6 +228,9 @@ export default function CHOBarangay() {
                 <thead>
                   <tr>
                     <th>BARANGAY</th>
+                    <th>POPULATION</th>
+                    <th>ADDRESS</th>
+                    <th>MIDWIFE NAME</th>
                     <th>ASSIGNED TO</th>
                     <th>NOTES</th>
                     <th>ACTION</th>
@@ -226,6 +242,9 @@ export default function CHOBarangay() {
                     return (
                       <tr key={b.id}>
                         <td><strong>{b.barangayName}</strong></td>
+                        <td>{b.totalPopulation ? Number(b.totalPopulation).toLocaleString() : "0"}</td>
+                        <td>{b.address || "—"}</td>
+                        <td>{b.midwifeName || "—"}</td>
                         <td>
                           {assignedTo
                             ? <span className="cho-barangay-chip">{assignedTo}</span>
@@ -264,11 +283,32 @@ export default function CHOBarangay() {
                   value={barangayName} onChange={e => setBarangayName(e.target.value)}
                   disabled={!!editingId} />
               </div>
+
+              <div className="cho-form-field">
+                <label className="cho-label">Total Population</label>
+                <input className="cho-input" type="number" min="0" placeholder="e.g., 5000"
+                  value={totalPopulation} onChange={e => setTotalPopulation(e.target.value)} />
+              </div>
+
+              <div className="cho-form-row">
+                <div className="cho-form-field">
+                  <label className="cho-label">Address</label>
+                  <input className="cho-input" type="text" placeholder="e.g., Barangay Hall, Longos, Malolos City"
+                    value={address} onChange={e => setAddress(e.target.value)} />
+                </div>
+                <div className="cho-form-field">
+                  <label className="cho-label">Midwife Name</label>
+                  <input className="cho-input" type="text" placeholder="e.g., Maria Santos"
+                    value={midwifeName} onChange={e => setMidwifeName(e.target.value)} />
+                </div>
+              </div>
+
               <div className="cho-form-field">
                 <label className="cho-label">Notes</label>
                 <input className="cho-input" type="text" placeholder="Optional"
                   value={notes} onChange={e => setNotes(e.target.value)} />
               </div>
+
               {editingId && (
                 <p className="cho-form-hint">Barangay name can't be changed after creation — delete and re-add if you need a different name.</p>
               )}

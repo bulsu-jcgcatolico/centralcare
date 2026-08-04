@@ -11,14 +11,15 @@ import { useUnreadCount } from "../../hooks/useUnreadCount";
 import "./CHOBatchInventory.css";
 
 const navItems = [
-  { label: "Dashboard",        to: "/cho/dashboard"         },
-  { label: "Item Management",  to: "/cho/item-management"   },
-  { label: "Batch Inventory",  to: "/cho/batch-inventory"   },
-  { label: "Barangay",         to: "/cho/barangay"           },
-  { label: "RHU Management",   to: "/cho/rhu-management"    },
+  { label: "Dashboard",         to: "/cho/dashboard"          },
+  { label: "Item Management",   to: "/cho/item-management"    },
+  { label: "Batch Inventory",   to: "/cho/batch-inventory"    },
+  { label: "Barangay",          to: "/cho/barangay"           },
+  { label: "RHU Management",    to: "/cho/rhu-management"     },
+  { label: "Population Report", to: "/cho/population-report"  },
   { label: "Batch Distribution",to: "/cho/batch-distribution" },
-  { label: "Reports",          to: "/cho/reports"           },
-  { label: "Notifications",    to: "/cho/notifications"     },
+  { label: "Reports",           to: "/cho/reports"            },
+  { label: "Notifications",     to: "/cho/notifications"      },
 ];
 
 const PRODUCTS_COLLECTION = "cho_products";

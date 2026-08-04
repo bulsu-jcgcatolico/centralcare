@@ -13,8 +13,9 @@ const navItems = [
   { label: "Dashboard",         to: "/cho/dashboard"          },
   { label: "Item Management",   to: "/cho/item-management"    },
   { label: "Batch Inventory",   to: "/cho/batch-inventory"    },
-  { label: "Barangay",         to: "/cho/barangay"           },
+  { label: "Barangay",          to: "/cho/barangay"           },
   { label: "RHU Management",    to: "/cho/rhu-management"     },
+  { label: "Population Report", to: "/cho/population-report"  },
   { label: "Batch Distribution",to: "/cho/batch-distribution" },
   { label: "Reports",           to: "/cho/reports"            },
   { label: "Notifications",     to: "/cho/notifications"      },
@@ -35,13 +36,11 @@ export default function CHOBatchDistribution() {
   const [saving, setSaving]             = useState(false);
   const [distributingId, setDistributingId] = useState(null);
 
-  // Distribute modal (per batch)
   const [showDistributeModal, setShowDistributeModal] = useState(false);
   const [distributingBatch, setDistributingBatch]     = useState(null);
   const [boxesToDistribute, setBoxesToDistribute]     = useState("");
   const [calculatedDist, setCalculatedDist]           = useState(null);
 
-  // Review modal
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewData, setReviewData]           = useState(null);
 
@@ -80,13 +79,16 @@ export default function CHOBatchDistribution() {
     setShowDistributeModal(true);
   }
 
-  // Split equally among every RHU currently in the registry
-  function calculateEqualSplit() {
-    if (rhus.length === 0) {
-      alert("No RHUs are registered yet. Add them in RHU Management first.");
+  // Calculate percentage dynamically from Total Population input
+  function calculatePercentageSplit() {
+    const activeRhus = rhus.filter(r => (Number(r.totalPopulation) || 0) > 0);
+    const populationSum = activeRhus.reduce((s, r) => s + (Number(r.totalPopulation) || 0), 0);
+
+    if (activeRhus.length === 0 || populationSum <= 0) {
+      alert('No RHU has a Total Population set yet. Set it in RHU Management first.');
       return;
     }
-    const total = parseInt(boxesToDistribute);
+    const total = parseInt(boxesToDistribute, 10);
     const remaining = distributingBatch.remaining ?? distributingBatch.quantity;
     if (!total || total <= 0) {
       alert("Enter a valid number of boxes.");
@@ -97,17 +99,22 @@ export default function CHOBatchDistribution() {
       return;
     }
 
-    const count = rhus.length;
-    const base = Math.floor(total / count);
-    const remainder = total % count;
-
-    // Spread the remainder across the first few RHUs so it's as equal as possible
-    const dist = rhus.map((rhu, i) => ({
-      id: rhu.id,
-      name: rhu.rhuName,
-      boxes: base + (i < remainder ? 1 : 0),
-      status: "Pending",
-    }));
+    let rem = total;
+    const dist = activeRhus.map((rhu, i) => {
+      const rhuPop = Number(rhu.totalPopulation) || 0;
+      const computedSharePercent = (rhuPop / populationSum);
+      const boxes = i === activeRhus.length - 1
+        ? rem
+        : Math.round(total * computedSharePercent);
+      rem -= boxes;
+      return {
+        id: rhu.id,
+        name: rhu.rhuName,
+        boxes,
+        sharePercent: (computedSharePercent * 100).toFixed(1),
+        status: "Pending",
+      };
+    });
 
     setCalculatedDist(dist);
   }
@@ -116,7 +123,7 @@ export default function CHOBatchDistribution() {
     if (!calculatedDist) return;
     setSaving(true);
     try {
-      const totalBoxes = parseInt(boxesToDistribute);
+      const totalBoxes = parseInt(boxesToDistribute, 10);
 
       const docRef = await addDoc(collection(db, "distributions"), {
         fromType: "cho",
@@ -133,16 +140,14 @@ export default function CHOBatchDistribution() {
         date: new Date().toLocaleDateString()
       });
 
-      // Deduct from the batch
       const newRemaining = (distributingBatch.remaining ?? distributingBatch.quantity) - totalBoxes;
       await updateDoc(doc(db, BATCHES_COLLECTION, distributingBatch.id), { remaining: newRemaining });
 
-      // Notify each registered RHU
       for (const rhu of calculatedDist) {
         await addDoc(collection(db, "notifications"), {
           type: "distribution",
           title: "New Supply from CHO",
-          message: `CHO has allocated ${rhu.boxes} boxes of ${distributingBatch.name} (Lot ${distributingBatch.lotNumber || "—"}) for ${rhu.name}. Awaiting distribution.`,
+          message: `CHO has allocated ${rhu.boxes} boxes of ${distributingBatch.name} (Lot ${distributingBatch.lotNumber || "—"}) for ${rhu.name}. Please confirm receipt in your Inventory.`,
           toRhuId: rhu.id,
           toRhuName: rhu.name,
           fromType: "cho",
@@ -150,9 +155,27 @@ export default function CHOBatchDistribution() {
           read: false,
           createdAt: serverTimestamp()
         });
+
+        await addDoc(collection(db, "inventory"), {
+          productKey: distributingBatch.productId ?? "",
+          name: distributingBatch.name,
+          category: distributingBatch.category ?? "",
+          subCategory: distributingBatch.subCategory ?? "",
+          lotNumber: distributingBatch.lotNumber ?? "",
+          quantity: rhu.boxes,
+          remaining: rhu.boxes,
+          expiry: distributingBatch.expiryDate ?? "",
+          source: "CHO",
+          ownerType: "rhu",
+          rhuId: rhu.id,
+          rhuName: rhu.name,
+          distributionId: docRef.id,
+          receivedStatus: "Pending",
+          createdAt: serverTimestamp(),
+        });
       }
 
-      alert("Batch distributed equally among all registered RHUs, and they've been notified.");
+      alert("Batch distributed according to RHU population proportions, and RHUs have been notified.");
       setShowDistributeModal(false);
       loadBatches();
       loadDistributions();
@@ -160,7 +183,6 @@ export default function CHOBatchDistribution() {
     setSaving(false);
   }
 
-  // Mark one RHU row as distributed
   async function distributeToRHU(dist, rhuId) {
     setDistributingId(rhuId + dist.id);
     try {
@@ -285,7 +307,7 @@ export default function CHOBatchDistribution() {
           <div className="cho-page-header">
             <div>
               <h1 className="cho-page-title">Batch Distribution</h1>
-              <p className="cho-page-sub">Distribute available batches — split equally among all registered RHUs.</p>
+              <p className="cho-page-sub">Distribute available batches based on total population metrics across registered RHUs.</p>
             </div>
           </div>
 
@@ -295,7 +317,6 @@ export default function CHOBatchDistribution() {
             </div>
           )}
 
-          {/* Stats */}
           <div className="cho-dist-stats-row">
             <div className="cho-dist-stat-card">
               <div className="cho-dist-stat-icon cho-dist-icon--orange">
@@ -321,7 +342,6 @@ export default function CHOBatchDistribution() {
             </div>
           </div>
 
-          {/* Available batches */}
           <section className="cho-section">
             <div className="cho-dist-plan-header">
               <div>
@@ -330,46 +350,45 @@ export default function CHOBatchDistribution() {
               </div>
             </div>
             <div className="cho-table-wrapper">
-            <table className="cho-table">
-              <thead>
-                <tr>
-                  <th>BATCH ID</th>
-                  <th>PRODUCT ID</th>
-                  <th>NAME</th>
-                  <th>LOT #</th>
-                  <th>REMAINING</th>
-                  <th>EXPIRY</th>
-                  <th>ACTION</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={7}>Loading batches...</td></tr>
-                ) : availableBatches.length === 0 ? (
-                  <tr><td colSpan={7}>No available batches. Add stock in Batch Inventory first.</td></tr>
-                ) : (
-                  availableBatches.map(b => (
-                    <tr key={b.id}>
-                      <td className="cho-product-key"><strong>{b.batchId || "—"}</strong></td>
-                      <td className="cho-product-key">{b.productId || "—"}</td>
-                      <td><strong>{b.name}</strong></td>
-                      <td className="cho-product-key">{b.lotNumber || "—"}</td>
-                      <td><strong>{b.remaining ?? b.quantity} boxes</strong></td>
-                      <td>{b.expiryDate}</td>
-                      <td>
-                        <button className="cho-btn-action cho-btn-distribute" onClick={() => openDistributeModal(b)}>
-                          Distribute
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+              <table className="cho-table">
+                <thead>
+                  <tr>
+                    <th>BATCH ID</th>
+                    <th>PRODUCT ID</th>
+                    <th>NAME</th>
+                    <th>LOT #</th>
+                    <th>REMAINING</th>
+                    <th>EXPIRY</th>
+                    <th>ACTION</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr><td colSpan={7}>Loading batches...</td></tr>
+                  ) : availableBatches.length === 0 ? (
+                    <tr><td colSpan={7}>No available batches. Add stock in Batch Inventory first.</td></tr>
+                  ) : (
+                    availableBatches.map(b => (
+                      <tr key={b.id}>
+                        <td className="cho-product-key"><strong>{b.batchId || "—"}</strong></td>
+                        <td className="cho-product-key">{b.productId || "—"}</td>
+                        <td><strong>{b.name}</strong></td>
+                        <td className="cho-product-key">{b.lotNumber || "—"}</td>
+                        <td><strong>{b.remaining ?? b.quantity} boxes</strong></td>
+                        <td>{b.expiryDate}</td>
+                        <td>
+                          <button className="cho-btn-action cho-btn-distribute" onClick={() => openDistributeModal(b)}>
+                            Distribute
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </section>
 
-          {/* Distribution Plans */}
           {distributions.map(dist => (
             <section className="cho-section cho-dist-plan" key={dist.id}>
               <div className="cho-dist-plan-header">
@@ -392,60 +411,60 @@ export default function CHOBatchDistribution() {
               </div>
 
               <div className="cho-table-wrapper">
-              <table className="cho-table">
-                <thead>
-                  <tr>
-                    <th>RHU'S</th>
-                    <th>MEDICINE</th>
-                    <th>BOXES</th>
-                    <th>STATUS</th>
-                    <th>ACTIONS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(dist.rhuDistribution || []).map(rhu => (
-                    <tr key={rhu.id}>
-                      <td><strong>{rhu.name}</strong></td>
-                      <td>{dist.medicineName}</td>
-                      <td>{rhu.boxes} boxes</td>
-                      <td>
-                        <span className={`cho-status-badge ${rhu.status === "Distributed" ? "cho-status--completed" : "cho-status--pending"}`}>
-                          {rhu.status || "Pending"}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="cho-action-group">
-                          <button
-                            className="cho-btn-action cho-btn-review"
-                            onClick={() => { setReviewData({ dist, rhu }); setShowReviewModal(true); }}
-                          >
-                            Review
-                          </button>
-                          {rhu.status !== "Distributed" && (
-                            <button
-                              className="cho-btn-action cho-btn-distribute"
-                              disabled={distributingId === rhu.id + dist.id}
-                              onClick={() => distributeToRHU(dist, rhu.id)}
-                            >
-                              {distributingId === rhu.id + dist.id ? "..." : "Distribute"}
-                            </button>
-                          )}
-                          {rhu.status === "Distributed" && (
-                            <span className="cho-distributed-label">Done</span>
-                          )}
-                        </div>
-                      </td>
+                <table className="cho-table">
+                  <thead>
+                    <tr>
+                      <th>RHU'S</th>
+                      <th>MEDICINE</th>
+                      <th>BOXES</th>
+                      <th>STATUS</th>
+                      <th>ACTIONS</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {(dist.rhuDistribution || []).map(rhu => (
+                      <tr key={rhu.id}>
+                        <td><strong>{rhu.name}</strong></td>
+                        <td>{dist.medicineName}</td>
+                        <td>{rhu.boxes} boxes</td>
+                        <td>
+                          <span className={`cho-status-badge ${rhu.status === "Distributed" ? "cho-status--completed" : "cho-status--pending"}`}>
+                            {rhu.status || "Pending"}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="cho-action-group">
+                            <button
+                              className="cho-btn-action cho-btn-review"
+                              onClick={() => { setReviewData({ dist, rhu }); setShowReviewModal(true); }}
+                            >
+                              Review
+                            </button>
+                            {rhu.status !== "Distributed" && (
+                              <button
+                                className="cho-btn-action cho-btn-distribute"
+                                disabled={distributingId === rhu.id + dist.id}
+                                onClick={() => distributeToRHU(dist, rhu.id)}
+                              >
+                                {distributingId === rhu.id + dist.id ? "..." : "Distribute"}
+                              </button>
+                            )}
+                            {rhu.status === "Distributed" && (
+                              <span className="cho-distributed-label">Done</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </section>
           ))}
         </main>
       </div>
 
-      {/* ── Distribute Batch Modal ── */}
+      {/* Distribute Batch Modal */}
       {showDistributeModal && distributingBatch && (
         <div className="cho-modal-overlay" onClick={() => setShowDistributeModal(false)}>
           <div className="cho-modal" onClick={e => e.stopPropagation()}>
@@ -456,26 +475,27 @@ export default function CHOBatchDistribution() {
             <div className="cho-modal-body">
               <p className="cho-dist-note">
                 Lot {distributingBatch.lotNumber || "—"} — {distributingBatch.remaining ?? distributingBatch.quantity} boxes remaining.
-                Will split equally among all {rhus.length} registered RHU{rhus.length !== 1 ? "s" : ""}.
+                Calculates share dynamically based on total RHU population.
               </p>
               <div className="cho-form-field">
                 <label className="cho-label">Boxes to Distribute</label>
                 <input className="cho-input" type="number" min="1" placeholder="e.g., 100"
                   value={boxesToDistribute} onChange={e => { setBoxesToDistribute(e.target.value); setCalculatedDist(null); }} />
               </div>
-              <button className="cho-btn-secondary" onClick={calculateEqualSplit}>Calculate Split</button>
+              <button className="cho-btn-secondary" onClick={calculatePercentageSplit}>Calculate Split</button>
 
               {calculatedDist && (
                 <>
-                  <p className="cho-dist-note" style={{ marginTop: "1rem" }}>Equal split preview:</p>
+                  <p className="cho-dist-note" style={{ marginTop: "1rem" }}>Calculated Split Preview:</p>
                   <table className="cho-table">
                     <thead>
-                      <tr><th>RHU</th><th>BOXES</th></tr>
+                      <tr><th>RHU</th><th>POP SHARE %</th><th>BOXES</th></tr>
                     </thead>
                     <tbody>
                       {calculatedDist.map(rhu => (
                         <tr key={rhu.id}>
                           <td><strong>{rhu.name}</strong></td>
+                          <td>{rhu.sharePercent}%</td>
                           <td><strong>{rhu.boxes} boxes</strong></td>
                         </tr>
                       ))}
@@ -496,7 +516,7 @@ export default function CHOBatchDistribution() {
         </div>
       )}
 
-      {/* ── Review Modal ── */}
+      {/* Review Modal */}
       {showReviewModal && reviewData && (
         <div className="cho-modal-overlay" onClick={() => setShowReviewModal(false)}>
           <div className="cho-modal" onClick={e => e.stopPropagation()}>

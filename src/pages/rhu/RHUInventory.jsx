@@ -13,6 +13,7 @@ import "./RHUInventory.css";
 const navItems = [
   { label: "Dashboard",     to: "/rhu/dashboard"      },
   { label: "Inventory",     to: "/rhu/inventory"      },
+  { label: "Barangay",      to: "/rhu/barangay"       },
   { label: "Distribution",  to: "/rhu/distribution"   },
   { label: "Reports",       to: "/rhu/reports"        },
   { label: "Notifications", to: "/rhu/notifications"  },
@@ -52,6 +53,13 @@ export default function RHUInventory() {
   const [tabletsPerBox, setTabletsPerBox] = useState("");
   const [source, setSource] = useState("");
   const [expiry, setExpiry] = useState("");
+
+  // Confirm Receipt modal (for items CHO sent that are awaiting confirmation)
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [receivingItem, setReceivingItem] = useState(null);
+  const [receivedBy, setReceivedBy] = useState("");
+  const [dateReceived, setDateReceived] = useState("");
+  const [receiving, setReceiving] = useState(false);
 
   function handleLogout() { logout(); navigate("/"); }
 
@@ -137,10 +145,40 @@ export default function RHUInventory() {
     } catch (err) { alert("Error: " + err.message); }
   }
 
+  function openReceiveModal(item) {
+    setReceivingItem(item);
+    setReceivedBy("");
+    setDateReceived(new Date().toISOString().split("T")[0]);
+    setShowReceiveModal(true);
+  }
+
+  async function confirmReceipt() {
+    if (!receivedBy.trim()) {
+      alert("Please enter the name of the person confirming receipt.");
+      return;
+    }
+    setReceiving(true);
+    try {
+      await updateDoc(doc(db, "inventory", receivingItem.id), {
+        receivedStatus: "Received",
+        receivedBy: receivedBy.trim(),
+        receivedAt: dateReceived,
+      });
+      setInventory(prev => prev.map(i => i.id === receivingItem.id
+        ? { ...i, receivedStatus: "Received", receivedBy: receivedBy.trim(), receivedAt: dateReceived }
+        : i
+      ));
+      setShowReceiveModal(false);
+      alert("Receipt confirmed — thank you!");
+    } catch (err) { alert("Error: " + err.message); }
+    setReceiving(false);
+  }
+
   const filteredInventory = inventory.filter(item =>
     item.name?.toLowerCase().includes(search.toLowerCase())
   );
   const lowStockCount = inventory.filter(i => (i.remaining ?? i.quantity) <= 50).length;
+  const pendingReceiptCount = inventory.filter(i => i.receivedStatus === "Pending").length;
   const expiringCount = inventory.filter(i => {
     if (!i.expiry) return false;
     const days = (new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24);
@@ -204,10 +242,14 @@ export default function RHUInventory() {
           </div>
 
           {/* Stats */}
-          <div className="rhu-stats-grid rhu-stats-grid--4">
+          <div className="rhu-stats-grid rhu-stats-grid--5">
             <div className="rhu-stat-card">
               <p className="rhu-stat-label">TOTAL ITEMS</p>
               <div className="rhu-stat-row"><span className="rhu-stat-value">{inventory.length}</span></div>
+            </div>
+            <div className="rhu-stat-card rhu-stat--blue">
+              <p className="rhu-stat-label">PENDING RECEIPT</p>
+              <div className="rhu-stat-row"><span className="rhu-stat-value">{pendingReceiptCount}</span></div>
             </div>
             <div className="rhu-stat-card rhu-stat--orange">
               <p className="rhu-stat-label">LOW STOCK</p>
@@ -254,6 +296,7 @@ export default function RHUInventory() {
                     <th>REMAINING</th>
                     <th>EXPIRY</th>
                     <th>STATUS</th>
+                    <th>RECEIPT</th>
                     <th>ACTION</th>
                   </tr>
                 </thead>
@@ -281,7 +324,21 @@ export default function RHUInventory() {
                           </span>
                         </td>
                         <td>
+                          {item.receivedStatus === "Pending" ? (
+                            <span className="rhu-inv-status-badge rhu-status--low">Pending</span>
+                          ) : item.receivedStatus === "Received" ? (
+                            <span className="rhu-inv-status-badge rhu-status--good">Received</span>
+                          ) : (
+                            <span className="rhu-product-key">—</span>
+                          )}
+                        </td>
+                        <td>
                           <div className="rhu-action-group">
+                            {item.receivedStatus === "Pending" && (
+                              <button className="rhu-btn-action rhu-btn-distribute" onClick={() => openReceiveModal(item)}>
+                                Receive
+                              </button>
+                            )}
                             <button className="rhu-btn-action rhu-btn-del" onClick={() => deleteItem(item.id)}>
                               Delete
                             </button>
@@ -369,6 +426,41 @@ export default function RHUInventory() {
               <button className="rhu-btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
               <button className="rhu-btn-primary" onClick={saveItem} disabled={saving}>
                 {saving ? "Saving..." : "Save Item"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirm Receipt Modal ── */}
+      {showReceiveModal && receivingItem && (
+        <div className="rhu-modal-overlay" onClick={() => setShowReceiveModal(false)}>
+          <div className="rhu-modal" onClick={e => e.stopPropagation()}>
+            <div className="rhu-modal-header">
+              <h2 className="rhu-modal-title">Confirm Receipt</h2>
+              <button className="rhu-modal-close" aria-label="Close" onClick={() => setShowReceiveModal(false)}>×</button>
+            </div>
+            <div className="rhu-modal-body">
+              <p className="rhu-dist-note">
+                Confirming that <strong>{receivingItem.quantity} boxes</strong> of <strong>{receivingItem.name}</strong>
+                {receivingItem.lotNumber ? ` (Lot ${receivingItem.lotNumber})` : ""} were physically received from CHO.
+              </p>
+              <div className="rhu-form-field">
+                <label className="rhu-label">Received By <span className="rhu-required">*</span></label>
+                <input className="rhu-input" type="text" placeholder="Name of person confirming receipt"
+                  value={receivedBy} onChange={e => setReceivedBy(e.target.value)} />
+              </div>
+              <div className="rhu-form-field">
+                <label className="rhu-label">Date Received</label>
+                <input className="rhu-input" type="date"
+                  value={dateReceived} onChange={e => setDateReceived(e.target.value)} />
+              </div>
+              <p className="rhu-form-hint"><span className="rhu-required">*</span> Required fields</p>
+            </div>
+            <div className="rhu-modal-footer">
+              <button className="rhu-btn-secondary" onClick={() => setShowReceiveModal(false)}>Cancel</button>
+              <button className="rhu-btn-primary" onClick={confirmReceipt} disabled={receiving}>
+                {receiving ? "Confirming..." : "Confirm Receipt"}
               </button>
             </div>
           </div>

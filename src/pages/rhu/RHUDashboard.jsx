@@ -3,6 +3,7 @@ import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebase/config";
+import { useUnreadCount } from "../../hooks/useUnreadCount";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -12,6 +13,7 @@ import "./RHUDashboard.css";
 const navItems = [
   { label: "Dashboard",     to: "/rhu/dashboard"      },
   { label: "Inventory",     to: "/rhu/inventory"      },
+  { label: "Barangay",      to: "/rhu/barangay"       },
   { label: "Distribution",  to: "/rhu/distribution"   },
   { label: "Reports",       to: "/rhu/reports"        },
   { label: "Notifications", to: "/rhu/notifications"  },
@@ -22,6 +24,7 @@ const PIE_COLORS = ["#1a56db", "#93c5fd", "#dbeafe", "#bfdbfe", "#eff6ff"];
 export default function RHUDashboard() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
+  const unreadCount = useUnreadCount();
   const [search, setSearch] = useState("");
   const [inventory, setInventory] = useState([]);
   const [distributions, setDistributions] = useState([]);
@@ -111,7 +114,10 @@ export default function RHUDashboard() {
           {navItems.map(item => (
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "rhu-nav-item" + (isActive ? " active" : "")}>
-              {item.label}
+              <span>{item.label}</span>
+              {item.label === "Notifications" && unreadCount > 0 && (
+                <span className="nav-badge">{unreadCount}</span>
+              )}
             </NavLink>
           ))}
         </nav>

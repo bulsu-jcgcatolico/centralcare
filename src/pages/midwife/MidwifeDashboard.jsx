@@ -3,12 +3,14 @@ import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebase/config";
+import { useUnreadCount } from "../../hooks/useUnreadCount";
 import "./MidwifeDashboard.css";
 
 const navItems = [
   { label: "Dashboard",     to: "/midwife/dashboard"     },
   { label: "Patients",      to: "/midwife/patients"      },
   { label: "Inventory",     to: "/midwife/inventory"     },
+  { label: "Dispense",      to: "/midwife/dispense"      },
   { label: "Reports",       to: "/midwife/reports"       },
   { label: "Notifications", to: "/midwife/notifications" },
 ];
@@ -16,6 +18,7 @@ const navItems = [
 export default function MidwifeDashboard() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
+  const unreadCount = useUnreadCount();
   const [search, setSearch] = useState("");
   const [inventory, setInventory] = useState([]);
   const [patients, setPatients] = useState([]);
@@ -67,7 +70,10 @@ export default function MidwifeDashboard() {
           {navItems.map(item => (
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "midwife-nav-item" + (isActive ? " active" : "")}>
-              {item.label}
+              <span>{item.label}</span>
+              {item.label === "Notifications" && unreadCount > 0 && (
+                <span className="nav-badge">{unreadCount}</span>
+              )}
             </NavLink>
           ))}
         </nav>

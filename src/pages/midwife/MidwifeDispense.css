@@ -1,0 +1,221 @@
+/* Reuse MidwifeDashboard layout styles */
+@import './MidwifeDashboard.css';
+
+/* ── Font (explicit, in case this file loads without the Dashboard import) ── */
+.midwife-layout {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* ── Two-column layout: form on left, recent history on right ────────────── */
+.dispense-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 1000px) {
+  .dispense-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Section (reused pattern) ─────────────────────────────────────────────── */
+.midwife-section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+.midwife-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 1rem;
+}
+
+/* ── Form basics ──────────────────────────────────────────────────────────── */
+.midwife-form-field { margin-bottom: 1rem; }
+.midwife-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+@media (max-width: 600px) {
+  .midwife-form-row { grid-template-columns: 1fr; }
+}
+.midwife-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+.midwife-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  min-height: 46px;
+  padding: 10px 14px;
+  font-size: 15px;
+  color: #0f172a;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: inherit;
+}
+.midwife-input:focus {
+  border-color: #1a56db;
+  box-shadow: 0 0 0 4px rgba(26,86,219,0.15);
+}
+.midwife-input::placeholder { color: #9ca3af; }
+.dispense-notes { min-height: 90px; resize: vertical; }
+
+/* ── Patient search ───────────────────────────────────────────────────────── */
+.dispense-patient-search { margin-bottom: 8px; }
+
+.dispense-patient-results {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.dispense-patient-result-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+.dispense-patient-result-row:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+.dispense-result-name { font-size: 14.5px; font-weight: 600; color: #0f172a; }
+.dispense-result-sub  { font-size: 12.5px; color: #6b7280; }
+
+.dispense-selected-patient {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 0.5rem;
+}
+.dispense-selected-name { font-size: 15px; font-weight: 700; color: #166534; margin: 0 0 2px; }
+.dispense-selected-sub  { font-size: 13px; color: #4b7c5f; margin: 0; }
+
+/* ── Submit row ───────────────────────────────────────────────────────────── */
+.dispense-submit-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.midwife-btn-primary {
+  background: #1a56db;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 11px 20px;
+  min-height: 44px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.midwife-btn-primary:hover:not(:disabled) { background: #1447c0; }
+.midwife-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.midwife-btn-secondary {
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 11px 20px;
+  min-height: 44px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.midwife-btn-secondary:hover { background: #f9fafb; border-color: #9ca3af; }
+
+/* ── Recent Dispense Log ──────────────────────────────────────────────────── */
+.dispense-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.dispense-log-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 12px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+.dispense-log-row:last-child { border-bottom: none; }
+.dispense-log-med {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 2px;
+}
+.dispense-log-sub {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0;
+}
+.dispense-log-date {
+  font-size: 11px;
+  color: #9ca3af;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.midwife-required { color: #dc2626; }
+.midwife-input-hint { font-size: 12px; color: #6b7280; margin: 6px 0 0; }
+
+/* ── Nav Notification Badge ───────────────────────────────────────────────── */
+.midwife-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-badge {
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 99px;
+  min-width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* ── Accessibility: visible keyboard focus ────────────────────────────────── */
+.midwife-btn-primary:focus-visible,
+.midwife-btn-secondary:focus-visible,
+.midwife-input:focus-visible,
+.dispense-patient-result-row:focus-visible,
+.midwife-nav-item:focus-visible {
+  outline: 3px solid #1a56db;
+  outline-offset: 2px;
+}

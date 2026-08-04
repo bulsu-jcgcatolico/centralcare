@@ -1,0 +1,321 @@
+/* ==========================================
+   CHO POPULATION REPORT & DEMOGRAPHICS STYLES
+   ========================================== */
+
+/* Page & Layout */
+.cho-content {
+  padding: 1.5rem 2rem;
+}
+
+.cho-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+}
+
+.cho-page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 0.25rem 0;
+}
+
+.cho-page-sub {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0;
+}
+
+/* Printable Section Outer Wrap */
+.printable-report-section {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  margin-top: 1.5rem;
+}
+
+/* Toolbar Header */
+.cho-report-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-direction: row;
+  gap: 1rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+/* View Switcher Tabs (RHU Breakdown vs Barangay Breakdown) */
+.cho-view-tabs {
+  display: inline-flex;
+  gap: 0.25rem;
+  background-color: #f1f5f9;
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  height: 38px;
+  box-sizing: border-box;
+}
+
+.cho-tab-btn {
+  border: none;
+  background: transparent;
+  padding: 0 0.85rem;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #64748b;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.cho-tab-btn.active {
+  background-color: #ffffff;
+  color: #1a56db;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* Controls (Toggle, Selects, Print Button) */
+.cho-report-controls {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.cho-report-controls > * {
+  width: auto;
+  margin: 0;
+}
+
+/* Toggle Buttons (Monthly / Yearly) */
+.cho-btn-group {
+  display: inline-flex;
+  align-items: center;
+  background-color: #f1f5f9;
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  height: 38px;
+  box-sizing: border-box;
+}
+
+.cho-toggle-btn {
+  border: none;
+  background: transparent;
+  padding: 0 0.85rem;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #64748b;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cho-toggle-btn.active {
+  background-color: #ffffff;
+  color: #1a56db;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* Inputs & Select Elements */
+.cho-select-sm {
+  width: auto;
+  min-width: 110px;
+  height: 38px;
+  padding: 0 2rem 0 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background-color: #ffffff;
+  color: #334155;
+  outline: none;
+  cursor: pointer;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.25em 1.25em;
+}
+
+.cho-select-sm:focus {
+  border-color: #1a56db;
+  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.1);
+}
+
+/* Print Button */
+.cho-btn-print {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 38px;
+  padding: 0 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: #1a56db;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-sizing: border-box;
+  transition: background-color 0.2s ease;
+}
+
+.cho-btn-print:hover {
+  background-color: #1d4ed8;
+}
+
+/* Table Enhancements */
+.cho-table-wrapper {
+  width: 100%;
+  max-height: none;
+  overflow-y: visible;
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.cho-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.cho-report-table th {
+  background-color: #f8fafc;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.cho-report-table td {
+  padding: 0.875rem 1rem;
+  font-size: 0.875rem;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.15s ease;
+}
+
+/* Selected Row Style */
+.cho-report-table tr.row-selected td {
+  background-color: #eff6ff;
+}
+
+.cho-report-summary-row {
+  background-color: #f8fafc;
+  font-weight: 700;
+}
+
+.cho-report-summary-row td {
+  border-top: 2px solid #cbd5e1;
+  border-bottom: 2px solid #cbd5e1;
+  color: #0f172a;
+}
+
+/* Percent Share Pills */
+.cho-subcategory-pill {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #1e40af;
+  background-color: #dbeafe;
+  border-radius: 9999px;
+}
+
+/* Printable Header Details */
+.print-header-only {
+  display: none;
+}
+
+/* ==========================================
+   PRINT SPECIFIC STYLES (@media print)
+   ========================================== */
+@media print {
+  .no-print,
+  .cho-sidebar,
+  .cho-topbar,
+  .cho-report-toolbar,
+  .cho-btn-action,
+  .cho-modal-overlay {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+  }
+
+  .printable-report-section {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .print-header-only {
+    display: block !important;
+    margin-bottom: 1.5rem;
+  }
+
+  .print-header-only h1 {
+    font-size: 16pt !important;
+    margin: 0 0 4px 0;
+    color: #000;
+  }
+
+  .print-header-only h2 {
+    font-size: 12pt !important;
+    margin: 0 0 8px 0;
+    color: #333;
+  }
+
+  .print-header-only p {
+    font-size: 9pt !important;
+    margin: 2px 0;
+    color: #555;
+  }
+
+  .print-header-only hr {
+    border: none;
+    border-top: 1px solid #ccc;
+    margin-top: 10px;
+  }
+
+  .cho-report-table th,
+  .cho-report-table td {
+    padding: 6pt 8pt !important;
+    border-bottom: 1pt solid #ddd !important;
+    color: #000 !important;
+    background: transparent !important;
+  }
+
+  .cho-subcategory-pill {
+    background: transparent !important;
+    color: #000 !important;
+    padding: 0 !important;
+    font-weight: bold;
+  }
+}

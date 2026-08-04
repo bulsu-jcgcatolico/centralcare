@@ -9,6 +9,7 @@ const navItems = [
   { label: "Dashboard",     to: "/midwife/dashboard"     },
   { label: "Patients",      to: "/midwife/patients"      },
   { label: "Inventory",     to: "/midwife/inventory"     },
+  { label: "Dispense",      to: "/midwife/dispense"      },
   { label: "Reports",       to: "/midwife/reports"       },
   { label: "Notifications", to: "/midwife/notifications" },
 ];
@@ -89,7 +90,7 @@ export default function MidwifeNotification() {
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "midwife-nav-item" + (isActive ? " active" : "")}>
               <span>{item.label}</span>
-              {item.label === "Notifications" && unreadCount && (
+              {item.label === "Notifications" && unreadCount > 0 && (
                 <span className="nav-badge">{unreadCount}</span>
               )}
             </NavLink>

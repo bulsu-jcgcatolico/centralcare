@@ -5,12 +5,14 @@ import {
 import { db } from "../../firebase/config";
 import { useNavigate, useParams, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useUnreadCount } from "../../hooks/useUnreadCount";
 import "./MidwifeAddPatient.css";
 
 const navItems = [
   { label: "Dashboard",     to: "/midwife/dashboard"     },
   { label: "Patients",      to: "/midwife/patients"      },
   { label: "Inventory",     to: "/midwife/inventory"     },
+  { label: "Dispense",      to: "/midwife/dispense"      },
   { label: "Reports",       to: "/midwife/reports"       },
   { label: "Notifications", to: "/midwife/notifications" },
 ];
@@ -49,6 +51,7 @@ export default function MidwifeAddPatient(props) {
   const navigate = useNavigate();
   const params = useParams();
   const patientId = params.id;
+  const unreadCount = useUnreadCount();
 
   const [type, setType] = useState(typeProp);
   const [pageLoading, setPageLoading] = useState(isEdit ? true : false);
@@ -266,7 +269,10 @@ export default function MidwifeAddPatient(props) {
             return (
               <NavLink key={item.to} to={item.to}
                 className={function (navInfo) { return "midwife-nav-item" + (navInfo.isActive ? " active" : ""); }}>
-                {item.label}
+                <span>{item.label}</span>
+                {item.label === "Notifications" && unreadCount > 0 && (
+                  <span className="nav-badge">{unreadCount}</span>
+                )}
               </NavLink>
             );
           })}
