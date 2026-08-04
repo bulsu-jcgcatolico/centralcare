@@ -8,7 +8,7 @@ import CHOItemManagement from "./pages/cho/CHOItemManagement";
 import CHOBatchInventory from "./pages/cho/CHOBatchInventory";
 import CHOBarangay from "./pages/cho/CHOBarangay";
 import CHORHUManagement from "./pages/cho/CHORHUManagement";
-import CHOPopulationReport from "./pages/cho/CHOPopulationReport"; // Added Import
+import CHOPopulationReport from "./pages/cho/CHOPopulationReport";
 import CHOBatchDistribution from "./pages/cho/CHOBatchDistribution";
 import CHOReports from "./pages/cho/CHOReports";
 import CHONotification from "./pages/cho/CHONotification";
@@ -44,7 +44,7 @@ export default function App() {
           <Route path="/cho/batch-inventory"    element={<PR roles={["cho"]}><CHOBatchInventory /></PR>} />
           <Route path="/cho/barangay"           element={<PR roles={["cho"]}><CHOBarangay /></PR>} />
           <Route path="/cho/rhu-management"     element={<PR roles={["cho"]}><CHORHUManagement /></PR>} />
-          <Route path="/cho/population-report"  element={<PR roles={["cho"]}><CHOPopulationReport /></PR>} /> {/* Added Route */}
+          <Route path="/cho/population-report"  element={<PR roles={["cho"]}><CHOPopulationReport /></PR>} />
           <Route path="/cho/batch-distribution" element={<PR roles={["cho"]}><CHOBatchDistribution /></PR>} />
           <Route path="/cho/reports"            element={<PR roles={["cho"]}><CHOReports /></PR>} />
           <Route path="/cho/notifications"      element={<PR roles={["cho"]}><CHONotification /></PR>} />
