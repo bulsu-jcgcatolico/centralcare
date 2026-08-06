@@ -590,20 +590,3 @@
   font-size: 13px;
   line-height: 1.6;
 }
-/* ── Nav Notification Badge ──────────────────────────────────────────────────── */
-.rhu-nav-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.nav-badge {
-  background: #dc2626;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 99px;
-  min-width: 18px;
-  text-align: center;
-  flex-shrink: 0;
-}

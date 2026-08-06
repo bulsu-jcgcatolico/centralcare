@@ -145,11 +145,11 @@
   flex: 1;
   max-width: 380px;
   padding: 8px 16px;
-  background: #334155;
-  border: 1px solid transparent;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
   font-size: 13px;
-  color: #ffffff;
+  color: #0f172a;
   outline: none;
   transition: all 0.2s;
 }
@@ -159,8 +159,8 @@
 }
 
 .rhu-search:focus {
-  background: #1e293b;
-  border-color: #3b82f6;
+  background: #ffffff;
+  border-color: #2563eb;
 }
 
 .rhu-topbar-right {
@@ -168,23 +168,6 @@
   align-items: center;
   gap: 16px;
   margin-left: auto;
-}
-
-.rhu-notif-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  position: relative;
-  padding: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #64748b;
-  transition: color 0.2s;
-}
-
-.rhu-notif-btn:hover {
-  color: #0f172a;
 }
 
 .rhu-user {
@@ -257,10 +240,32 @@
   margin: 0;
 }
 
-.rhu-page-header-actions {
+/* ── Form Inputs ─────────────────────────────────────────────────────────────── */
+.rhu-form-field {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rhu-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.rhu-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #0f172a;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.rhu-input:focus {
+  border-color: #2563eb;
 }
 
 /* ── Buttons ─────────────────────────────────────────────────────────────────── */
@@ -280,6 +285,11 @@
   background: #1d4ed8;
 }
 
+.rhu-btn-primary:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+}
+
 .rhu-btn-secondary {
   background: #ffffff;
   color: #334155;
@@ -295,6 +305,11 @@
 .rhu-btn-secondary:hover {
   background: #f8fafc;
   border-color: #94a3b8;
+}
+
+.rhu-btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
 }
 
 .rhu-btn-danger-sm {
@@ -365,8 +380,8 @@
   margin: 0;
 }
 
-/* ── Distribution Plan Container ─────────────────────────────────────────────── */
-.rhu-dist-plan {
+/* ── Distribution Section Container ────────────────────────────────────────── */
+.rhu-section {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
@@ -401,37 +416,20 @@
   gap: 10px;
 }
 
-.rhu-dist-plan-badge {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 6px;
-}
-
-.rhu-badge--done {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.rhu-badge--pending {
-  background: #fef3c7;
-  color: #92400e;
-}
-
 /* ── Table Styling ───────────────────────────────────────────────────────────── */
 .rhu-table-wrapper {
   width: 100%;
   overflow-x: auto;
 }
 
-.rhu-inv-table {
+.rhu-table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
   font-size: 13px;
 }
 
-.rhu-inv-table th {
+.rhu-table th {
   background: #f8fafc;
   color: #64748b;
   font-weight: 600;
@@ -442,17 +440,22 @@
   border-bottom: 1px solid #e2e8f0;
 }
 
-.rhu-inv-table td {
+.rhu-table td {
   padding: 14px 1.5rem;
   border-bottom: 1px solid #f1f5f9;
   color: #334155;
 }
 
-.rhu-inv-table tbody tr:last-child td {
+.rhu-table tbody tr:last-child td {
   border-bottom: none;
 }
 
-.rhu-inv-status-badge {
+.rhu-product-key {
+  font-family: monospace;
+  color: #475569;
+}
+
+.rhu-status-badge {
   display: inline-block;
   font-size: 12px;
   font-weight: 600;
@@ -510,35 +513,10 @@
   font-weight: 500;
 }
 
-/* ── Empty State ─────────────────────────────────────────────────────────────── */
-.rhu-empty-state {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 3rem 2rem;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.rhu-empty-icon {
-  color: #cbd5e1;
-  margin-bottom: 1rem;
-}
-
-.rhu-empty-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0 0 6px;
-}
-
-.rhu-empty-text {
+.rhu-dist-note {
   font-size: 13px;
   color: #64748b;
-  margin: 0 0 1.25rem;
+  margin: 0;
 }
 
 /* ── Modals ──────────────────────────────────────────────────────────────────── */
@@ -563,10 +541,6 @@
   display: flex;
   flex-direction: column;
   max-height: 90vh;
-}
-
-.rhu-modal--lg {
-  max-width: 680px;
 }
 
 .rhu-modal-header {
@@ -615,124 +589,6 @@
   background: #f8fafc;
   border-bottom-left-radius: 12px;
   border-bottom-right-radius: 12px;
-}
-
-/* ── Modal Specific Components ───────────────────────────────────────────────── */
-.rhu-dist-note {
-  font-size: 13px;
-  color: #64748b;
-  margin: 0;
-}
-
-.rhu-med-select-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 220px;
-  overflow-y: auto;
-}
-
-.rhu-med-select-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  transition: all 0.15s ease;
-}
-
-.rhu-med-select-row--active {
-  border-color: #3b82f6;
-  background: #eff6ff;
-}
-
-.rhu-med-checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  flex: 1;
-}
-
-.rhu-med-checkbox-text {
-  display: flex;
-  flex-direction: column;
-  font-size: 13px;
-  color: #0f172a;
-}
-
-.rhu-med-checkbox-sub {
-  font-size: 11px;
-  color: #64748b;
-}
-
-.rhu-med-boxes-input {
-  width: 90px;
-  padding: 6px 10px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  font-size: 13px;
-}
-
-.rhu-barangay-summary {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 10px 12px;
-}
-
-.rhu-barangay-summary-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
-  color: #64748b;
-  margin-bottom: 8px;
-}
-
-.rhu-link-btn {
-  background: none;
-  border: none;
-  color: #2563eb;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-  font-size: 12px;
-}
-
-.rhu-barangay-summary-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.rhu-barangay-chip {
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  color: #334155;
-}
-
-.rhu-calc-btn {
-  width: 100%;
-}
-
-.rhu-plan-preview {
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.rhu-plan-preview-title {
-  background: #f1f5f9;
-  padding: 8px 12px;
-  margin: 0;
-  font-size: 12px;
-  font-weight: 700;
-  color: #334155;
 }
 
 .rhu-review-row {

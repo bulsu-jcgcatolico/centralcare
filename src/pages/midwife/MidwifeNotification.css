@@ -1,0 +1,154 @@
+/* Reuse MidwifeDashboard layout styles */
+@import './MidwifeDashboard.css';
+
+/* ── Typography & Container ───────────────────────────────────────────── */
+.midwife-layout {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* ── Header Actions ───────────────────────────────────────────────────── */
+.midwife-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Stat Card Orange Variant ─────────────────────────────────────────── */
+.midwife-stat--orange .midwife-stat-label { color: #f59e0b; }
+.midwife-stat--orange .midwife-stat-value { color: #d97706; }
+
+/* ── Filter Chips ─────────────────────────────────────────────────────── */
+.midwife-filter-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.midwife-chip {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.midwife-chip:hover {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+}
+
+.midwife-chip.active {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1a56db;
+  font-weight: 600;
+}
+
+/* ── Notification Items ───────────────────────────────────────────────── */
+.midwife-notif-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.midwife-notif-card {
+  border-style: solid;
+  border-width: 1px 1px 1px 4px;
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  transition: box-shadow 0.15s ease;
+}
+
+.midwife-notif-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.midwife-notif-body {
+  flex: 1;
+}
+
+.midwife-notif-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.midwife-notif-title {
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0;
+  font-size: 14px;
+}
+
+.midwife-notif-message {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.midwife-notif-badge {
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+
+.midwife-notif-close-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+  padding: 0 4px;
+  transition: color 0.15s ease;
+}
+
+.midwife-notif-close-btn:hover {
+  color: #ef4444;
+}
+
+/* ── Nav Notification Badge Alignment ──────────────────────────────────── */
+.midwife-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-badge {
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 99px;
+  min-width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* ── Responsive Adjustment ────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .midwife-header-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .midwife-header-actions button {
+    width: 100%;
+  }
+}

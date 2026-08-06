@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { collection, getDocs, query, where, updateDoc, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import "./MidwifeNotification.css";
 
 const navItems = [
   { label: "Dashboard",     to: "/midwife/dashboard"     },
@@ -21,6 +22,7 @@ export default function MidwifeNotification() {
   const [notifications, setNotifications] = useState([]);
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
 
   function handleLogout() { logout(); navigate("/"); }
 
@@ -55,9 +57,15 @@ export default function MidwifeNotification() {
     } catch (err) { alert("Error: " + err.message); }
   }
 
-  const filtered = filter === "all"
-    ? notifications
-    : notifications.filter(n => n.type === filter);
+  const filtered = notifications
+    .filter(n => (filter === "all" ? true : n.type === filter))
+    .filter(n =>
+      search.trim() === ""
+        ? true
+        : n.title?.toLowerCase().includes(search.toLowerCase()) ||
+          n.message?.toLowerCase().includes(search.toLowerCase())
+    );
+
   const unreadNum = notifications.filter(n => !n.read).length;
 
   const borderColor = (n) => {
@@ -65,10 +73,16 @@ export default function MidwifeNotification() {
     return "#1a56db";
   };
 
-  const bgColor = (n) => {
+  const cardBg = (n) => {
     if (n.read) return "#f9fafb";
     if (n.type === "low-stock") return n.level === "Critical" ? "#fef2f2" : "#fffbeb";
     return "#eff6ff";
+  };
+
+  const cardBorder = (n) => {
+    if (n.read) return "#e5e7eb";
+    if (n.type === "low-stock") return n.level === "Critical" ? "#fecaca" : "#fde68a";
+    return "#bfdbfe";
   };
 
   return (
@@ -98,15 +112,19 @@ export default function MidwifeNotification() {
         </nav>
         <div className="midwife-sidebar-footer">
           <button className="midwife-nav-item midwife-nav-btn">Settings</button>
-          <button className="midwife-nav-item midwife-nav-btn midwife-signout" onClick={handleLogout}>
-            Sign Out
-          </button>
+          <button className="midwife-nav-item midwife-nav-btn midwife-signout" onClick={handleLogout}>Sign Out</button>
         </div>
       </aside>
 
       <div className="midwife-main">
         <header className="midwife-topbar">
-          <input className="midwife-search" type="text" placeholder="Search notifications..." />
+          <input
+            className="midwife-search"
+            type="text"
+            placeholder="Search notifications..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
           <div className="midwife-topbar-right">
             <div className="midwife-user">
               <div className="midwife-user-info">
@@ -126,67 +144,53 @@ export default function MidwifeNotification() {
                 {unreadNum > 0 ? `${unreadNum} unread notification(s)` : "All caught up!"}
               </p>
             </div>
-            <button className="midwife-btn-primary" onClick={markAllRead}>
-              Mark All as Read
-            </button>
+            <div className="midwife-header-actions">
+              <button className="midwife-btn-secondary" onClick={markAllRead}>Mark All as Read</button>
+            </div>
           </div>
 
-          {/* Stats */}
+          {/* Stat Cards Header */}
           <div className="midwife-stats-grid midwife-stats-grid--3">
-            <div className="midwife-stat-card-simple">
-              <div className="midwife-stat-icon-sm">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                  <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                </svg>
-              </div>
-              <div>
-                <p className="midwife-stat-label-sm">TOTAL</p>
-                <p className="midwife-stat-value-sm">{notifications.length}</p>
+            <div className="midwife-stat-card">
+              <p className="midwife-stat-label">TOTAL</p>
+              <div className="midwife-stat-row">
+                <span className="midwife-stat-value">{notifications.length}</span>
               </div>
             </div>
-            <div className="midwife-stat-card-simple midwife-stat--warning">
-              <div className="midwife-stat-icon-sm">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                  <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
-                </svg>
-              </div>
-              <div>
-                <p className="midwife-stat-label-sm">UNREAD</p>
-                <p className="midwife-stat-value-sm">{unreadNum}</p>
+            <div className="midwife-stat-card midwife-stat--orange">
+              <p className="midwife-stat-label">UNREAD</p>
+              <div className="midwife-stat-row">
+                <span className="midwife-stat-value">{unreadNum}</span>
               </div>
             </div>
-            <div className="midwife-stat-card-simple">
-              <div className="midwife-stat-icon-sm">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                  <path d="M20 7h-3V4a2 2 0 00-2-2H9a2 2 0 00-2 2v3H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
-                </svg>
-              </div>
-              <div>
-                <p className="midwife-stat-label-sm">FROM RHU</p>
-                <p className="midwife-stat-value-sm">
+            <div className="midwife-stat-card">
+              <p className="midwife-stat-label">FROM RHU</p>
+              <div className="midwife-stat-row">
+                <span className="midwife-stat-value">
                   {notifications.filter(n => n.type === "distribution").length}
-                </p>
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Filter chips */}
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "1rem" }}>
+          {/* Filter Chips */}
+          <div className="midwife-filter-chips">
             {[
-              { key: "all",          label: "All"          },
-              { key: "distribution", label: "From RHU"     },
-              { key: "low-stock",    label: "Low Stock"    },
+              { key: "all",          label: "All"       },
+              { key: "distribution", label: "From RHU"  },
+              { key: "low-stock",    label: "Low Stock" },
             ].map(f => (
-              <button key={f.key} onClick={() => setFilter(f.key)} style={{
-                padding: "8px 16px", borderRadius: "8px", border: "1px solid",
-                fontSize: "13px", fontWeight: "500", cursor: "pointer",
-                background: filter === f.key ? "#eff6ff" : "#f3f4f6",
-                borderColor: filter === f.key ? "#bfdbfe" : "#e5e7eb",
-                color: filter === f.key ? "#1a56db" : "#374151"
-              }}>{f.label}</button>
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                className={`midwife-chip ${filter === f.key ? "active" : ""}`}
+              >
+                {f.label}
+              </button>
             ))}
           </div>
 
+          {/* List Display */}
           {loading ? (
             <div className="midwife-empty-small"><p>Loading...</p></div>
           ) : filtered.length === 0 ? (
@@ -202,36 +206,42 @@ export default function MidwifeNotification() {
               </p>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div className="midwife-notif-container">
               {filtered.map(n => (
-                <div key={n.id} style={{
-                  background: bgColor(n),
-                  border: `1px solid ${n.read ? "#e5e7eb" : "#bfdbfe"}`,
-                  borderLeft: `4px solid ${borderColor(n)}`,
-                  borderRadius: "10px", padding: "14px 16px",
-                  display: "flex", alignItems: "flex-start",
-                  justifyContent: "space-between", gap: "1rem"
-                }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                      <p style={{ fontWeight: "600", color: "#0f172a", margin: 0 }}>{n.title}</p>
+                <div
+                  key={n.id}
+                  className="midwife-notif-card"
+                  style={{
+                    background: cardBg(n),
+                    borderColor: cardBorder(n),
+                    borderLeftColor: borderColor(n)
+                  }}
+                >
+                  <div className="midwife-notif-body">
+                    <div className="midwife-notif-title-row">
+                      <p className="midwife-notif-title">{n.title}</p>
                       {!n.read && (
-                        <span style={{
-                          background: n.type === "low-stock"
-                            ? (n.level === "Critical" ? "#dc2626" : "#d97706")
-                            : "#1a56db",
-                          color: "#fff", fontSize: "10px", fontWeight: "700",
-                          padding: "2px 8px", borderRadius: "99px"
-                        }}>
+                        <span
+                          className="midwife-notif-badge"
+                          style={{
+                            background: n.type === "low-stock"
+                              ? (n.level === "Critical" ? "#dc2626" : "#d97706")
+                              : "#1a56db"
+                          }}
+                        >
                           {n.level || "NEW"}
                         </span>
                       )}
                     </div>
-                    <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>{n.message}</p>
+                    <p className="midwife-notif-message">{n.message}</p>
                   </div>
-                  <button onClick={() => dismissNotif(n.id)}
-                    style={{ background: "none", border: "none", color: "#9ca3af",
-                      cursor: "pointer", fontSize: "18px", flexShrink: 0 }}>x</button>
+                  <button
+                    className="midwife-notif-close-btn"
+                    onClick={() => dismissNotif(n.id)}
+                    title="Dismiss notification"
+                  >
+                    x
+                  </button>
                 </div>
               ))}
             </div>

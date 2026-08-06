@@ -3,7 +3,7 @@ import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
   collection, getDocs, query, where,
-  doc, updateDoc, deleteDoc
+  doc, deleteDoc, getDoc
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
@@ -27,24 +27,46 @@ export default function MidwifePatients() {
   const [activeTab, setActiveTab] = useState("child");
   const [filterBy, setFilterBy]   = useState("all");
   const [patients, setPatients]   = useState([]);
+  const [barangayPopulation, setBarangayPopulation] = useState(0);
   const [loading, setLoading]     = useState(false);
 
-  const [saving, setSaving] = useState(false);
+  function handleLogout() {
+    logout();
+    navigate("/");
+  }
 
-  function handleLogout() { logout(); navigate("/"); }
+  useEffect(() => {
+    if (userData?.barangayName) {
+      loadPatientsAndBarangay();
+    }
+  }, [userData?.barangayName]);
 
-  useEffect(() => { loadPatients(); }, []);
-
-  async function loadPatients() {
+  async function loadPatientsAndBarangay() {
     setLoading(true);
     try {
-      const q = query(
-        collection(db, "patients"),
-        where("barangayName", "==", userData?.barangayName ?? "")
-      );
-      const snap = await getDocs(q);
-      setPatients(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (err) { console.error(err); }
+      const currentBarangay = userData?.barangayName ?? "";
+
+      const [patSnap, barangaySnap] = await Promise.all([
+        getDocs(query(
+          collection(db, "patients"),
+          where("barangayName", "==", currentBarangay)
+        )),
+        currentBarangay 
+          ? getDoc(doc(db, "cho_barangays", currentBarangay))
+          : Promise.resolve(null)
+      ]);
+
+      setPatients(patSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      if (barangaySnap && barangaySnap.exists()) {
+        const bData = barangaySnap.data();
+        if (bData.totalPopulation !== undefined) {
+          setBarangayPopulation(bData.totalPopulation);
+        }
+      }
+    } catch (err) {
+      console.error("Error loading patient records:", err);
+    }
     setLoading(false);
   }
 
@@ -61,24 +83,26 @@ export default function MidwifePatients() {
     try {
       await deleteDoc(doc(db, "patients", id));
       setPatients(patients.filter(p => p.id !== id));
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) {
+      alert("Error: " + err.message);
+    }
   }
 
   function exportPatients() {
-    alert("Export patients - connect to backend for CSV/PDF");
+    alert("Export feature: CSV data generation in progress.");
   }
 
-  // Split by type
+  // Split patients by type
   const childPatients = patients.filter(p => p.type === "child");
   const adultPatients = patients.filter(p => p.type === "adult");
 
-  // Apply search
+  // Search logic
   const searchFilter = (list) => list.filter(p =>
     p.name?.toLowerCase().includes(search.toLowerCase()) ||
     p.patientId?.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Apply gender/immunization filter
+  // Filter dropdown logic
   const applyFilter = (list) => {
     if (filterBy === "all") return list;
     if (filterBy === "male")   return list.filter(p => p.sex?.toLowerCase() === "male" || p.sex?.toLowerCase() === "m");
@@ -92,12 +116,11 @@ export default function MidwifePatients() {
     activeTab === "child" ? childPatients : adultPatients
   ));
 
-  const barangayPopulation = 15240;
   const activeCases = patients.filter(p => p.status === "active").length;
 
   return (
     <div className="midwife-layout">
-      {/* ── Sidebar ── */}
+      {/* Sidebar */}
       <aside className="midwife-sidebar">
         <div className="midwife-brand">
           <div className="midwife-brand-icon">
@@ -112,8 +135,11 @@ export default function MidwifePatients() {
         </div>
         <nav className="midwife-nav">
           {navItems.map((item) => (
-            <NavLink key={item.to} to={item.to}
-              className={({ isActive }) => "midwife-nav-item" + (isActive ? " active" : "")}>
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) => "midwife-nav-item" + (isActive ? " active" : "")}
+            >
               <span>{item.label}</span>
               {item.label === "Notifications" && unreadCount > 0 && (
                 <span className="nav-badge">{unreadCount}</span>
@@ -129,12 +155,16 @@ export default function MidwifePatients() {
         </div>
       </aside>
 
-      {/* ── Main ── */}
+      {/* Main Content */}
       <div className="midwife-main">
         <header className="midwife-topbar">
-          <input className="midwife-search" type="text"
+          <input
+            className="midwife-search"
+            type="text"
             placeholder="Search patients, medicine, or ID..."
-            value={search} onChange={(e) => setSearch(e.target.value)} />
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
           <div className="midwife-topbar-right">
             <button className="midwife-notif-btn">
               <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
@@ -146,7 +176,9 @@ export default function MidwifePatients() {
                 <span className="midwife-user-name">{userData?.username || "Maria Santos"}</span>
                 <span className="midwife-user-role">Registered Midwife</span>
               </div>
-              <div className="midwife-avatar">MS</div>
+              <div className="midwife-avatar">
+                {userData?.username ? userData.username.split(" ").map(n => n[0]).join("") : "MS"}
+              </div>
             </div>
           </div>
         </header>
@@ -158,24 +190,25 @@ export default function MidwifePatients() {
                 Patient Records for {activeTab === "child" ? "Children" : "Adults"}
               </h1>
               <p className="midwife-page-sub">
-                Manage and monitor patient health history and treatments.
+                Manage and monitor patient health history and treatments in Barangay {userData?.barangayName || "Longos"}.
               </p>
             </div>
           </div>
 
-          {/* Stats */}
+          {/* Stats Grid */}
           <div className="midwife-stats-grid midwife-stats-grid--4">
             <div className="midwife-stat-card-box">
               <div className="midwife-stat-icon-box blue">
                 <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-                  <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                  <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
                 </svg>
               </div>
               <div>
-                <p className="midwife-stat-label-box">Total Population</p>
+                <p className="midwife-stat-label-box">Barangay Population</p>
                 <p className="midwife-stat-value-box">{barangayPopulation.toLocaleString()}</p>
               </div>
             </div>
+
             <div className="midwife-stat-card-box">
               <div className="midwife-stat-icon-box green">
                 <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
@@ -187,6 +220,7 @@ export default function MidwifePatients() {
                 <p className="midwife-stat-value-box">{activeCases}</p>
               </div>
             </div>
+
             <div className="midwife-stat-card-box">
               <div className="midwife-stat-icon-box orange">
                 <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
@@ -198,10 +232,11 @@ export default function MidwifePatients() {
                 <p className="midwife-stat-value-box">{childPatients.length}</p>
               </div>
             </div>
+
             <div className="midwife-stat-card-box">
               <div className="midwife-stat-icon-box purple">
                 <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-                  <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                  <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
                 </svg>
               </div>
               <div>
@@ -211,18 +246,28 @@ export default function MidwifePatients() {
             </div>
           </div>
 
-          {/* Search & Tabs */}
+          {/* Search & Category Tabs */}
           <div className="midwife-patient-toolbar">
-            <input className="midwife-search-patient" type="text"
-              placeholder="Search Patient"
-              value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input
+              className="midwife-search-patient"
+              type="text"
+              placeholder="Search Patient Name or ID"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
             <div className="midwife-tab-buttons">
               <button
                 className={`midwife-tab-btn ${activeTab === "child" ? "active" : ""}`}
-                onClick={() => setActiveTab("child")}>Child</button>
+                onClick={() => setActiveTab("child")}
+              >
+                Child
+              </button>
               <button
                 className={`midwife-tab-btn ${activeTab === "adult" ? "active" : ""}`}
-                onClick={() => setActiveTab("adult")}>Adult</button>
+                onClick={() => setActiveTab("adult")}
+              >
+                Adult
+              </button>
             </div>
           </div>
 
@@ -252,9 +297,9 @@ export default function MidwifePatients() {
             </div>
           </div>
 
-          {/* Table or Empty State */}
+          {/* Table Container */}
           {loading ? (
-            <div className="midwife-empty-state"><p>Loading patients...</p></div>
+            <div className="midwife-empty-state"><p>Loading records...</p></div>
           ) : displayList.length === 0 ? (
             <div className="midwife-empty-state">
               <div className="midwife-empty-icon">
@@ -263,10 +308,10 @@ export default function MidwifePatients() {
                 </svg>
               </div>
               <h2 className="midwife-empty-title">
-                No {activeTab === "child" ? "Child" : "Adult"} Patient Records Yet
+                No {activeTab === "child" ? "Child" : "Adult"} Patient Records Found
               </h2>
               <p className="midwife-empty-text">
-                Start by registering your first {activeTab === "child" ? "child" : "adult"} patient.
+                Start by registering your first {activeTab === "child" ? "child" : "adult"} patient for Barangay {userData?.barangayName || "Longos"}.
               </p>
               <button className="midwife-btn-primary" onClick={handleRegisterPatient}>
                 Register First Patient
@@ -331,12 +376,16 @@ export default function MidwifePatients() {
                       <td>{patient.lastVisit || "—"}</td>
                       <td>
                         <div style={{ display: "flex", gap: "6px" }}>
-                          <button className="midwife-btn-icon"
-                            onClick={() => navigate(`/midwife/patients/edit/${patient.id}`)}>
+                          <button
+                            className="midwife-btn-icon"
+                            onClick={() => navigate(`/midwife/patients/edit/${patient.id}`)}
+                          >
                             Edit
                           </button>
-                          <button className="midwife-btn-icon midwife-btn-icon--danger"
-                            onClick={() => deletePatient(patient.id)}>
+                          <button
+                            className="midwife-btn-icon midwife-btn-icon--danger"
+                            onClick={() => deletePatient(patient.id)}
+                          >
                             Delete
                           </button>
                         </div>

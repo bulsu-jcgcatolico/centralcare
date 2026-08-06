@@ -88,20 +88,21 @@ export default function MidwifeDispense() {
   }
 
   const selectedItem = inventory.find(i => i.id === selectedItemId);
+  const availableStock = selectedItem ? (selectedItem.remaining ?? selectedItem.quantity ?? 0) : 0;
 
   async function saveDispense() {
     if (!selectedPatient) { alert("Please search and select a patient first."); return; }
     if (!selectedItem) { alert("Please select a medicine to dispense."); return; }
     const boxes = parseInt(boxesToDispense);
     if (!boxes || boxes <= 0) { alert("Please enter a valid number of boxes."); return; }
-    if (boxes > (selectedItem.remaining ?? 0)) {
-      alert(`Only ${selectedItem.remaining} boxes of ${selectedItem.name} remaining!`);
+    if (boxes > availableStock) {
+      alert(`Only ${availableStock} boxes of ${selectedItem.name} remaining!`);
       return;
     }
 
     setSaving(true);
     try {
-      const newRemaining = (selectedItem.remaining ?? 0) - boxes;
+      const newRemaining = availableStock - boxes;
       await updateDoc(doc(db, "inventory", selectedItem.id), { remaining: newRemaining });
       await checkAndNotifyLowStock(
         { id: selectedItem.id, name: selectedItem.name, remaining: newRemaining },
@@ -166,7 +167,11 @@ export default function MidwifeDispense() {
       <div className="midwife-main">
         <header className="midwife-topbar">
           <input className="midwife-search" type="text"
-            placeholder="Search patients, medicine, or ID..." aria-label="Search" />
+            placeholder="Search patients, medicine, or ID..." 
+            aria-label="Search" 
+            value={patientSearch}
+            onChange={e => setPatientSearch(e.target.value)}
+          />
           <div className="midwife-topbar-right">
             <div className="midwife-user">
               <div className="midwife-user-info">
@@ -239,9 +244,9 @@ export default function MidwifeDispense() {
                 <label className="midwife-label">Medicine <span className="midwife-required">*</span></label>
                 <select className="midwife-input" value={selectedItemId} onChange={e => setSelectedItemId(e.target.value)}>
                   <option value="">-- Select Medicine --</option>
-                  {inventory.filter(i => (i.remaining ?? 0) > 0).map(item => (
+                  {inventory.filter(i => (i.remaining ?? i.quantity ?? 0) > 0).map(item => (
                     <option key={item.id} value={item.id}>
-                      {item.name}{item.lotNumber ? ` (Lot ${item.lotNumber})` : ""} — {item.remaining} boxes remaining
+                      {item.name}{item.lotNumber ? ` (Lot ${item.lotNumber})` : ""} — {item.remaining ?? item.quantity ?? 0} boxes remaining
                     </option>
                   ))}
                 </select>
@@ -249,12 +254,12 @@ export default function MidwifeDispense() {
               <div className="midwife-form-field">
                 <label className="midwife-label">Boxes to Dispense (30's) <span className="midwife-required">*</span></label>
                 <input className="midwife-input" type="number" min="1"
-                  placeholder={selectedItem ? `Max: ${selectedItem.remaining} boxes` : "Select medicine first"}
+                  placeholder={selectedItem ? `Max: ${availableStock} boxes` : "Select medicine first"}
                   value={boxesToDispense} onChange={e => setBoxesToDispense(e.target.value)} />
                 {boxesToDispense && selectedItem && (
                   <p className="midwife-input-hint">
                     = {parseInt(boxesToDispense || 0) * TABLETS_PER_BOX} tablets dispensed.
-                    Remaining after: {selectedItem.remaining - parseInt(boxesToDispense || 0)} boxes
+                    Remaining after: {availableStock - parseInt(boxesToDispense || 0)} boxes
                   </p>
                 )}
               </div>

@@ -1,122 +1,84 @@
 /* Reuse RHUDashboard layout styles */
 @import './RHUDashboard.css';
 
-/* ── Stats Grid 3 columns ──────────────────────────────────────────────────── */
-.rhu-stats-grid--3 {
-  grid-template-columns: repeat(3, 1fr);
+/* ── Header Actions ─────────────────────────────────────────────────────────── */
+.rhu-header-actions {
+  display: flex;
+  gap: 8px;
 }
 
-/* ── Tabs ───────────────────────────────────────────────────────────────────── */
-.rhu-tabs {
+/* ── Yellow stat variant ────────────────────────────────────────────────────── */
+.rhu-stat--yellow .rhu-stat-label { color: #f59e0b; }
+.rhu-stat--yellow .rhu-stat-value { color: #d97706; }
+
+/* ── Filter Chips ───────────────────────────────────────────────────────────── */
+.rhu-filter-chips {
   display: flex;
-  gap: 4px;
-  border-bottom: 2px solid #e5e7eb;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-bottom: 1.5rem;
 }
 
-.rhu-tab {
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  padding: 12px 20px;
-  font-size: 14px;
+.rhu-chip {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
   font-weight: 500;
-  color: #6b7280;
-  cursor: pointer;
-  transition: all 0.2s;
-  margin-bottom: -2px;
-}
-
-.rhu-tab:hover {
   color: #374151;
-  background: #f9fafb;
+  cursor: pointer;
+  transition: all 0.15s;
 }
 
-.rhu-tab.active {
+.rhu-chip:hover {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+}
+
+.rhu-chip.active {
+  background: #eff6ff;
+  border-color: #bfdbfe;
   color: #1a56db;
-  border-bottom-color: #1a56db;
   font-weight: 600;
 }
 
-/* ── Empty Actions ──────────────────────────────────────────────────────────── */
-.rhu-empty-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
+/* ── Alert List ─────────────────────────────────────────────────────────────── */
+.rhu-alert-list {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem auto;
+  max-width: 500px;
+  text-align: left;
+}
+
+.rhu-alert-list li {
+  padding: 12px 16px;
+  background: #f9fafb;
+  border-left: 3px solid #1a56db;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.rhu-alert-list li strong {
+  color: #0f172a;
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────────────── */
-@media (max-width: 900px) {
-  .rhu-stats-grid--3 {
-    grid-template-columns: 1fr;
+@media (max-width: 768px) {
+  .rhu-header-actions {
+    flex-direction: column;
+    width: 100%;
   }
 
-  .rhu-tabs {
-    overflow-x: auto;
-  }
-
-  .rhu-tab {
-    white-space: nowrap;
+  .rhu-header-actions button {
+    width: 100%;
   }
 }
 
-/* ── Print styles ───────────────────────────────────────────────────────────── */
-@media print {
-  .no-print {
-    display: none !important;
-  }
-
-  body, html {
-    background: #ffffff !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-
-  .rhu-layout {
-    display: block !important;
-    height: auto !important;
-    background: #ffffff !important;
-    overflow: visible !important;
-  }
-  .rhu-main {
-    display: block !important;
-    overflow: visible !important;
-    height: auto !important;
-    width: 100% !important;
-  }
-  .rhu-content {
-    display: block !important;
-    overflow: visible !important;
-    height: auto !important;
-    padding: 0 !important;
-    background: #ffffff !important;
-  }
-
-  .rhu-page-header {
-    margin-bottom: 1rem !important;
-  }
-  .rhu-page-title { color: #000000 !important; }
-  .rhu-page-sub   { color: #333333 !important; }
-
-  .rhu-section,
-  .rhu-stat-card,
-  .rhu-stat-card-box {
-    border: 1px solid #999999 !important;
-    box-shadow: none !important;
-    background: #ffffff !important;
-  }
-
-  .rhu-table,
-  .rhu-reports-table {
-    font-size: 11px !important;
-    width: 100% !important;
-  }
-  .rhu-table th,
-  .rhu-table td {
-    border-color: #999999 !important;
-    color: #000000 !important;
-  }
-}
 /* ── Nav Notification Badge ──────────────────────────────────────────────────── */
 .rhu-nav-item {
   display: flex;

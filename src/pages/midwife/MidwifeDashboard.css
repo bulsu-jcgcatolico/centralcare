@@ -1,4 +1,4 @@
-/* ── Layout ─────────────────────────────────────────────────────────────────── */
+/* Layout */
 .midwife-layout {
   display: flex;
   height: 100vh;
@@ -7,40 +7,43 @@
   background: #f8fafc;
 }
 
-/* ── Sidebar ─────────────────────────────────────────────────────────────────── */
+/* Sidebar Navigation */
 .midwife-sidebar {
-  width: 210px;
-  min-width: 210px;
-  background: #fff;
+  width: 240px;
+  min-width: 240px;
+  background: #ffffff;
   border-right: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
-  padding: 1.25rem 0.75rem;
+  padding: 1.25rem 1rem;
   gap: 0.5rem;
+  box-sizing: border-box;
 }
 
 .midwife-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 0.5rem 1rem;
-  border-bottom: 1px solid #e5e7eb;
+  gap: 12px;
+  padding: 0 0.5rem 1.25rem;
+  border-bottom: 1px solid #f1f5f9;
   margin-bottom: 0.5rem;
 }
 
 .midwife-brand-icon {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   background: #1a56db;
-  border-radius: 8px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(26, 86, 219, 0.15);
 }
 
 .midwife-brand-name {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: #0f172a;
   margin: 0;
@@ -48,32 +51,36 @@
 }
 
 .midwife-brand-role {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
-  color: #9ca3af;
-  letter-spacing: 0.06em;
-  margin: 0;
+  color: #64748b;
+  letter-spacing: 0.05em;
+  margin: 2px 0 0 0;
+  text-transform: uppercase;
 }
 
 .midwife-nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   flex: 1;
 }
 
 .midwife-nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 11px 12px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
   border-radius: 8px;
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 500;
-  color: #374151;
+  color: #475569;
   text-decoration: none;
-  transition: background 0.15s, color 0.15s;
-  min-height: 44px;
+  transition: all 0.15s ease-in-out;
+  min-height: 42px;
+  box-sizing: border-box;
+  cursor: pointer;
 }
 
 .midwife-nav-item:hover {
@@ -93,14 +100,29 @@
   border: none;
   cursor: pointer;
   text-align: left;
+  padding: 0;
+  font-family: inherit;
+}
+
+.nav-badge {
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  min-width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+  line-height: 1;
 }
 
 .midwife-sidebar-footer {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding-top: 0.75rem;
-  border-top: 1px solid #e5e7eb;
+  gap: 4px;
+  padding-top: 1rem;
+  border-top: 1px solid #f1f5f9;
 }
 
 .midwife-signout {
@@ -112,7 +134,7 @@
   color: #dc2626 !important;
 }
 
-/* ── Main ─────────────────────────────────────────────────────────────────────── */
+/* Main Layout Area */
 .midwife-main {
   flex: 1;
   display: flex;
@@ -120,7 +142,6 @@
   overflow: hidden;
 }
 
-/* ── Topbar ─────────────────────────────────────────────────────────────────── */
 .midwife-topbar {
   display: flex;
   align-items: center;
@@ -144,10 +165,6 @@
 
 .midwife-search:focus {
   border-color: #1a56db;
-}
-
-.midwife-search::placeholder {
-  color: #9ca3af;
 }
 
 .midwife-topbar-right {
@@ -212,7 +229,7 @@
   flex-shrink: 0;
 }
 
-/* ── Content ─────────────────────────────────────────────────────────────────── */
+/* Content Container */
 .midwife-content {
   flex: 1;
   overflow-y: auto;
@@ -222,7 +239,7 @@
   gap: 1.5rem;
 }
 
-/* ── Hero Banner ─────────────────────────────────────────────────────────────── */
+/* Hero Banner */
 .midwife-hero {
   background: linear-gradient(135deg, #1a56db 0%, #3b82f6 100%);
   border-radius: 12px;
@@ -279,10 +296,10 @@
   transform: translateY(-2px);
 }
 
-/* ── Stat Cards ─────────────────────────────────────────────────────────────── */
+/* Stat Cards */
 .midwife-stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
 
@@ -307,6 +324,7 @@
 .midwife-stat-icon-wrap.blue { background: #eff6ff; }
 .midwife-stat-icon-wrap.orange { background: #fff7ed; }
 .midwife-stat-icon-wrap.purple { background: #faf5ff; }
+.midwife-stat-icon-wrap.green { background: #f0fdf4; }
 
 .midwife-stat-label {
   font-size: 12px;
@@ -333,20 +351,13 @@
 .midwife-stat-trend.up { color: #16a34a; }
 .midwife-stat-trend.warning { color: #ef4444; }
 
-.midwife-stat-sub {
-  font-size: 12px;
-  color: #9ca3af;
-  margin: 4px 0 0;
-}
-
-/* ── Two Column Layout ──────────────────────────────────────────────────────── */
+/* Two Column Section */
 .midwife-two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
 }
 
-/* ── Section ──────────────────────────────────────────────────────────────────── */
 .midwife-section {
   background: #fff;
   border: 1px solid #e5e7eb;
@@ -380,7 +391,6 @@
 
 .midwife-view-all:hover { text-decoration: underline; }
 
-/* ── Medicine Table ─────────────────────────────────────────────────────────── */
 .midwife-medicine-list {
   display: flex;
   flex-direction: column;
@@ -422,23 +432,6 @@
   gap: 12px;
 }
 
-.midwife-stock-bar {
-  width: 80px;
-  height: 6px;
-  background: #f3f4f6;
-  border-radius: 99px;
-  overflow: hidden;
-}
-
-.midwife-stock-fill {
-  height: 100%;
-  border-radius: 99px;
-  transition: width 0.3s;
-}
-
-.midwife-stock-fill.high { background: #16a34a; }
-.midwife-stock-fill.low { background: #f59e0b; }
-
 .midwife-stock-text {
   font-size: 13px;
   font-weight: 600;
@@ -465,7 +458,7 @@
   color: #92400e;
 }
 
-/* ── Alert Card ─────────────────────────────────────────────────────────────── */
+/* Alerts */
 .midwife-alert-card {
   background: #fff;
   border: 1px solid #e5e7eb;
@@ -490,9 +483,7 @@
   flex-shrink: 0;
 }
 
-.midwife-alert-content {
-  flex: 1;
-}
+.midwife-alert-content { flex: 1; }
 
 .midwife-alert-title {
   font-size: 14px;
@@ -517,17 +508,6 @@
   border-radius: 6px;
 }
 
-/* ── Responsive ──────────────────────────────────────────────────────────────── */
-@media (max-width: 1100px) {
-  .midwife-stats-grid { grid-template-columns: 1fr; }
-  .midwife-two-col { grid-template-columns: 1fr; }
-}
-
-@media (max-width: 768px) {
-  .midwife-sidebar { display: none; }
-}
-
-/* ── Empty States ────────────────────────────────────────────────────────────── */
 .midwife-empty-small {
   padding: 2rem 1rem;
   text-align: center;
@@ -535,20 +515,17 @@
   font-size: 13px;
   line-height: 1.6;
 }
-/* ── Nav Notification Badge ──────────────────────────────────────────────────── */
-.midwife-nav-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+
+/* Responsive Styles */
+@media (max-width: 1200px) {
+  .midwife-stats-grid { grid-template-columns: repeat(2, 1fr); }
 }
-.nav-badge {
-  background: #dc2626;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 99px;
-  min-width: 18px;
-  text-align: center;
-  flex-shrink: 0;
+
+@media (max-width: 1100px) {
+  .midwife-two-col { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+  .midwife-sidebar { display: none; }
+  .midwife-stats-grid { grid-template-columns: 1fr; }
 }

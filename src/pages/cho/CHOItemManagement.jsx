@@ -61,91 +61,100 @@ export default function CHOItemManagement() {
     try {
       const snap = await getDocs(collection(db, PRODUCTS_COLLECTION));
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      list.sort((a, b) => (a.productId || "").localeCompare(b.productId || ""));
+      list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
       setProducts(list);
     } catch (err) { console.error(err); }
     setLoading(false);
   }
 
+  function generateAutoProductId(form) {
+    const prefix = FORM_PREFIXES[form] || "GEN";
+    const randNum = Math.floor(100 + Math.random() * 900);
+    return `${prefix}${randNum}`;
+  }
+
+  function handleDosageFormChange(e) {
+    const selectedForm = e.target.value;
+    setDosageForm(selectedForm);
+    if (!editingId) {
+      setProductId(generateAutoProductId(selectedForm));
+    }
+  }
+
   function openAddModal() {
     setEditingId(null);
-    setProductId(""); setName(""); setCategory("General Consumption");
-    setSubCategory(""); setBrand(""); setDosageForm("Tablet");
+    const initialForm = "Tablet";
+    setDosageForm(initialForm);
+    setProductId(generateAutoProductId(initialForm));
+    setName("");
+    setCategory("General Consumption");
+    setSubCategory("");
+    setBrand("");
     setShowAddModal(true);
   }
 
   function openEditModal(p) {
     setEditingId(p.id);
     setProductId(p.productId || p.id);
+    setDosageForm(p.dosageForm || "Tablet");
     setName(p.name || "");
     setCategory(p.category || "General Consumption");
     setSubCategory(p.subCategory || "");
     setBrand(p.brand || "");
-    setDosageForm(p.dosageForm || "Tablet");
     setShowAddModal(true);
   }
 
-  // Auto-generate the next available ID for the selected medicine form,
-  // e.g. Tablet -> TAB001, TAB002... based on what's already in the catalog.
-  function autoGenerateProductId() {
-    const prefix = FORM_PREFIXES[dosageForm] || "GEN";
-    const usedNumbers = products
-      .map(p => p.productId || "")
-      .filter(id => id.toUpperCase().startsWith(prefix))
-      .map(id => parseInt(id.slice(prefix.length), 10))
-      .filter(n => !isNaN(n));
-    const nextNumber = usedNumbers.length > 0 ? Math.max(...usedNumbers) + 1 : 1;
-    setProductId(prefix + String(nextNumber).padStart(3, "0"));
-  }
-
   async function saveProduct() {
-    const trimmedId = productId.trim();
-    if (!trimmedId || !name.trim()) {
-      alert("Please fill in Product ID and Medicine Name.");
+    const trimmedId = productId.trim().toUpperCase();
+    const trimmedName = name.trim();
+
+    if (!trimmedId || !trimmedName) {
+      alert("Please fill in Product ID and Product Name.");
       return;
     }
+
     setSaving(true);
     try {
-      // Product ID is the document ID, so it's guaranteed unique.
-      // Editing an existing product keeps the same ID and just updates fields.
       if (!editingId) {
         const existing = await getDoc(doc(db, PRODUCTS_COLLECTION, trimmedId));
         if (existing.exists()) {
-          alert(`Product ID "${trimmedId}" already exists. Use a different ID, or edit the existing product instead.`);
+          alert(`Product ID "${trimmedId}" already exists. Please use a unique Product ID.`);
           setSaving(false);
           return;
         }
       }
 
-      await setDoc(doc(db, PRODUCTS_COLLECTION, trimmedId), {
+      const docId = editingId || trimmedId;
+      await setDoc(doc(db, PRODUCTS_COLLECTION, docId), {
         productId: trimmedId,
-        name: name.trim(),
+        dosageForm,
+        name: trimmedName,
         category,
         subCategory: subCategory.trim(),
         brand: brand.trim(),
-        dosageForm,
         createdBy: user?.uid ?? "",
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      alert(editingId ? "Product updated!" : "Product added to catalog!");
+      alert(editingId ? "Product updated successfully!" : "Product added successfully!");
       setShowAddModal(false);
       loadProducts();
     } catch (err) { alert("Error: " + err.message); }
     setSaving(false);
   }
 
-  async function deleteProduct(id) {
-    if (!confirm("Delete this product from the catalog? Existing batch inventory records for it will keep their saved info, but you won't be able to look it up for new batches.")) return;
+  async function deleteProduct(p) {
+    if (!confirm(`Delete "${p.name}" (${p.productId}) from catalog?`)) return;
     try {
-      await deleteDoc(doc(db, PRODUCTS_COLLECTION, id));
-      setProducts(products.filter(p => p.id !== id));
+      await deleteDoc(doc(db, PRODUCTS_COLLECTION, p.id));
+      setProducts(products.filter(x => x.id !== p.id));
     } catch (err) { alert("Error: " + err.message); }
   }
 
   const filteredProducts = products.filter(p =>
     (p.name || "").toLowerCase().includes(search.toLowerCase()) ||
     (p.productId || "").toLowerCase().includes(search.toLowerCase()) ||
+    (p.category || "").toLowerCase().includes(search.toLowerCase()) ||
     (p.brand || "").toLowerCase().includes(search.toLowerCase())
   );
 
@@ -183,7 +192,7 @@ export default function CHOItemManagement() {
       <div className="cho-main">
         <header className="cho-topbar">
           <input className="cho-search" type="text"
-            placeholder="Search product ID, name, or brand..."
+            placeholder="Search catalog by name, ID, category, or brand..."
             value={search} onChange={(e) => setSearch(e.target.value)} />
           <div className="cho-topbar-right">
             <div className="cho-user">
@@ -200,139 +209,136 @@ export default function CHOItemManagement() {
           <div className="cho-page-header">
             <div>
               <h1 className="cho-page-title">Item Management</h1>
-              <p className="cho-page-sub">Maintain your medicine catalog — product ID, name, category, sub-category, and brand.</p>
+              <p className="cho-page-sub">Master medical catalog — defined products here can be stocked in Batch Inventory.</p>
             </div>
             <button className="cho-btn-primary" onClick={openAddModal}>+ Add New Product</button>
           </div>
 
           <div className="cho-stats-grid cho-stats-grid--2">
             <div className="cho-stat-card">
-              <p className="cho-stat-label">TOTAL PRODUCTS</p>
+              <p className="cho-stat-label">TOTAL CATALOG ITEMS</p>
               <div className="cho-stat-row"><span className="cho-stat-value">{products.length}</span></div>
+            </div>
+            <div className="cho-stat-card">
+              <p className="cho-stat-label">SEARCH MATCHES</p>
+              <div className="cho-stat-row"><span className="cho-stat-value">{filteredProducts.length}</span></div>
             </div>
           </div>
 
           {loading ? (
-            <div className="cho-empty-state"><p>Loading catalog...</p></div>
+            <div className="cho-empty-state"><p>Loading medical catalog...</p></div>
           ) : filteredProducts.length === 0 ? (
             <div className="cho-empty-state">
               <div className="cho-empty-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="64" height="64">
-                  <path d="M20 7h-3V4a2 2 0 00-2-2H9a2 2 0 00-2 2v3H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
+                  <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
                 </svg>
               </div>
-              <h2 className="cho-empty-title">No Products Yet</h2>
-              <p className="cho-empty-text">Add your first product to the catalog — this is what Batch Inventory will look up by Product ID.</p>
-              <button className="cho-btn-primary" onClick={openAddModal}>+ Add Your First Product</button>
+              <h2 className="cho-empty-title">No Items Found</h2>
+              <p className="cho-empty-text">Add your medical items here first to establish Product IDs for inventory logging.</p>
+              <button className="cho-btn-primary" onClick={openAddModal}>+ Add First Product</button>
             </div>
           ) : (
             <section className="cho-section">
               <div className="cho-table-wrapper">
-              <table className="cho-table">
-                <thead>
-                  <tr>
-                    <th>PRODUCT ID</th>
-                    <th>DOSAGE FORM</th>
-                    <th>NAME</th>
-                    <th>CATEGORY</th>
-                    <th>SUB-CATEGORY</th>
-                    <th>BRAND</th>
-                    <th>ACTION</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredProducts.map(p => (
-                    <tr key={p.id}>
-                      <td className="cho-product-key"><strong>{p.productId}</strong></td>
-                      <td>{p.dosageForm || "—"}</td>
-                      <td><strong>{p.name}</strong></td>
-                      <td>{p.category}</td>
-                      <td>
-                        {p.subCategory
-                          ? <span className="cho-subcategory-pill">{p.subCategory}</span>
-                          : "—"}
-                      </td>
-                      <td>{p.brand || "—"}</td>
-                      <td>
-                        <div className="cho-action-group">
-                          <button className="cho-btn-action cho-btn-review" onClick={() => openEditModal(p)}>Edit</button>
-                          <button className="cho-btn-action cho-btn-danger" onClick={() => deleteProduct(p.id)}>Delete</button>
-                        </div>
-                      </td>
+                <table className="cho-table">
+                  <thead>
+                    <tr>
+                      <th>PRODUCT ID</th>
+                      <th>NAME</th>
+                      <th>DOSAGE FORM</th>
+                      <th>CATEGORY</th>
+                      <th>SUB-CATEGORY</th>
+                      <th>BRAND</th>
+                      <th>ACTION</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredProducts.map(p => (
+                      <tr key={p.id}>
+                        <td className="cho-product-key"><strong>{p.productId || p.id}</strong></td>
+                        <td><strong>{p.name}</strong></td>
+                        <td>{p.dosageForm || "—"}</td>
+                        <td>{p.category || "—"}</td>
+                        <td>
+                          {p.subCategory
+                            ? <span className="cho-subcategory-pill">{p.subCategory}</span>
+                            : "—"}
+                        </td>
+                        <td>{p.brand || "—"}</td>
+                        <td>
+                          <div className="cho-action-group">
+                            <button className="cho-btn-action cho-btn-review" onClick={() => openEditModal(p)}>Edit</button>
+                            <button className="cho-btn-action cho-btn-danger" onClick={() => deleteProduct(p)}>Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </section>
           )}
         </main>
       </div>
 
-      {/* ── Add / Edit Product Modal ── */}
+      {/* Add / Edit Product Modal */}
       {showAddModal && (
         <div className="cho-modal-overlay" onClick={() => setShowAddModal(false)}>
           <div className="cho-modal cho-modal--md" onClick={e => e.stopPropagation()}>
             <div className="cho-modal-header">
-              <h2 className="cho-modal-title">{editingId ? "Edit Product" : "Add New Product"}</h2>
+              <h2 className="cho-modal-title">{editingId ? "Edit Catalog Item" : "Add New Item to Catalog"}</h2>
               <button className="cho-modal-close" aria-label="Close" onClick={() => setShowAddModal(false)}>×</button>
             </div>
             <div className="cho-modal-body">
-
-              <h3 className="cho-form-section-title">Product Details</h3>
-              <div className="cho-form-row cho-form-row--3">
+              <div className="cho-form-row">
                 <div className="cho-form-field">
                   <label className="cho-label">Dosage Form</label>
-                  <select className="cho-input" value={dosageForm} onChange={e => setDosageForm(e.target.value)}>
-                    {Object.keys(FORM_PREFIXES).map(f => <option key={f}>{f}</option>)}
+                  <select className="cho-input" value={dosageForm} onChange={handleDosageFormChange}>
+                    {Object.keys(FORM_PREFIXES).map(form => (
+                      <option key={form} value={form}>{form}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="cho-form-field">
                   <label className="cho-label">Product ID <span className="cho-required">*</span></label>
-                  <div className="cho-id-input-wrap">
-                    <input className="cho-input" type="text" placeholder="e.g., TAB001"
-                      value={productId} onChange={e => setProductId(e.target.value)}
-                      disabled={!!editingId} />
-                    {!editingId && (
-                      <button type="button" className="cho-btn-secondary cho-id-auto-btn" onClick={autoGenerateProductId}>
-                        Auto
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="cho-form-field">
-                  <label className="cho-label">Category</label>
-                  <select className="cho-input" value={category} onChange={e => setCategory(e.target.value)}>
-                    <option>General Consumption</option>
-                    <option>Non-Consumption</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="cho-form-row">
-                <div className="cho-form-field">
-                  <label className="cho-label">Sub-Category</label>
-                  <input className="cho-input" type="text" placeholder="e.g., Antibiotic"
-                    value={subCategory} onChange={e => setSubCategory(e.target.value)} />
-                </div>
-                <div className="cho-form-field">
-                  <label className="cho-label">Brand</label>
-                  <input className="cho-input" type="text" placeholder="e.g., Biogesic"
-                    value={brand} onChange={e => setBrand(e.target.value)} />
+                  <input className="cho-input" type="text" placeholder="e.g., TAB001"
+                    value={productId} onChange={e => setProductId(e.target.value)}
+                    disabled={!!editingId} />
                 </div>
               </div>
 
               <div className="cho-form-field">
-                <label className="cho-label">Medicine Name <span className="cho-required">*</span></label>
-                <input className="cho-input" type="text" placeholder="e.g., Paracetamol 500mg Tablet"
+                <label className="cho-label">Product Name <span className="cho-required">*</span></label>
+                <input className="cho-input" type="text" placeholder="e.g., Amoxicillin 500mg"
                   value={name} onChange={e => setName(e.target.value)} />
               </div>
 
-              {!editingId && (
-                <p className="cho-form-hint">Pick a Dosage Form, then click "Auto" to generate the next available ID for that form — or type your own.</p>
-              )}
+              <div className="cho-form-row">
+                <div className="cho-form-field">
+                  <label className="cho-label">Category</label>
+                  <select className="cho-input" value={category} onChange={e => setCategory(e.target.value)}>
+                    <option value="General Consumption">General Consumption</option>
+                    <option value="Targeted Programs">Targeted Programs</option>
+                    <option value="Emergency Supplies">Emergency Supplies</option>
+                    <option value="Equipment & Medical Tools">Equipment & Medical Tools</option>
+                  </select>
+                </div>
+                <div className="cho-form-field">
+                  <label className="cho-label">Sub-Category</label>
+                  <input className="cho-input" type="text" placeholder="e.g., Antibiotic, Maternal Care"
+                    value={subCategory} onChange={e => setSubCategory(e.target.value)} />
+                </div>
+              </div>
+
+              <div className="cho-form-field">
+                <label className="cho-label">Brand / Manufacturer</label>
+                <input className="cho-input" type="text" placeholder="e.g., Pfizer, Unilab"
+                  value={brand} onChange={e => setBrand(e.target.value)} />
+              </div>
+
               {editingId && (
-                <p className="cho-form-hint">Product ID can't be changed after creation — delete and re-add if you need a different ID.</p>
+                <p className="cho-form-hint">Product ID cannot be changed after creation.</p>
               )}
               <p className="cho-form-hint"><span className="cho-required">*</span> Required fields</p>
             </div>

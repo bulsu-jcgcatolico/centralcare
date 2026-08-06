@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
 import "./MidwifeDashboard.css";
@@ -19,41 +19,77 @@ export default function MidwifeDashboard() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  
   const [search, setSearch] = useState("");
   const [inventory, setInventory] = useState([]);
   const [patients, setPatients] = useState([]);
   const [dispenseLogs, setDispenseLogs] = useState([]);
+  const [barangayPopulation, setBarangayPopulation] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  function handleLogout() { logout(); navigate("/"); }
+  function handleLogout() {
+    logout();
+    navigate("/");
+  }
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    if (userData?.barangayName) {
+      loadData();
+    }
+  }, [userData?.barangayName]);
 
   async function loadData() {
     setLoading(true);
     try {
-      const [invSnap, patSnap, dispSnap] = await Promise.all([
-        getDocs(query(collection(db, "inventory"),
+      const currentBarangay = userData?.barangayName ?? "";
+
+      const [invSnap, patSnap, dispSnap, barangaySnap] = await Promise.all([
+        getDocs(query(
+          collection(db, "inventory"),
           where("ownerType", "==", "midwife"),
-          where("barangayName", "==", userData?.barangayName ?? ""))),
-        getDocs(query(collection(db, "patients"),
-          where("barangayName", "==", userData?.barangayName ?? ""))),
-        getDocs(query(collection(db, "dispense_logs"),
-          where("barangayName", "==", userData?.barangayName ?? "")))
+          where("barangayName", "==", currentBarangay)
+        )),
+        getDocs(query(
+          collection(db, "patients"),
+          where("barangayName", "==", currentBarangay)
+        )),
+        getDocs(query(
+          collection(db, "dispense_logs"),
+          where("barangayName", "==", currentBarangay)
+        )),
+        currentBarangay
+          ? getDoc(doc(db, "cho_barangays", currentBarangay))
+          : Promise.resolve(null)
       ]);
+
       setInventory(invSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setPatients(patSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setDispenseLogs(dispSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (err) { console.error(err); }
+
+      if (barangaySnap && barangaySnap.exists()) {
+        const bData = barangaySnap.data();
+        if (bData.totalPopulation !== undefined) {
+          setBarangayPopulation(bData.totalPopulation);
+        }
+      }
+    } catch (err) {
+      console.error("Error loading dashboard data:", err);
+    }
     setLoading(false);
   }
 
-  const lowStockItems       = inventory.filter(i => (i.remaining ?? i.quantity) <= 50);
-  const availableMedicines  = inventory.filter(i => (i.remaining ?? 0) > 0);
+  const lowStockItems = inventory.filter(i => (i.remaining ?? i.quantity ?? 0) <= 50);
+  const availableMedicines = inventory.filter(i => (i.remaining ?? i.quantity ?? 0) > 0);
   const totalBoxesDispensed = dispenseLogs.reduce((s, l) => s + (l.boxesDispensed || 0), 0);
+
+  const filteredMedicines = availableMedicines.filter(med =>
+    med.name?.toLowerCase().includes(search.toLowerCase()) ||
+    med.category?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="midwife-layout">
+      {/* Sidebar */}
       <aside className="midwife-sidebar">
         <div className="midwife-brand">
           <div className="midwife-brand-icon">
@@ -66,10 +102,14 @@ export default function MidwifeDashboard() {
             <p className="midwife-brand-role">HEALTH SYSTEM</p>
           </div>
         </div>
+
         <nav className="midwife-nav">
           {navItems.map(item => (
-            <NavLink key={item.to} to={item.to}
-              className={({ isActive }) => "midwife-nav-item" + (isActive ? " active" : "")}>
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) => "midwife-nav-item" + (isActive ? " active" : "")}
+            >
               <span>{item.label}</span>
               {item.label === "Notifications" && unreadCount > 0 && (
                 <span className="nav-badge">{unreadCount}</span>
@@ -77,17 +117,25 @@ export default function MidwifeDashboard() {
             </NavLink>
           ))}
         </nav>
+
         <div className="midwife-sidebar-footer">
           <button className="midwife-nav-item midwife-nav-btn">Settings</button>
-          <button className="midwife-nav-item midwife-nav-btn midwife-signout" onClick={handleLogout}>Sign Out</button>
+          <button className="midwife-nav-item midwife-nav-btn midwife-signout" onClick={handleLogout}>
+            Sign Out
+          </button>
         </div>
       </aside>
 
+      {/* Main Section */}
       <div className="midwife-main">
         <header className="midwife-topbar">
-          <input className="midwife-search" type="text"
+          <input
+            className="midwife-search"
+            type="text"
             placeholder="Search patients, medicine, or ID..."
-            value={search} onChange={e => setSearch(e.target.value)} />
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
           <div className="midwife-topbar-right">
             <button className="midwife-notif-btn">
               <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
@@ -99,7 +147,9 @@ export default function MidwifeDashboard() {
                 <span className="midwife-user-name">{userData?.username || "Maria Santos"}</span>
                 <span className="midwife-user-role">Registered Midwife</span>
               </div>
-              <div className="midwife-avatar">MS</div>
+              <div className="midwife-avatar">
+                {userData?.username ? userData.username.split(" ").map(n => n[0]).join("") : "MS"}
+              </div>
             </div>
           </div>
         </header>
@@ -111,27 +161,30 @@ export default function MidwifeDashboard() {
                 Barangay {userData?.barangayName || "Longos"} Health Center
               </h1>
               <p className="midwife-hero-sub">
-                Good morning, Midwife {userData?.username?.split(" ")[0] || "Maria"}.
+                Good day, Midwife {userData?.username?.split(" ")[0] || "Maria"}. Here is your health station summary.
               </p>
-              <button className="midwife-hero-btn"
-                onClick={() => navigate("/midwife/patients/add/child")}>
+              <button
+                className="midwife-hero-btn"
+                onClick={() => navigate("/midwife/patients/add/child")}
+              >
                 Register New Patient
               </button>
             </div>
           </div>
 
-          {/* Stat Cards — real data */}
+          {/* Stat Cards */}
           <div className="midwife-stats-grid">
             <div className="midwife-stat-card">
               <div className="midwife-stat-icon-wrap blue">
                 <svg viewBox="0 0 24 24" fill="#1a56db" width="24" height="24">
-                  <path d="M20 7h-3V4a2 2 0 00-2-2H9a2 2 0 00-2 2v3H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
+                  <path d="M20 7h-3V4a2 2 0 00-2-2H9a2 2 0 00-2 2v3H4a2 2 0 00-2 2v10a2 2 0 022 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
                 </svg>
               </div>
               <p className="midwife-stat-label">Available Medicines</p>
               <p className="midwife-stat-value">{availableMedicines.length}</p>
               <span className="midwife-stat-trend up">Total inventory items</span>
             </div>
+
             <div className="midwife-stat-card">
               <div className="midwife-stat-icon-wrap orange">
                 <svg viewBox="0 0 24 24" fill="#d97706" width="24" height="24">
@@ -144,16 +197,20 @@ export default function MidwifeDashboard() {
                 {lowStockItems.length > 0 ? "Request from RHU" : "All stocked"}
               </span>
             </div>
+
             <div className="midwife-stat-card">
               <div className="midwife-stat-icon-wrap purple">
                 <svg viewBox="0 0 24 24" fill="#7c3aed" width="24" height="24">
-                  <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                  <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
                 </svg>
               </div>
-              <p className="midwife-stat-label">Total Patients</p>
+              <p className="midwife-stat-label">Total Registered Patients</p>
               <p className="midwife-stat-value">{patients.length}</p>
-              <span className="midwife-stat-trend up">{patients.length} registered</span>
+              <span className="midwife-stat-trend up">
+                Pop. {barangayPopulation.toLocaleString()}
+              </span>
             </div>
+
             <div className="midwife-stat-card">
               <div className="midwife-stat-icon-wrap green">
                 <svg viewBox="0 0 24 24" fill="#16a34a" width="24" height="24">
@@ -166,6 +223,7 @@ export default function MidwifeDashboard() {
             </div>
           </div>
 
+          {/* Two Column Layout */}
           <div className="midwife-two-col">
             {/* Available medicines */}
             <section className="midwife-section">
@@ -173,13 +231,15 @@ export default function MidwifeDashboard() {
                 <h2 className="midwife-section-title">Available Medicines</h2>
                 <NavLink to="/midwife/inventory" className="midwife-view-all">View All</NavLink>
               </div>
-              {availableMedicines.length === 0 ? (
+              {loading ? (
+                <div className="midwife-empty-small"><p>Loading inventory...</p></div>
+              ) : filteredMedicines.length === 0 ? (
                 <div className="midwife-empty-small">
-                  <p>No medicines yet. Log a shipment or wait for RHU distribution.</p>
+                  <p>{search ? "No matching medicines found." : "No medicines yet. Log a shipment or wait for RHU distribution."}</p>
                 </div>
               ) : (
                 <div className="midwife-medicine-list">
-                  {availableMedicines.slice(0, 5).map(med => (
+                  {filteredMedicines.slice(0, 5).map(med => (
                     <div key={med.id} className="midwife-medicine-item">
                       <div className="midwife-medicine-info">
                         <p className="midwife-medicine-name">{med.name}</p>
@@ -187,10 +247,10 @@ export default function MidwifeDashboard() {
                       </div>
                       <div className="midwife-medicine-stock">
                         <span className="midwife-stock-text">
-                          {med.remaining} boxes
+                          {med.remaining ?? med.quantity ?? 0} boxes
                         </span>
-                        <span className={`midwife-medicine-status ${(med.remaining ?? 0) > 50 ? "good" : "expiring"}`}>
-                          {med.expiry}
+                        <span className={`midwife-medicine-status ${(med.remaining ?? med.quantity ?? 0) > 50 ? "good" : "expiring"}`}>
+                          {med.expiry || "Active"}
                         </span>
                       </div>
                     </div>
@@ -205,7 +265,9 @@ export default function MidwifeDashboard() {
                 <h2 className="midwife-section-title">Low Stock Alerts</h2>
                 <span className="midwife-alert-count">{lowStockItems.length} ITEMS</span>
               </div>
-              {lowStockItems.length === 0 ? (
+              {loading ? (
+                <div className="midwife-empty-small"><p>Loading alerts...</p></div>
+              ) : lowStockItems.length === 0 ? (
                 <div className="midwife-empty-small"><p>No low stock alerts.</p></div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -219,7 +281,7 @@ export default function MidwifeDashboard() {
                       <div className="midwife-alert-content">
                         <p className="midwife-alert-title">{item.name}</p>
                         <p className="midwife-alert-msg">
-                          Only {item.remaining} boxes remaining
+                          Only {item.remaining ?? item.quantity ?? 0} boxes remaining
                         </p>
                       </div>
                     </div>

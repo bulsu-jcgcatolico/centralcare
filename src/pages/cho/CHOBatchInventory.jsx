@@ -25,21 +25,16 @@ const navItems = [
 const PRODUCTS_COLLECTION = "cho_products";
 const BATCHES_COLLECTION  = "cho_batches";
 
-// Batch ID is its own primary key — separate from Product ID, which is
-// just a foreign-key reference back to the Item Management catalog.
 function generateBatchId() {
   return "BAT" + Math.floor(10000 + Math.random() * 89999).toString();
 }
 
-function getStatus(remaining) {
-  if (remaining <= 20) return "Critical";
-  if (remaining <= 50) return "Low";
-  return "Good";
-}
-function getStatusClass(remaining) {
-  if (remaining <= 20) return "cho-status--critical";
-  if (remaining <= 50) return "cho-status--low";
-  return "cho-status--good";
+function getBatchStatusClass(status) {
+  switch (status) {
+    case "Accepted": return "cho-status--accepted";
+    case "Declined": return "cho-status--declined";
+    default: return "cho-status--pending";
+  }
 }
 
 export default function CHOBatchInventory() {
@@ -48,7 +43,7 @@ export default function CHOBatchInventory() {
   const unreadCount = useUnreadCount();
 
   const [search, setSearch] = useState("");
-  const [products, setProducts] = useState([]); // full catalog, for lookup
+  const [products, setProducts] = useState([]);
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -86,7 +81,6 @@ export default function CHOBatchInventory() {
     setLoading(false);
   }
 
-  // Live client-side lookup as the user types a Product ID
   const matchedProduct = products.find(
     p => (p.productId || "").toLowerCase() === productIdInput.trim().toLowerCase()
   );
@@ -114,8 +108,8 @@ export default function CHOBatchInventory() {
     try {
       const qty = parseInt(quantity);
       await addDoc(collection(db, BATCHES_COLLECTION), {
-        batchId: generateBatchId(),      // this batch's own primary key
-        productId: matchedProduct.productId, // foreign key → Item Management
+        batchId: generateBatchId(),
+        productId: matchedProduct.productId,
         name: matchedProduct.name,
         category: matchedProduct.category,
         subCategory: matchedProduct.subCategory ?? "",
@@ -125,6 +119,7 @@ export default function CHOBatchInventory() {
         remaining: qty,
         manufactureDate,
         expiryDate,
+        status: "Pending", // Default status for new batches
         ownerType: "cho",
         createdBy: user?.uid ?? "",
         createdAt: serverTimestamp(),
@@ -134,6 +129,16 @@ export default function CHOBatchInventory() {
       loadBatches();
     } catch (err) { alert("Error: " + err.message); }
     setSaving(false);
+  }
+
+  // Handle Accept / Decline status updates
+  async function updateBatchStatus(id, newStatus) {
+    try {
+      await updateDoc(doc(db, BATCHES_COLLECTION, id), { status: newStatus });
+      setBatches(batches.map(b => b.id === id ? { ...b, status: newStatus } : b));
+    } catch (err) {
+      alert("Error updating batch status: " + err.message);
+    }
   }
 
   async function deleteBatch(id) {
@@ -151,7 +156,8 @@ export default function CHOBatchInventory() {
     (b.lotNumber || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const lowStockCount = batches.filter(b => (b.remaining ?? b.quantity) <= 50).length;
+  const pendingCount = batches.filter(b => (b.status || "Pending") === "Pending").length;
+  const acceptedCount = batches.filter(b => b.status === "Accepted").length;
   const expiringCount = batches.filter(b => {
     if (!b.expiryDate) return false;
     const days = (new Date(b.expiryDate) - new Date()) / (1000 * 60 * 60 * 24);
@@ -221,12 +227,12 @@ export default function CHOBatchInventory() {
               <div className="cho-stat-row"><span className="cho-stat-value">{batches.length}</span></div>
             </div>
             <div className="cho-stat-card cho-stat--orange">
-              <p className="cho-stat-label">LOW STOCK BATCHES</p>
-              <div className="cho-stat-row"><span className="cho-stat-value">{lowStockCount}</span></div>
+              <p className="cho-stat-label">PENDING APPROVAL</p>
+              <div className="cho-stat-row"><span className="cho-stat-value">{pendingCount}</span></div>
             </div>
-            <div className="cho-stat-card cho-stat--red">
-              <p className="cho-stat-label">EXPIRING SOON</p>
-              <div className="cho-stat-row"><span className="cho-stat-value">{expiringCount}</span></div>
+            <div className="cho-stat-card cho-stat--green">
+              <p className="cho-stat-label">ACCEPTED BATCHES</p>
+              <div className="cho-stat-row"><span className="cho-stat-value">{acceptedCount}</span></div>
             </div>
             <div className="cho-stat-card">
               <p className="cho-stat-label">TOTAL QUANTITY</p>
@@ -270,6 +276,7 @@ export default function CHOBatchInventory() {
                 <tbody>
                   {filteredBatches.map(b => {
                     const remaining = b.remaining ?? b.quantity;
+                    const batchStatus = b.status || "Pending";
                     return (
                       <tr key={b.id}>
                         <td className="cho-product-key"><strong>{b.batchId || "—"}</strong></td>
@@ -287,16 +294,32 @@ export default function CHOBatchInventory() {
                         <td>{b.manufactureDate || "—"}</td>
                         <td>{b.expiryDate}</td>
                         <td>
-                          <span className={`cho-status-badge ${getStatusClass(remaining)}`}>
-                            <span className={`cho-status-dot cho-dot--${getStatus(remaining).toLowerCase()}`} />
-                            {getStatus(remaining)}
+                          <span className={`cho-status-badge ${getBatchStatusClass(batchStatus)}`}>
+                            {batchStatus}
                           </span>
                         </td>
                         <td>
                           <div className="cho-action-group">
-                            <button className="cho-btn-action cho-btn-danger" onClick={() => deleteBatch(b.id)}>
-                              Delete
-                            </button>
+                            {batchStatus === "Pending" ? (
+                              <>
+                                <button
+                                  className="cho-btn-action cho-btn-success"
+                                  onClick={() => updateBatchStatus(b.id, "Accepted")}
+                                >
+                                  Accept
+                                </button>
+                                <button
+                                  className="cho-btn-action cho-btn-decline"
+                                  onClick={() => updateBatchStatus(b.id, "Declined")}
+                                >
+                                  Decline
+                                </button>
+                              </>
+                            ) : (
+                              <button className="cho-btn-action cho-btn-danger" onClick={() => deleteBatch(b.id)}>
+                                Delete
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

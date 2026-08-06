@@ -1,41 +1,81 @@
-/* ── Wrapper ─────────────────────────────────────────────────────────────────── */
+/* ── Main Layout Canvas ── */
 .rl-wrapper {
   min-height: 100vh;
-  background: #f3f4f6;
+  background: #f1f5f9;
   display: flex;
   flex-direction: column;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #0f172a;
 }
 
-/* ── Top Bar ─────────────────────────────────────────────────────────────────── */
+/* ── Refined Topbar Navigation ── */
 .rl-topbar {
-  background: #111827;
-  color: #fff;
+  background: #0f172a;
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 2rem;
-  height: 52px;
+  padding: 0 1.5rem;
+  height: 56px;
   flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.rl-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rl-topbar-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .rl-topbar-title {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 600;
   margin: 0;
-  color: #fff;
+  color: #f8fafc;
+  letter-spacing: -0.01em;
 }
 
 .rl-topbar-actions {
   display: flex;
+  align-items: center;
   gap: 10px;
+}
+
+/* ── Topbar Buttons ── */
+.rl-btn-back {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.15s ease-in-out;
+}
+
+.rl-btn-back:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 .rl-btn-outline {
   background: transparent;
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 7px;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
   padding: 6px 14px;
   font-size: 13px;
   font-weight: 500;
@@ -43,127 +83,238 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  transition: background 0.15s, border-color 0.15s;
-}
-.rl-btn-outline:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.6);
+  transition: all 0.15s ease-in-out;
 }
 
-/* ── Main ────────────────────────────────────────────────────────────────────── */
+.rl-btn-outline:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.rl-btn-primary {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: all 0.15s ease-in-out;
+}
+
+.rl-btn-primary:hover {
+  background: #1d4ed8;
+}
+
+/* ── Main View Container ── */
 .rl-main {
   flex: 1;
   display: flex;
   justify-content: center;
-  padding: 2.5rem 1.5rem;
+  padding: 2.5rem 1.5rem 4rem;
+  overflow-y: auto;
 }
 
-/* ── Letter Paper ────────────────────────────────────────────────────────────── */
+/* ── Standardized Letter Paper Container ── */
 .rl-paper {
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  background: #ffffff;
+  border-radius: 4px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
   width: 100%;
-  max-width: 900px;
-  padding: 3rem 4rem;
-  font-family: 'Times New Roman', Times, serif;
-  font-size: 14px;
-  line-height: 1.9;
+  max-width: 800px;
+  padding: 4rem 4.5rem;
+  font-family: "Times New Roman", Times, Georgia, serif;
+  font-size: 15px;
+  line-height: 1.8;
+  color: #0f172a;
+  box-sizing: border-box;
+}
+
+/* Header / Letterhead */
+.rl-letterhead {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.rl-republic,
+.rl-province,
+.rl-municipality {
+  margin: 0;
+  line-height: 1.3;
+  font-size: 13px;
+  color: #475569;
+}
+
+.rl-bhs-name {
+  margin: 6px 0 0;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.02em;
   color: #0f172a;
 }
 
-.rl-paper-title {
-  text-align: center;
-  font-size: 20px;
-  font-weight: 700;
-  margin: 0 0 1.75rem;
-  font-family: 'Times New Roman', Times, serif;
+.rl-header-line {
+  margin-top: 12px;
+  height: 2px;
+  background: #0f172a;
+  width: 100%;
 }
 
 .rl-date {
-  margin: 0 0 1.25rem;
-  font-family: 'Times New Roman', Times, serif;
+  margin: 0 0 1.5rem;
+  text-align: right;
+  font-size: 14px;
 }
 
-.rl-recipient {
-  margin: 0;
-  font-family: 'Times New Roman', Times, serif;
-}
-.rl-recipient p {
-  margin: 0;
-  line-height: 1.7;
+/* Recipients */
+.rl-recipients {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-bottom: 1.75rem;
 }
 
-/* ── Body textarea ───────────────────────────────────────────────────────────── */
+.rl-recipient-block p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.rl-recipient-title {
+  font-weight: 700;
+}
+
+/* Subject Line */
+.rl-subject {
+  margin-bottom: 1.5rem;
+  font-size: 14px;
+  text-decoration: underline;
+}
+
+.rl-salutation {
+  margin-bottom: 1rem;
+}
+
+/* Body Textarea */
 .rl-body {
-  margin: 1.75rem 0;
+  margin: 1rem 0 2rem;
 }
 
 .rl-textarea {
   width: 100%;
   box-sizing: border-box;
-  border: none;
-  border-left: 2px solid #e5e7eb;
-  padding: 4px 12px;
-  font-size: 14px;
-  font-family: 'Times New Roman', Times, serif;
-  line-height: 1.9;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  padding: 1rem;
+  font-size: 15px;
+  font-family: "Times New Roman", Times, Georgia, serif;
+  line-height: 1.8;
   color: #0f172a;
-  background: transparent;
+  background: #f8fafc;
   outline: none;
   resize: vertical;
-  min-height: 200px;
-}
-.rl-textarea:focus {
-  border-left-color: #1a56db;
-}
-.rl-textarea::placeholder {
-  color: #9ca3af;
+  min-height: 240px;
+  transition: all 0.2s ease;
 }
 
-/* ── Closing / Signatory ─────────────────────────────────────────────────────── */
-.rl-closing {
-  margin-top: 2rem;
-  font-family: 'Times New Roman', Times, serif;
+.rl-textarea:focus {
+  background: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
-.rl-closing > p {
-  margin: 0 0 0.25rem;
+
+.rl-textarea::placeholder {
+  color: #94a3b8;
   font-style: italic;
 }
 
-.rl-signatory {
-  margin-top: 2.25rem;
+/* Closing & Signatory */
+.rl-closing {
+  margin-top: 2rem;
+  page-break-inside: avoid;
 }
+
+.rl-closing > p {
+  margin: 0 0 0.5rem;
+}
+
+.rl-signatory {
+  margin-top: 2.5rem;
+}
+
 .rl-signatory-name {
   font-weight: 700;
   margin: 0;
-  font-family: 'Times New Roman', Times, serif;
-}
-.rl-signatory-role {
-  margin: 0;
-  font-size: 13px;
-  font-family: 'Times New Roman', Times, serif;
-  color: #374151;
+  font-size: 16px;
+  text-decoration: underline;
 }
 
-/* ── Print styles ────────────────────────────────────────────────────────────── */
+.rl-signatory-role {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+  color: #334155;
+}
+
+.rl-signatory-station {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* ── Print Media Optimizations ── */
 @media print {
-  .rl-topbar  { display: none !important; }
-  .rl-wrapper { background: #fff; }
-  .rl-main    { padding: 0; }
-  .rl-paper   {
+  body {
+    background: #ffffff !important;
+  }
+
+  .rl-topbar {
+    display: none !important;
+  }
+
+  .rl-wrapper {
+    background: #ffffff;
+    min-height: auto;
+  }
+
+  .rl-main {
+    padding: 0;
+  }
+
+  .rl-paper {
     box-shadow: none;
     border-radius: 0;
     max-width: 100%;
-    padding: 1.5rem 2rem;
+    padding: 0;
   }
+
   .rl-textarea {
-    border: none;
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    resize: none;
   }
 }
 
-/* ── Responsive ──────────────────────────────────────────────────────────────── */
+/* ── Mobile Responsiveness ── */
 @media (max-width: 768px) {
-  .rl-paper  { padding: 2rem 1.5rem; }
-  .rl-topbar { padding: 0 1rem; }
+  .rl-paper {
+    padding: 2rem 1.5rem;
+  }
+  
+  .rl-topbar {
+    padding: 0 1rem;
+  }
+
+  .rl-topbar-title {
+    display: none;
+  }
+
+  .rl-topbar-divider {
+    display: none;
+  }
 }
