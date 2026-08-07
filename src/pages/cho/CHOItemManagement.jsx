@@ -67,17 +67,40 @@ export default function CHOItemManagement() {
     setLoading(false);
   }
 
-  function generateAutoProductId(form) {
+  // --- UPDATED: Generate sequential zero-padded Product IDs (e.g., TAB-001, SYR-002) ---
+  function generateAutoProductId(form, currentProductsList = products) {
     const prefix = FORM_PREFIXES[form] || "GEN";
-    const randNum = Math.floor(100 + Math.random() * 900);
-    return `${prefix}${randNum}`;
+
+    // Filter products that match the current form prefix
+    const matchingProducts = currentProductsList.filter(p => {
+      const pId = p.productId || p.id || "";
+      return pId.startsWith(prefix);
+    });
+
+    let maxNumber = 0;
+
+    // Parse existing IDs to find the highest sequence number
+    matchingProducts.forEach(p => {
+      const pId = p.productId || p.id || "";
+      // Extracts numbers from strings like "TAB-001" or "TAB001"
+      const numberMatch = pId.match(/\d+/); 
+      if (numberMatch) {
+        const num = parseInt(numberMatch[0], 10);
+        if (!isNaN(num) && num > maxNumber) {
+          maxNumber = num;
+        }
+      }
+    });
+
+    const nextNumber = String(maxNumber + 1).padStart(3, "0");
+    return `${prefix}-${nextNumber}`;
   }
 
   function handleDosageFormChange(e) {
     const selectedForm = e.target.value;
     setDosageForm(selectedForm);
     if (!editingId) {
-      setProductId(generateAutoProductId(selectedForm));
+      setProductId(generateAutoProductId(selectedForm, products));
     }
   }
 
@@ -85,7 +108,7 @@ export default function CHOItemManagement() {
     setEditingId(null);
     const initialForm = "Tablet";
     setDosageForm(initialForm);
-    setProductId(generateAutoProductId(initialForm));
+    setProductId(generateAutoProductId(initialForm, products));
     setName("");
     setCategory("General Consumption");
     setSubCategory("");
@@ -302,7 +325,7 @@ export default function CHOItemManagement() {
                 </div>
                 <div className="cho-form-field">
                   <label className="cho-label">Product ID <span className="cho-required">*</span></label>
-                  <input className="cho-input" type="text" placeholder="e.g., TAB001"
+                  <input className="cho-input" type="text" placeholder="e.g., TAB-001"
                     value={productId} onChange={e => setProductId(e.target.value)}
                     disabled={!!editingId} />
                 </div>
