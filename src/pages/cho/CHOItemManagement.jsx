@@ -67,22 +67,21 @@ export default function CHOItemManagement() {
     setLoading(false);
   }
 
-  // --- UPDATED: Generate sequential zero-padded Product IDs (e.g., TAB-001, SYR-002) ---
+  // --- UPDATED: Generates ID formatted as PREFIX-001 (e.g. TAB-001) ---
   function generateAutoProductId(form, currentProductsList = products) {
     const prefix = FORM_PREFIXES[form] || "GEN";
 
-    // Filter products that match the current form prefix
+    // Filter products that start with the prefix (handles TAB-001 and legacy TAB001)
     const matchingProducts = currentProductsList.filter(p => {
       const pId = p.productId || p.id || "";
-      return pId.startsWith(prefix);
+      return pId.toUpperCase().startsWith(prefix);
     });
 
     let maxNumber = 0;
 
-    // Parse existing IDs to find the highest sequence number
+    // Extract sequence number from existing IDs
     matchingProducts.forEach(p => {
       const pId = p.productId || p.id || "";
-      // Extracts numbers from strings like "TAB-001" or "TAB001"
       const numberMatch = pId.match(/\d+/); 
       if (numberMatch) {
         const num = parseInt(numberMatch[0], 10);
