@@ -67,11 +67,11 @@ export default function CHOItemManagement() {
     setLoading(false);
   }
 
-  // --- UPDATED: Generates ID formatted as PREFIX-001 (e.g. TAB-001) ---
+  // --- UPDATED: Generates ID formatted without hyphen as PREFIX001 (e.g. TAB001) ---
   function generateAutoProductId(form, currentProductsList = products) {
     const prefix = FORM_PREFIXES[form] || "GEN";
 
-    // Filter products that start with the prefix (handles TAB-001 and legacy TAB001)
+    // Filter products that start with the prefix (handles TAB001 or legacy TAB-001)
     const matchingProducts = currentProductsList.filter(p => {
       const pId = p.productId || p.id || "";
       return pId.toUpperCase().startsWith(prefix);
@@ -92,7 +92,7 @@ export default function CHOItemManagement() {
     });
 
     const nextNumber = String(maxNumber + 1).padStart(3, "0");
-    return `${prefix}-${nextNumber}`;
+    return `${prefix}${nextNumber}`;
   }
 
   function handleDosageFormChange(e) {
@@ -324,7 +324,7 @@ export default function CHOItemManagement() {
                 </div>
                 <div className="cho-form-field">
                   <label className="cho-label">Product ID <span className="cho-required">*</span></label>
-                  <input className="cho-input" type="text" placeholder="e.g., TAB-001"
+                  <input className="cho-input" type="text" placeholder="e.g., TAB001"
                     value={productId} onChange={e => setProductId(e.target.value)}
                     disabled={!!editingId} />
                 </div>
