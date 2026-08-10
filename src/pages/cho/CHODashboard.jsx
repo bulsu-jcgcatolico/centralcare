@@ -32,6 +32,7 @@ export default function CHODashboard() {
   const [inventory, setInventory] = useState([]);
   const [distributions, setDistributions] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [totalMalolosPopulation, setTotalMalolosPopulation] = useState(0);
   const [loading, setLoading] = useState(false);
 
   function handleLogout() { logout(); navigate("/"); }
@@ -41,14 +42,23 @@ export default function CHODashboard() {
   async function loadData() {
     setLoading(true);
     try {
-      const [invSnap, distSnap, notifSnap] = await Promise.all([
+      const [invSnap, distSnap, notifSnap, barangaySnap] = await Promise.all([
         getDocs(query(collection(db, "inventory"), where("ownerType", "==", "cho"))),
         getDocs(query(collection(db, "distributions"), where("fromType", "==", "cho"))),
-        getDocs(query(collection(db, "notifications"), where("fromType", "==", "cho")))
+        getDocs(query(collection(db, "notifications"), where("fromType", "==", "cho"))),
+        getDocs(collection(db, "cho_barangays"))
       ]);
       setInventory(invSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setDistributions(distSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setNotifications(notifSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      // Calculate total Malolos population by summing up all barangay populations
+      const totalPop = barangaySnap.docs.reduce((sum, doc) => {
+        const data = doc.data();
+        return sum + Number(data.population ?? data.totalPopulation ?? 0);
+      }, 0);
+      setTotalMalolosPopulation(totalPop);
+
     } catch (err) { console.error(err); }
     setLoading(false);
   }
@@ -159,6 +169,13 @@ export default function CHODashboard() {
 
           {/* Stat Cards — real data */}
           <div className="cho-stats-grid">
+            <div className="cho-stat-card">
+              <p className="cho-stat-label">TOTAL MALOLOS POPULATION</p>
+              <div className="cho-stat-row">
+                <span className="cho-stat-value">{totalMalolosPopulation.toLocaleString()}</span>
+              </div>
+              <p className="cho-stat-sub">Combined population of all barangays</p>
+            </div>
             <div className="cho-stat-card">
               <p className="cho-stat-label">TOTAL INVENTORY</p>
               <div className="cho-stat-row">

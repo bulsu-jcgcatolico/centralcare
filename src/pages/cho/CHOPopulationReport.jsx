@@ -64,7 +64,26 @@ export default function CHOPopulationReport() {
   async function loadReportData() {
     setLoading(true);
     try {
-      // 1. Fetch RHU Registry
+      // 1. Fetch Master Barangays first to construct lookup map
+      const barangaySnap = await getDocs(collection(db, BARANGAYS_COLLECTION));
+      const bMap = {}; // Lookup map by barangay name
+      const fetchedBarangays = barangaySnap.docs.map(d => {
+        const data = d.data();
+        const bName = data.barangayName || d.id;
+        const pop = Number(data.population ?? data.totalPopulation ?? 0);
+
+        const bItem = {
+          id: d.id,
+          barangayName: bName,
+          totalPopulation: pop,
+          assignedRhu: "Unassigned",
+        };
+
+        bMap[bName] = bItem;
+        return bItem;
+      });
+
+      // 2. Fetch RHU Registry
       const rhuSnap = await getDocs(collection(db, RHU_REGISTRY_COLLECTION));
       let fetchedRhus = [];
       if (rhuSnap.empty) {
@@ -77,28 +96,27 @@ export default function CHOPopulationReport() {
           ...saved[rhu.id],
         }));
       }
-      setRhus(fetchedRhus);
 
-      // Map assigned barangays to RHU Name for quick lookup
-      const barangayToRhuMap = {};
-      fetchedRhus.forEach(rhu => {
-        (rhu.assignedBarangays || []).forEach(bName => {
-          barangayToRhuMap[bName] = rhu.rhuName;
+      // Map assigned barangays to RHU Name & dynamically aggregate RHU total population
+      fetchedRhus = fetchedRhus.map(rhu => {
+        const assignedList = rhu.assignedBarangays || [];
+        
+        let calculatedPop = 0;
+        assignedList.forEach(bName => {
+          if (bMap[bName]) {
+            bMap[bName].assignedRhu = rhu.rhuName;
+            calculatedPop += bMap[bName].totalPopulation;
+          }
         });
-      });
 
-      // 2. Fetch Master Barangays
-      const barangaySnap = await getDocs(collection(db, BARANGAYS_COLLECTION));
-      const fetchedBarangays = barangaySnap.docs.map(d => {
-        const data = d.data();
-        const bName = data.barangayName || d.id;
         return {
-          id: d.id,
-          barangayName: bName,
-          totalPopulation: Number(data.totalPopulation) || 0,
-          assignedRhu: barangayToRhuMap[bName] || "Unassigned",
+          ...rhu,
+          // RHU population is the combined population of each assigned barangay
+          totalPopulation: calculatedPop,
         };
       });
+
+      setRhus(fetchedRhus);
 
       fetchedBarangays.sort((a, b) => a.barangayName.localeCompare(b.barangayName));
       setBarangays(fetchedBarangays);
@@ -226,11 +244,23 @@ export default function CHOPopulationReport() {
             </div>
           </div>
 
-          <div className="cho-stats-grid cho-stats-grid--2 no-print">
+          {/* ── STATS GRID WITH MALOLOS TOTAL POPULATION CARD ── */}
+          <div className="cho-stats-grid no-print">
+            <div className="cho-stat-card">
+              <p className="cho-stat-label">TOTAL MALOLOS POPULATION</p>
+              <div className="cho-stat-row">
+                <span className="cho-stat-value">{overallBarangayPopulation.toLocaleString()}</span>
+              </div>
+              <p className="cho-page-sub" style={{ fontSize: "0.75rem", marginTop: "4px" }}>
+                Combined population of all barangays
+              </p>
+            </div>
+            
             <div className="cho-stat-card">
               <p className="cho-stat-label">TOTAL REGISTERED RHUS</p>
               <div className="cho-stat-row"><span className="cho-stat-value">{rhus.length}</span></div>
             </div>
+
             <div className="cho-stat-card">
               <p className="cho-stat-label">TOTAL REGISTERED BARANGAYS</p>
               <div className="cho-stat-row"><span className="cho-stat-value">{barangays.length}</span></div>
@@ -350,14 +380,16 @@ export default function CHOPopulationReport() {
                           </tr>
                         );
                       })}
+                    </tbody>
+                    <tfoot>
                       <tr className="cho-report-summary-row">
                         <td className="no-print"></td>
-                        <td><strong>Total (Print View Summary)</strong></td>
+                        <td><strong>TOTAL POPULATION</strong></td>
                         <td><strong>{printRhusList.reduce((sum, r) => sum + (r.assignedBarangays || []).length, 0)} Barangays</strong></td>
-                        <td><strong>{printRhuTotal.toLocaleString()}</strong></td>
+                        <td className="summary-count"><strong>{printRhuTotal.toLocaleString()}</strong></td>
                         <td><strong>100.0%</strong></td>
                       </tr>
-                    </tbody>
+                    </tfoot>
                   </table>
                 </div>
               )}
@@ -415,14 +447,16 @@ export default function CHOPopulationReport() {
                           );
                         })
                       )}
+                    </tbody>
+                    <tfoot>
                       <tr className="cho-report-summary-row">
                         <td className="no-print"></td>
-                        <td><strong>Total (Print View Summary)</strong></td>
+                        <td><strong>TOTAL POPULATION</strong></td>
                         <td><strong>{printBarangaysList.length} Barangays</strong></td>
-                        <td><strong>{printBarangayTotal.toLocaleString()}</strong></td>
+                        <td className="summary-count"><strong>{printBarangayTotal.toLocaleString()}</strong></td>
                         <td><strong>100.0%</strong></td>
                       </tr>
-                    </tbody>
+                    </tfoot>
                   </table>
                 </div>
               )}

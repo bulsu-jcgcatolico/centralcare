@@ -49,7 +49,7 @@ export default function CHORHUManagement() {
   const [editingRhu, setEditingRhu] = useState(null);
   const [editAddress, setEditAddress] = useState("");
   const [editContactPerson, setEditContactPerson] = useState("");
-  const [editTotalPopulation, setEditTotalPopulation] = useState("");
+  const [editTotalPopulation, setEditTotalPopulation] = useState("0");
   const [editBarangays, setEditBarangays] = useState([]);
   const [selectedBarangayToAdd, setSelectedBarangayToAdd] = useState("");
 
@@ -88,13 +88,27 @@ export default function CHORHUManagement() {
     setLoading(false);
   }
 
+  // Calculate sum of population from assigned barangays (checking both population and totalPopulation)
+  function recalculatePopFromBarangays(assignedList, catalog = barangayCatalog) {
+    return assignedList.reduce((sum, bName) => {
+      const match = catalog.find(b => b.barangayName === bName);
+      const pop = Number(match?.population ?? match?.totalPopulation ?? 0);
+      return sum + pop;
+    }, 0);
+  }
+
   function openEditModal(rhu) {
+    const assigned = rhu.assignedBarangays || [];
     setEditingRhu(rhu);
     setEditAddress(rhu.address || "");
     setEditContactPerson(rhu.contactPerson || "");
-    setEditTotalPopulation(rhu.totalPopulation ? String(rhu.totalPopulation) : "");
-    setEditBarangays([...(rhu.assignedBarangays || [])]);
+    setEditBarangays([...assigned]);
     setSelectedBarangayToAdd("");
+    
+    // Automatically calculate population based on assigned barangays
+    const computedPop = recalculatePopFromBarangays(assigned);
+    setEditTotalPopulation(String(computedPop));
+    
     setShowEditModal(true);
   }
 
@@ -113,23 +127,18 @@ export default function CHORHUManagement() {
     setEditBarangays(newBarangays);
     setSelectedBarangayToAdd("");
 
-    const addedPop = recalculatePopFromBarangays(newBarangays);
-    if (addedPop > 0) setEditTotalPopulation(String(addedPop));
+    // Auto update population
+    const newPop = recalculatePopFromBarangays(newBarangays);
+    setEditTotalPopulation(String(newPop));
   }
 
   function removeBarangayFromEdit(name) {
     const newBarangays = editBarangays.filter(b => b !== name);
     setEditBarangays(newBarangays);
 
-    const addedPop = recalculatePopFromBarangays(newBarangays);
-    if (addedPop > 0) setEditTotalPopulation(String(addedPop));
-  }
-
-  function recalculatePopFromBarangays(assignedList) {
-    return assignedList.reduce((sum, bName) => {
-      const match = barangayCatalog.find(b => b.barangayName === bName);
-      return sum + (Number(match?.population) || 0);
-    }, 0);
+    // Auto update population
+    const newPop = recalculatePopFromBarangays(newBarangays);
+    setEditTotalPopulation(String(newPop));
   }
 
   async function saveRhu() {
@@ -308,9 +317,10 @@ export default function CHORHUManagement() {
                     value={editContactPerson} onChange={e => setEditContactPerson(e.target.value)} />
                 </div>
                 <div className="cho-form-field">
-                  <label className="cho-label">Total Population</label>
-                  <input className="cho-input" type="number" min="0" placeholder="e.g., 15000"
-                    value={editTotalPopulation} onChange={e => setEditTotalPopulation(e.target.value)} />
+                  <label className="cho-label">Total Population (Auto-Calculated)</label>
+                  <input className="cho-input" type="number" readOnly
+                    style={{ backgroundColor: "#f3f4f6", cursor: "not-allowed" }}
+                    value={editTotalPopulation} />
                 </div>
               </div>
 
@@ -324,9 +334,14 @@ export default function CHORHUManagement() {
                   <select className="cho-input" value={selectedBarangayToAdd}
                     onChange={e => setSelectedBarangayToAdd(e.target.value)}>
                     <option value="">Select a barangay to add...</option>
-                    {availableBarangaysToAdd.map(b => (
-                      <option key={b.id} value={b.barangayName}>{b.barangayName}</option>
-                    ))}
+                    {availableBarangaysToAdd.map(b => {
+                      const pop = Number(b.population ?? b.totalPopulation ?? 0);
+                      return (
+                        <option key={b.id} value={b.barangayName}>
+                          {b.barangayName} ({pop.toLocaleString()} pop.)
+                        </option>
+                      );
+                    })}
                   </select>
                   <button type="button" className="cho-btn-secondary" onClick={addBarangayToEdit} disabled={!selectedBarangayToAdd}>
                     Add

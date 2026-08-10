@@ -253,7 +253,14 @@ export default function CHOBatchDistribution() {
     } catch (err) { alert("Error: " + err.message); }
   }
 
-  const availableBatches = batches.filter(b => (b.remaining ?? b.quantity) > 0);
+  // --- UPDATED: Filters batches to only show ones that have remaining stock AND are accepted ---
+  const availableBatches = batches.filter(b => {
+    const hasRemaining = (b.remaining ?? b.quantity) > 0;
+    // Checks if status is explicitly accepted/received (or defaults to true if status is not set)
+    const isAccepted = !b.status || b.status.toLowerCase() === "accepted" || b.status.toLowerCase() === "received";
+    return hasRemaining && isAccepted;
+  });
+
   const pendingCount = distributions.filter(d => d.status === "Pending" || d.status === "Partial").length;
   const totalDistributed = distributions.reduce((s, d) => s + (d.totalBoxes || 0), 0);
 
@@ -365,7 +372,7 @@ export default function CHOBatchDistribution() {
                   {loading ? (
                     <tr><td colSpan={7}>Loading batches...</td></tr>
                   ) : availableBatches.length === 0 ? (
-                    <tr><td colSpan={7}>No available batches. Add stock in Batch Inventory first.</td></tr>
+                    <tr><td colSpan={7}>No available accepted batches. Add and accept stock in Batch Inventory first.</td></tr>
                   ) : (
                     availableBatches.map(b => (
                       <tr key={b.id}>

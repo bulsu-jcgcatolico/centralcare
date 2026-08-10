@@ -184,14 +184,12 @@
   background-color: #1d4ed8;
 }
 
-/* Table Enhancements */
+/* Table Wrapper (Screen View) */
 .cho-table-wrapper {
   width: 100%;
-  max-height: none;
-  overflow-y: visible;
-  overflow-x: auto;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
+  overflow-x: auto;
 }
 
 .cho-report-table {
@@ -224,14 +222,28 @@
   background-color: #eff6ff;
 }
 
+/* Summary / Total Row (Screen View) */
 .cho-report-summary-row {
   background-color: #f8fafc;
   font-weight: 700;
 }
 
 .cho-report-summary-row td {
-  border-top: 2px solid #cbd5e1;
-  border-bottom: 2px solid #cbd5e1;
+  border-top: 2px solid #cbd5e1 !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  font-size: 0.875rem !important;
+  padding: 0.875rem 1rem !important;
+}
+
+.cho-report-summary-row .summary-title {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #0f172a;
+}
+
+.cho-report-summary-row .summary-count {
+  font-size: 0.9rem;
   color: #0f172a;
 }
 
@@ -246,35 +258,53 @@
   border-radius: 9999px;
 }
 
-/* Printable Header Details */
-.print-header-only {
-  display: none;
+/* Hide print-only elements completely on screen view */
+.print-header-only,
+.official-print-header,
+.official-print-signatures {
+  display: none !important;
 }
+
 
 /* ==========================================
    PRINT SPECIFIC STYLES (@media print)
    ========================================== */
 @media print {
-  .no-print,
-  .cho-sidebar,
-  .cho-topbar,
-  .cho-report-toolbar,
-  .cho-btn-action,
-  .cho-modal-overlay {
-    display: none !important;
-  }
-
-  body {
-    background: #ffffff !important;
-  }
-
+  /* 1. Unlock all parent containers for multi-page printing */
+  html, 
+  body, 
+  #root, 
+  .app-container, 
+  .cho-layout, 
+  .cho-main, 
+  .cho-content,
   .printable-report-section {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-y: visible !important;
+    position: static !important;
+    background: #ffffff !important;
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
     margin: 0 !important;
   }
 
+  /* Hide screen-only web UI components */
+  .no-print,
+  .cho-sidebar,
+  .cho-topbar,
+  .cho-page-header,
+  .cho-stats-grid,
+  .cho-report-toolbar,
+  .cho-btn-action,
+  .cho-modal-overlay {
+    display: none !important;
+  }
+
+  /* Show the Print Header */
   .print-header-only {
     display: block !important;
     margin-bottom: 1.5rem;
@@ -304,12 +334,53 @@
     margin-top: 10px;
   }
 
+  /* 2. Unlock table wrapper for multi-page document pagination */
+  .cho-table-wrapper {
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    border: none !important;
+    display: block !important;
+  }
+
+  .cho-report-table {
+    width: 100% !important;
+    height: auto !important;
+  }
+
   .cho-report-table th,
   .cho-report-table td {
     padding: 6pt 8pt !important;
     border-bottom: 1pt solid #ddd !important;
     color: #000 !important;
     background: transparent !important;
+  }
+
+  /* Keep headers repeating on Page 2 and Page 3 */
+  .cho-report-table thead {
+    display: table-header-group !important;
+  }
+
+  /* Prevent awkward mid-row breaks across pages */
+  .cho-report-table tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Summary / Total Row (Print View) */
+  .cho-report-summary-row {
+    background-color: #f1f5f9 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .cho-report-summary-row td {
+    border-top: 2pt solid #000000 !important;
+    border-bottom: 2pt solid #000000 !important;
+    font-weight: 800 !important;
+    color: #000000 !important;
+    font-size: 9pt !important;
+    padding: 6pt 8pt !important;
   }
 
   .cho-subcategory-pill {
