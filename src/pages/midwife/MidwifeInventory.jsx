@@ -20,8 +20,6 @@ const navItems = [
   { label: "Notifications", to: "/midwife/notifications" },
 ];
 
-const TABLETS_PER_BOX = 30;
-
 function generateProductKey() {
   return Math.floor(10000 + Math.random() * 89999).toString();
 }
@@ -42,11 +40,11 @@ export default function MidwifeInventory() {
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
 
-
   const [inventory, setInventory]   = useState([]);
   const [loading, setLoading]       = useState(false);
   const [saving, setSaving]         = useState(false);
   const [search, setSearch]         = useState("");
+  const [activeTab, setActiveTab]   = useState("active"); // "active" | "pending"
 
   // Log New Shipment modal
   const [showShipmentModal, setShowShipmentModal] = useState(false);
@@ -58,36 +56,49 @@ export default function MidwifeInventory() {
   const [shipExpiry, setShipExpiry]               = useState("");
   const [shipSource, setShipSource]               = useState("");
 
-  // Confirm Receipt modal (for items RHU sent that are awaiting confirmation)
+  // Confirm Receipt modal
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [receivingItem, setReceivingItem]       = useState(null);
   const [receivedBy, setReceivedBy]             = useState("");
   const [dateReceived, setDateReceived]         = useState("");
   const [receiving, setReceiving]               = useState(false);
 
-
-
   function handleLogout() { logout(); navigate("/"); }
 
-  useEffect(() => { loadInventory(); }, []);
+  useEffect(() => { loadInventory(); }, [userData]);
 
   async function loadInventory() {
     setLoading(true);
     try {
-      const q = query(
+      const baseQuery = query(
         collection(db, "inventory"),
-        where("ownerType", "==", "midwife"),
-        where("barangayName", "==", userData?.barangayName ?? "")
+        where("ownerType", "==", "midwife")
       );
-      const snap = await getDocs(q);
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      
+      const snap = await getDocs(baseQuery);
+      const userBarangay = String(userData?.barangayName || userData?.barangay || "").toLowerCase();
+
+      const list = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(item => {
+          const itemBarangay = String(item.barangayName || item.barangay || "").toLowerCase();
+          return userBarangay && itemBarangay === userBarangay;
+        });
+
       setInventory(list);
-      runExpiryChecks(list, "midwife", { barangayName: userData?.barangayName });
-    } catch (err) { console.error(err); }
+      
+      // Run expiry checks strictly on active/received items
+      const activeItems = list.filter(i => {
+        const status = String(i.receivedStatus || "").trim().toLowerCase();
+        return status === "received" || status === "accepted" || !i.receivedStatus;
+      });
+      runExpiryChecks(activeItems, "midwife", { barangayName: userData?.barangayName });
+    } catch (err) { 
+      console.error("Error loading Midwife inventory:", err); 
+    }
     setLoading(false);
   }
 
-  // ── Log new shipment ────────────────────────────────────────────────────────
   async function saveShipment() {
     if (!shipProductName.trim() || !shipBoxes || !shipExpiry) {
       alert("Please fill in Product Name, Boxes, and Expiry Date");
@@ -98,13 +109,11 @@ export default function MidwifeInventory() {
       const boxes = parseInt(shipBoxes);
       const trimmedName = shipProductName.trim();
 
-      // Check if an item with the exact same name already exists in this barangay's inventory
-      const existing = inventory.find(
+      const existing = activeInventory.find(
         i => i.name.trim().toLowerCase() === trimmedName.toLowerCase()
       );
 
       if (existing) {
-        // Merge: add the new boxes to the existing item instead of duplicating
         const newQuantity  = (existing.quantity  ?? 0) + boxes;
         const newRemaining = (existing.remaining ?? 0) + boxes;
         await updateDoc(doc(db, "inventory", existing.id), {
@@ -125,9 +134,10 @@ export default function MidwifeInventory() {
           quantity:      boxes,
           remaining:     boxes,
           expiry:        shipExpiry,
-          source:        shipSource,
+          source:        shipSource || "Manual Log",
           ownerType:     "midwife",
-          barangayName:  userData?.barangayName ?? "",
+          receivedStatus: "Received", // Manual entries default to active/received
+          barangayName:  userData?.barangayName || userData?.barangay || "",
           createdAt:     serverTimestamp(),
         });
         alert("Shipment logged successfully!");
@@ -168,24 +178,37 @@ export default function MidwifeInventory() {
         receivedBy: receivedBy.trim(),
         receivedAt: dateReceived,
       });
-      setInventory(prev => prev.map(i => i.id === receivingItem.id
-        ? { ...i, receivedStatus: "Received", receivedBy: receivedBy.trim(), receivedAt: dateReceived }
-        : i
-      ));
       setShowReceiveModal(false);
       alert("Receipt confirmed — thank you!");
+      loadInventory();
     } catch (err) { alert("Error: " + err.message); }
     setReceiving(false);
   }
 
-  const filtered = inventory.filter(i =>
+  // Strict Split: Active vs Pending
+  const activeInventory = inventory.filter(i => {
+    const status = String(i.receivedStatus || "").trim().toLowerCase();
+    return status === "received" || status === "accepted" || !i.receivedStatus;
+  });
+
+  const pendingInventory = inventory.filter(i => {
+    const status = String(i.receivedStatus || "").trim().toLowerCase();
+    return status === "pending" || status === ""; // depending on backend setup, treating blank/pending safely
+  });
+
+  // For the actual table rows rendered
+  const currentList = activeTab === "active" ? activeInventory : pendingInventory;
+  const filtered = currentList.filter(i =>
     i.name?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const lowStockCount   = inventory.filter(i => (i.remaining ?? 0) <= 50 && (i.remaining ?? 0) > 20).length;
-  const criticalCount   = inventory.filter(i => (i.remaining ?? 0) <= 20).length;
-  const pendingReceiptCount = inventory.filter(i => i.receivedStatus === "Pending").length;
-  const expiringCount   = inventory.filter(i => {
+  const lowStockCount   = activeInventory.filter(i => (i.remaining ?? 0) <= 50 && (i.remaining ?? 0) > 20).length;
+  const criticalCount   = activeInventory.filter(i => (i.remaining ?? 0) <= 20).length;
+  const pendingReceiptCount = inventory.filter(i => {
+    const status = String(i.receivedStatus || "").trim().toLowerCase();
+    return status === "pending" || status === "";
+  }).length;
+  const expiringCount   = activeInventory.filter(i => {
     if (!i.expiry) return false;
     const days = (new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24);
     return days <= 30 && days >= 0;
@@ -193,7 +216,6 @@ export default function MidwifeInventory() {
 
   return (
     <div className="midwife-layout">
-      {/* ── Sidebar ── */}
       <aside className="midwife-sidebar">
         <div className="midwife-brand">
           <div className="midwife-brand-icon">
@@ -225,7 +247,6 @@ export default function MidwifeInventory() {
         </div>
       </aside>
 
-      {/* ── Main ── */}
       <div className="midwife-main">
         <header className="midwife-topbar">
           <input className="midwife-search" type="text"
@@ -252,7 +273,6 @@ export default function MidwifeInventory() {
             </div>
           </div>
 
-          {/* Stats — 4 cards */}
           <div className="midwife-inv-stats-row">
             <div className="midwife-inv-stat-card">
               <div className="midwife-inv-stat-icon midwife-inv-icon--blue">
@@ -261,11 +281,11 @@ export default function MidwifeInventory() {
                 </svg>
               </div>
               <div>
-                <p className="midwife-inv-stat-label">Total Items</p>
-                <p className="midwife-inv-stat-value">{inventory.length}</p>
+                <p className="midwife-inv-stat-label">Active Items</p>
+                <p className="midwife-inv-stat-value">{activeInventory.length}</p>
               </div>
             </div>
-            <div className="midwife-inv-stat-card">
+            <div className="midwife-inv-stat-card" onClick={() => setActiveTab("pending")} style={{ cursor: "pointer" }}>
               <div className="midwife-inv-stat-icon midwife-inv-icon--blue">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
                   <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -300,7 +320,38 @@ export default function MidwifeInventory() {
             </div>
           </div>
 
-          {/* Toolbar */}
+          {/* Tab Navigation */}
+          <div className="midwife-tabs" style={{ display: "flex", gap: "1rem", marginBottom: "1.25rem", borderBottom: "1px solid #e2e8f0", paddingBottom: "0.5rem" }}>
+            <button 
+              className={`midwife-tab-btn ${activeTab === "active" ? "active" : ""}`}
+              onClick={() => setActiveTab("active")}
+              style={{
+                background: "none", border: "none", fontWeight: activeTab === "active" ? "bold" : "normal",
+                borderBottom: activeTab === "active" ? "2px solid #1a56db" : "none",
+                color: activeTab === "active" ? "#1a56db" : "#64748b", padding: "0.5rem 1rem", cursor: "pointer"
+              }}
+            >
+              Active Stock ({activeInventory.length})
+            </button>
+            <button 
+              className={`midwife-tab-btn ${activeTab === "pending" ? "active" : ""}`}
+              onClick={() => setActiveTab("pending")}
+              style={{
+                background: "none", border: "none", fontWeight: activeTab === "pending" ? "bold" : "normal",
+                borderBottom: activeTab === "pending" ? "2px solid #1a56db" : "none",
+                color: activeTab === "pending" ? "#1a56db" : "#64748b", padding: "0.5rem 1rem", cursor: "pointer",
+                display: "flex", alignItems: "center", gap: "0.5rem"
+              }}
+            >
+              Pending Shipments
+              {pendingReceiptCount > 0 && (
+                <span style={{ background: "#dc2626", color: "#fff", borderRadius: "9999px", fontSize: "0.75rem", padding: "0.1rem 0.5rem" }}>
+                  {pendingReceiptCount}
+                </span>
+              )}
+            </button>
+          </div>
+
           <div className="midwife-inv-toolbar">
             <div className="midwife-inv-search-wrap">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
@@ -331,7 +382,6 @@ export default function MidwifeInventory() {
             </div>
           </div>
 
-          {/* Table */}
           {loading ? (
             <div className="midwife-empty-state"><p>Loading inventory...</p></div>
           ) : filtered.length === 0 ? (
@@ -341,13 +391,19 @@ export default function MidwifeInventory() {
                   <path d="M20 7h-3V4a2 2 0 00-2-2H9a2 2 0 00-2 2v3H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
                 </svg>
               </div>
-              <h2 className="midwife-empty-title">No Inventory Items Yet</h2>
+              <h2 className="midwife-empty-title">
+                {activeTab === "active" ? "No Active Inventory Items Yet" : "No Pending Shipments"}
+              </h2>
               <p className="midwife-empty-text">
-                Log a new shipment or wait for your RHU to distribute supplies.
+                {activeTab === "active" 
+                  ? "Log a new shipment or accept pending supplies from your RHU." 
+                  : "Incoming distributions from the RHU will appear here for confirmation."}
               </p>
-              <button className="midwife-btn-primary" onClick={() => setShowShipmentModal(true)}>
-                Log New Shipment
-              </button>
+              {activeTab === "active" && (
+                <button className="midwife-btn-primary" onClick={() => setShowShipmentModal(true)}>
+                  Log New Shipment
+                </button>
+              )}
             </div>
           ) : (
             <section className="midwife-inv-section">
@@ -370,6 +426,8 @@ export default function MidwifeInventory() {
                 <tbody>
                   {filtered.map(item => {
                     const remaining = item.remaining ?? item.quantity;
+                    const isPending = activeTab === "pending";
+
                     return (
                       <tr key={item.id}>
                         <td className="midwife-product-key">{item.productKey || "—"}</td>
@@ -385,23 +443,25 @@ export default function MidwifeInventory() {
                         <td><strong>{remaining} boxes(30's)</strong></td>
                         <td>{item.expiry}</td>
                         <td>
-                          <span className={`midwife-status-badge ${getStatusClass(remaining)}`}>
-                            <span className={`midwife-status-dot midwife-dot--${getStatus(remaining).toLowerCase()}`} />
-                            {getStatus(remaining)}
-                          </span>
+                          {isPending ? (
+                            <span className="midwife-status-badge midwife-status--low">Pending</span>
+                          ) : (
+                            <span className={`midwife-status-badge ${getStatusClass(remaining)}`}>
+                              <span className={`midwife-status-dot midwife-dot--${getStatus(remaining).toLowerCase()}`} />
+                              {getStatus(remaining)}
+                            </span>
+                          )}
                         </td>
                         <td>
-                          {item.receivedStatus === "Pending" ? (
+                          {isPending || item.receivedStatus === "Pending" ? (
                             <span className="midwife-status-badge midwife-status--low">Pending</span>
-                          ) : item.receivedStatus === "Received" ? (
-                            <span className="midwife-status-badge midwife-status--good">Received</span>
                           ) : (
-                            <span className="midwife-product-key">—</span>
+                            <span className="midwife-status-badge midwife-status--good">Received</span>
                           )}
                         </td>
                         <td>
                           <div style={{ display: "flex", gap: "6px" }}>
-                            {item.receivedStatus === "Pending" && (
+                            {isPending && (
                               <button className="midwife-btn-icon" onClick={() => openReceiveModal(item)}>
                                 Receive
                               </button>
@@ -422,7 +482,7 @@ export default function MidwifeInventory() {
         </main>
       </div>
 
-      {/* ── Log New Shipment Modal ── */}
+      {/* Modal */}
       {showShipmentModal && (
         <div className="midwife-modal-overlay" onClick={() => setShowShipmentModal(false)}>
           <div className="midwife-modal midwife-modal--wide" onClick={e => e.stopPropagation()}>
@@ -492,7 +552,6 @@ export default function MidwifeInventory() {
         </div>
       )}
 
-      {/* ── Confirm Receipt Modal ── */}
       {showReceiveModal && receivingItem && (
         <div className="midwife-modal-overlay" onClick={() => setShowReceiveModal(false)}>
           <div className="midwife-modal" onClick={e => e.stopPropagation()}>
@@ -526,7 +585,6 @@ export default function MidwifeInventory() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

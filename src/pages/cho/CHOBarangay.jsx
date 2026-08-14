@@ -142,23 +142,23 @@ export default function CHOBarangay() {
   const assignedCount = barangays.filter(b => assignedMap[b.barangayName || b.id]).length;
 
   return (
-    <div className="cho-layout">
-      <aside className="cho-sidebar">
-        <div className="cho-brand">
-          <div className="cho-brand-icon">
+    <div className="rhu-layout">
+      <aside className="rhu-sidebar">
+        <div className="rhu-brand">
+          <div className="rhu-brand-icon">
             <svg viewBox="0 0 24 24" fill="white" width="20" height="20">
               <path d="M19 3H5C3.9 3 3 3.9 3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c.55 0 1 .45 1 1v3h3c.55 0 1 .45 1 1s-.45 1-1 1h-3v3c0 .55-.45 1-1 1s-1-.45-1-1v-3H8c-.55 0-1-.45-1-1s.45-1 1-1h3V7c0-.55.45-1 1-1z"/>
             </svg>
           </div>
           <div>
-            <p className="cho-brand-name">CentralCare</p>
-            <p className="cho-brand-role">CHO ADMIN PANEL</p>
+            <p className="rhu-brand-name">CentralCare</p>
+            <p className="rhu-brand-role">CHO ADMIN PANEL</p>
           </div>
         </div>
-        <nav className="cho-nav">
+        <nav className="rhu-nav">
           {navItems.map((item) => (
             <NavLink key={item.to} to={item.to}
-              className={({ isActive }) => "cho-nav-item" + (isActive ? " active" : "")}>
+              className={({ isActive }) => "rhu-nav-item" + (isActive ? " active" : "")}>
               <span>{item.label}</span>
               {item.label === "Notifications" && unreadCount > 0 && (
                 <span className="nav-badge">{unreadCount}</span>
@@ -166,29 +166,29 @@ export default function CHOBarangay() {
             </NavLink>
           ))}
         </nav>
-        <div className="cho-sidebar-footer">
-          <button className="cho-nav-item cho-nav-btn">Settings</button>
-          <button className="cho-nav-item cho-nav-btn cho-signout" onClick={handleLogout}>Sign out</button>
+        <div className="rhu-sidebar-footer">
+          <button className="rhu-nav-item rhu-nav-btn">Settings</button>
+          <button className="rhu-nav-item rhu-nav-btn rhu-signout" onClick={handleLogout}>Sign out</button>
         </div>
       </aside>
 
-      <div className="cho-main">
-        <header className="cho-topbar">
-          <input className="cho-search" type="text"
+      <div className="rhu-main">
+        <header className="rhu-topbar">
+          <input className="rhu-search" type="text"
             placeholder="Search barangay..."
             value={search} onChange={(e) => setSearch(e.target.value)} />
-          <div className="cho-topbar-right">
-            <div className="cho-user">
-              <div className="cho-user-info">
-                <span className="cho-user-name">Dr. Sarah Smith</span>
-                <span className="cho-user-role">CHO Administrator</span>
+          <div className="rhu-topbar-right">
+            <div className="rhu-user">
+              <div className="rhu-user-info">
+                <span className="rhu-user-name">Dr. Sarah Smith</span>
+                <span className="rhu-user-role">CHO Administrator</span>
               </div>
-              <div className="cho-avatar">SS</div>
+              <div className="rhu-avatar">SS</div>
             </div>
           </div>
         </header>
 
-        <main className="cho-content">
+        <main className="rhu-content">
           <div className="cho-page-header">
             <div>
               <h1 className="cho-page-title">Barangay</h1>
@@ -224,44 +224,44 @@ export default function CHOBarangay() {
           ) : (
             <section className="cho-section">
               <div className="cho-table-wrapper">
-              <table className="cho-table">
-                <thead>
-                  <tr>
-                    <th>BARANGAY</th>
-                    <th>POPULATION</th>
-                    <th>ADDRESS</th>
-                    <th>MIDWIFE NAME</th>
-                    <th>ASSIGNED TO</th>
-                    <th>NOTES</th>
-                    <th>ACTION</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredBarangays.map(b => {
-                    const assignedTo = assignedMap[b.barangayName || b.id];
-                    return (
-                      <tr key={b.id}>
-                        <td><strong>{b.barangayName}</strong></td>
-                        <td>{b.totalPopulation ? Number(b.totalPopulation).toLocaleString() : "0"}</td>
-                        <td>{b.address || "—"}</td>
-                        <td>{b.midwifeName || "—"}</td>
-                        <td>
-                          {assignedTo
-                            ? <span className="cho-barangay-chip">{assignedTo}</span>
-                            : <span className="cho-product-key">Unassigned</span>}
-                        </td>
-                        <td>{b.notes || "—"}</td>
-                        <td>
-                          <div className="cho-action-group">
-                            <button className="cho-btn-action cho-btn-review" onClick={() => openEditModal(b)}>Edit</button>
-                            <button className="cho-btn-action cho-btn-danger" onClick={() => deleteBarangay(b)}>Delete</button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                <table className="cho-table">
+                  <thead>
+                    <tr>
+                      <th>BARANGAY</th>
+                      <th>POPULATION</th>
+                      <th>ADDRESS</th>
+                      <th>MIDWIFE NAME</th>
+                      <th>ASSIGNED TO</th>
+                      <th>NOTES</th>
+                      <th>ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredBarangays.map(b => {
+                      const assignedTo = assignedMap[b.barangayName || b.id];
+                      return (
+                        <tr key={b.id}>
+                          <td><strong>{b.barangayName}</strong></td>
+                          <td>{b.totalPopulation ? Number(b.totalPopulation).toLocaleString() : "0"}</td>
+                          <td>{b.address || "—"}</td>
+                          <td>{b.midwifeName || "—"}</td>
+                          <td>
+                            {assignedTo
+                              ? <span className="cho-barangay-chip">{assignedTo}</span>
+                              : <span className="cho-product-key">Unassigned</span>}
+                          </td>
+                          <td>{b.notes || "—"}</td>
+                          <td>
+                            <div className="cho-action-group">
+                              <button className="cho-btn-action cho-btn-review" onClick={() => openEditModal(b)}>Edit</button>
+                              <button className="cho-btn-action cho-btn-danger" onClick={() => deleteBarangay(b)}>Delete</button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </section>
           )}

@@ -1,8 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
-  collection, doc, getDoc, getDocs, updateDoc
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  updateDoc,
+  query
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
@@ -20,78 +25,155 @@ const navItems = [
 const BARANGAYS_COLLECTION = "cho_barangays";
 const RHU_REGISTRY_COLLECTION = "cho_rhu_registry";
 
+// Helper function to extract population across possible field naming conventions
+const getBarangayPopulation = (b) => {
+  if (!b) return 0;
+  const pop = b.population ?? b.totalPopulation ?? b.headcount ?? b.pop ?? b.residents;
+  return Number(pop) || 0;
+};
+
+// Helper function to extract population percentage/share
+const getBarangayPercent = (b) => {
+  if (!b) return 0;
+  const pct = b.populationPercent ?? b.allocationShare ?? b.percent ?? 0;
+  return Number(pct) || 0;
+};
+
 export default function RHUBarangay() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
 
   const [barangays, setBarangays] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingBarangay, setEditingBarangay] = useState(null);
+  const [editPopulation, setEditPopulation] = useState("");
   const [editPercent, setEditPercent] = useState("");
 
-  function handleLogout() { logout(); navigate("/"); }
+  function handleLogout() {
+    logout();
+    navigate("/");
+  }
 
-  useEffect(() => { loadAssignedBarangays(); }, []);
+  useEffect(() => {
+    if (userData) {
+      loadAssignedBarangays();
+    }
+  }, [userData]);
 
-  // Barangays are assigned by CHO — this page reads that assignment,
-  // then lets the RHU edit each barangay's population % (a shared field
-  // on the barangay itself, since CHO also references the same data).
   async function loadAssignedBarangays() {
     setLoading(true);
     try {
-      const rhuId = userData?.rhuId ?? "";
-      const registrySnap = await getDoc(doc(db, RHU_REGISTRY_COLLECTION, rhuId));
-      const assignedNames = registrySnap.exists()
-        ? (registrySnap.data().assignedBarangays || [])
-        : [];
+      const userRhuId   = String(userData?.rhuId   || "").trim().toLowerCase();
+      const userRhuName = String(userData?.rhuName || "").trim().toLowerCase();
 
-      if (assignedNames.length === 0) {
-        setBarangays([]);
-        setLoading(false);
-        return;
+      let assignedKeys = [];
+
+      // Strategy 1: Look up registry document directly by ID
+      if (userData?.rhuId) {
+        const regRef = doc(db, RHU_REGISTRY_COLLECTION, String(userData.rhuId));
+        const regSnap = await getDoc(regRef);
+        if (regSnap.exists()) {
+          assignedKeys = regSnap.data().assignedBarangays || [];
+        }
       }
 
+      // Strategy 2: Scan registry collection if array is empty
+      if (assignedKeys.length === 0) {
+        const regQuery = query(collection(db, RHU_REGISTRY_COLLECTION));
+        const regSnap = await getDocs(regQuery);
+        regSnap.docs.forEach(d => {
+          const data = d.data();
+          const dRhuId   = String(data.rhuId   || "").trim().toLowerCase();
+          const dRhuName = String(data.rhuName || d.id || "").trim().toLowerCase();
+          if ((userRhuId && dRhuId === userRhuId) || (userRhuName && dRhuName === userRhuName)) {
+            if (Array.isArray(data.assignedBarangays)) {
+              assignedKeys = [...assignedKeys, ...data.assignedBarangays];
+            }
+          }
+        });
+      }
+
+      // Fetch all barangays to match
       const allSnap = await getDocs(collection(db, BARANGAYS_COLLECTION));
-      const all = allSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const assigned = all
-        .filter(b => assignedNames.includes(b.barangayName))
-        .sort((a, b) => (a.barangayName || "").localeCompare(b.barangayName || ""));
+      const allBarangays = allSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      const normalizedKeys = assignedKeys.map(k => String(k).trim().toLowerCase());
+
+      const assigned = allBarangays.filter(b => {
+        const bName = String(b.barangayName || b.name || "").trim().toLowerCase();
+        const bId   = String(b.id).trim().toLowerCase();
+        const bRhuId = String(b.rhuId || b.assignedRhuId || "").trim().toLowerCase();
+        const bRhuName = String(b.assignedRhu || b.rhuName || "").trim().toLowerCase();
+
+        const inRegistry = normalizedKeys.includes(bName) || normalizedKeys.includes(bId);
+        const directMatch = (userRhuId && bRhuId === userRhuId) || (userRhuName && bRhuName === userRhuName);
+
+        return inRegistry || directMatch;
+      }).sort((a, b) => (a.barangayName || a.name || "").localeCompare(b.barangayName || b.name || ""));
 
       setBarangays(assigned);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error("Error loading assigned barangays:", err);
+    }
     setLoading(false);
   }
 
   function openEditModal(b) {
     setEditingBarangay(b);
-    setEditPercent(b.populationPercent ? (b.populationPercent * 100).toFixed(1) : "");
+    setEditPopulation(getBarangayPopulation(b));
+    const rawPct = getBarangayPercent(b);
+    setEditPercent(rawPct > 1 ? rawPct.toFixed(1) : (rawPct * 100).toFixed(1));
     setShowEditModal(true);
   }
 
-  async function savePercent() {
+  async function saveBarangayDetails() {
+    if (!editingBarangay) return;
     setSaving(true);
     try {
+      const rawPop = parseInt(editPopulation, 10) || 0;
       const fraction = parseFloat(editPercent) / 100 || 0;
+
       await updateDoc(doc(db, BARANGAYS_COLLECTION, editingBarangay.id), {
+        population: rawPop,
         populationPercent: fraction,
       });
+
       setBarangays(prev => prev.map(b => b.id === editingBarangay.id
-        ? { ...b, populationPercent: fraction }
+        ? { ...b, population: rawPop, populationPercent: fraction }
         : b
       ));
       setShowEditModal(false);
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) {
+      alert("Error updating barangay: " + err.message);
+    }
     setSaving(false);
   }
 
-  const totalPercent = barangays.reduce((s, b) => s + (b.populationPercent || 0), 0) * 100;
+  const filteredBarangays = useMemo(() => {
+    if (!searchQuery.trim()) return barangays;
+    const q = searchQuery.toLowerCase();
+    return barangays.filter(b => (b.barangayName || b.name || "").toLowerCase().includes(q));
+  }, [barangays, searchQuery]);
+
+  const totalRawPopulation = useMemo(() => {
+    return barangays.reduce((sum, b) => sum + getBarangayPopulation(b), 0);
+  }, [barangays]);
+
+  const totalPercent = useMemo(() => {
+    return barangays.reduce((sum, b) => {
+      const pct = getBarangayPercent(b);
+      return sum + (pct > 1 ? pct : pct * 100);
+    }, 0);
+  }, [barangays]);
 
   return (
     <div className="rhu-layout">
+      {/* ── Sidebar ── */}
       <aside className="rhu-sidebar">
         <div className="rhu-brand">
           <div className="rhu-brand-icon">
@@ -121,14 +203,21 @@ export default function RHUBarangay() {
         </div>
       </aside>
 
+      {/* ── Main Area ── */}
       <div className="rhu-main">
         <header className="rhu-topbar">
-          <input className="rhu-search" type="text" placeholder="Search barangay..." aria-label="Search" />
+          <input
+            className="rhu-search"
+            type="text"
+            placeholder="Search assigned barangays..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            aria-label="Search barangays"
+          />
           <div className="rhu-topbar-right">
             <div className="rhu-user">
               <div className="rhu-user-info">
                 <span className="rhu-user-name">{userData?.username || "RHU Admin"}</span>
-                <span className="rhu-user-role">{userData?.rhuName || "RHU Unit"}</span>
               </div>
               <div className="rhu-avatar">RH</div>
             </div>
@@ -136,98 +225,175 @@ export default function RHUBarangay() {
         </header>
 
         <main className="rhu-content">
-          <div className="rhu-page-header">
+          <div className="bgy-header-row">
             <div>
-              <h1 className="rhu-page-title">Barangay</h1>
-              <p className="rhu-page-sub">Barangays assigned to your RHU by CHO. You can edit each one's population % — this is what your Distribution page uses to split supplies.</p>
+              <h1 className="rhu-page-title">Assigned Barangays</h1>
+              <p className="rhu-page-sub">
+                Barangays assigned to <strong>{userData?.rhuName || "your RHU"}</strong> from CHO.
+              </p>
             </div>
+            <button className="bgy-btn-refresh" onClick={loadAssignedBarangays}>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+              </svg>
+              Refresh
+            </button>
           </div>
 
-          <div className="rhu-stats-grid rhu-stats-grid--2">
-            <div className="rhu-stat-card">
-              <p className="rhu-stat-label">ASSIGNED BARANGAYS</p>
-              <div className="rhu-stat-row"><span className="rhu-stat-value">{barangays.length}</span></div>
-            </div>
-            <div className="rhu-stat-card">
-              <p className="rhu-stat-label">TOTAL POPULATION %</p>
-              <div className="rhu-stat-row"><span className="rhu-stat-value">{totalPercent.toFixed(1)}%</span></div>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="rhu-empty-state"><p>Loading barangays...</p></div>
-          ) : barangays.length === 0 ? (
-            <div className="rhu-empty-state">
-              <div className="rhu-empty-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="64" height="64">
-                  <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 11h.01M15 11h.01M9 15h.01M15 15h.01"/>
+          {/* Metric Overview Cards */}
+          <div className="bgy-metrics-grid">
+            <div className="bgy-card">
+              <div className="bgy-icon bgy-icon--blue">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                 </svg>
               </div>
-              <h2 className="rhu-empty-title">No Barangays Assigned Yet</h2>
-              <p className="rhu-empty-text">CHO hasn't assigned any barangays to your RHU yet. You'll get a notification once they do.</p>
+              <div>
+                <span className="bgy-card-title">ASSIGNED BARANGAYS</span>
+                <p className="bgy-card-val">{barangays.length}</p>
+              </div>
+            </div>
+
+            <div className="bgy-card">
+              <div className="bgy-icon bgy-icon--green">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                  <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                </svg>
+              </div>
+              <div>
+                <span className="bgy-card-title">TOTAL HEADCOUNT</span>
+                <p className="bgy-card-val">{totalRawPopulation.toLocaleString()}</p>
+              </div>
+            </div>
+
+            <div className="bgy-card">
+              <div className="bgy-icon bgy-icon--purple">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                  <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c.55 0 1 .45 1 1v3h3c.55 0 1 .45 1 1s-.45 1-1 1h-3v3c0 .55-.45 1-1 1s-1-.45-1-1v-3H8c-.55 0-1-.45-1-1s.45-1 1-1h3V7c0-.55.45-1 1-1z"/>
+                </svg>
+              </div>
+              <div>
+                <span className="bgy-card-title">ALLOCATED SHARE</span>
+                <p className="bgy-card-val">{totalPercent.toFixed(1)}%</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Table Area */}
+          {loading ? (
+            <div className="bgy-loading-card">
+              <div className="bgy-spinner"></div>
+              <p>Fetching assigned barangay records...</p>
+            </div>
+          ) : filteredBarangays.length === 0 ? (
+            <div className="bgy-empty-card">
+              <p className="bgy-empty-title">
+                {searchQuery ? "No matching barangays" : "No Assigned Barangays Found"}
+              </p>
+              <p className="bgy-empty-sub">
+                {searchQuery
+                  ? `No barangay matching "${searchQuery}" was found.`
+                  : "CHO has not configured assigned barangays for this unit yet."}
+              </p>
             </div>
           ) : (
-            <section className="rhu-section">
-              <div className="rhu-table-wrapper">
-              <table className="rhu-inv-table">
+            <div className="bgy-table-card">
+              <table className="bgy-table">
                 <thead>
                   <tr>
-                    <th>BARANGAY</th>
-                    <th>POPULATION %</th>
-                    <th>ACTION</th>
+                    <th>BARANGAY NAME</th>
+                    <th>POPULATION</th>
+                    <th>ALLOCATION SHARE</th>
+                    <th>DISTRIBUTION % VISUAL</th>
+                    <th style={{ textAlign: "right" }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {barangays.map(b => (
-                    <tr key={b.id}>
-                      <td><strong>{b.barangayName}</strong></td>
-                      <td>{((b.populationPercent || 0) * 100).toFixed(1)}%</td>
-                      <td>
-                        <button className="rhu-btn-action rhu-btn-review" onClick={() => openEditModal(b)}>
-                          Edit %
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredBarangays.map(b => {
+                    const pop = getBarangayPopulation(b);
+                    const rawPct = getBarangayPercent(b);
+                    const pct = rawPct > 1 ? rawPct : rawPct * 100;
+
+                    return (
+                      <tr key={b.id}>
+                        <td>
+                          <div className="bgy-name-cell">
+                            <strong>{b.barangayName || b.name}</strong>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="bgy-pop-badge">
+                            {pop.toLocaleString()}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="bgy-share-badge">{pct.toFixed(1)}%</span>
+                        </td>
+                        <td className="bgy-bar-cell">
+                          <div className="bgy-bar-track">
+                            <div
+                              className="bgy-bar-fill"
+                              style={{ width: `${Math.min(pct, 100)}%` }}
+                            />
+                          </div>
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          <button
+                            className="bgy-btn-edit"
+                            onClick={() => openEditModal(b)}
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
-              </div>
-            </section>
+            </div>
           )}
         </main>
       </div>
 
-      {/* ── Edit Population % Modal ── */}
+      {/* Edit Modal */}
       {showEditModal && editingBarangay && (
-        <div className="rhu-modal-overlay" onClick={() => setShowEditModal(false)}>
-          <div className="rhu-modal" onClick={e => e.stopPropagation()}>
-            <div className="rhu-modal-header">
-              <h2 className="rhu-modal-title">Edit {editingBarangay.barangayName}</h2>
-              <button className="rhu-modal-close" aria-label="Close" onClick={() => setShowEditModal(false)}>×</button>
+        <div className="bgy-modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="bgy-modal" onClick={e => e.stopPropagation()}>
+            <div className="bgy-modal-header">
+              <h3>Edit {editingBarangay.barangayName || editingBarangay.name}</h3>
+              <button className="bgy-modal-close" onClick={() => setShowEditModal(false)}>×</button>
             </div>
-            <div className="rhu-modal-body">
-              <div className="rhu-form-field">
-                <label className="rhu-label">Population %</label>
-                <div className="rhu-pct-input-wrap">
+            <div className="bgy-modal-body">
+              <div className="bgy-field">
+                <label>Barangay Population Headcount</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={editPopulation}
+                  onChange={e => setEditPopulation(e.target.value)}
+                  placeholder="e.g. 4500"
+                />
+              </div>
+              <div className="bgy-field">
+                <label>Allocation Share %</label>
+                <div className="bgy-input-group">
                   <input
-                    className="rhu-input rhu-pct-input"
                     type="number"
                     min="0"
                     max="100"
                     step="0.1"
-                    placeholder="0"
                     value={editPercent}
                     onChange={e => setEditPercent(e.target.value)}
-                    aria-label={`${editingBarangay.barangayName} population percentage`}
+                    placeholder="0.0"
                   />
-                  <span className="rhu-pct-symbol">%</span>
+                  <span>%</span>
                 </div>
               </div>
             </div>
-            <div className="rhu-modal-footer">
-              <button className="rhu-btn-secondary" onClick={() => setShowEditModal(false)}>Cancel</button>
-              <button className="rhu-btn-primary" onClick={savePercent} disabled={saving}>
-                {saving ? "Saving..." : "Save"}
+            <div className="bgy-modal-footer">
+              <button className="bgy-btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
+              <button className="bgy-btn-save" onClick={saveBarangayDetails} disabled={saving}>
+                {saving ? "Saving..." : "Save Changes"}
               </button>
             </div>
           </div>

@@ -43,7 +43,7 @@ export default function CHODashboard() {
     setLoading(true);
     try {
       const [invSnap, distSnap, notifSnap, barangaySnap] = await Promise.all([
-        getDocs(query(collection(db, "inventory"), where("ownerType", "==", "cho"))),
+        getDocs(collection(db, "inventory")),
         getDocs(query(collection(db, "distributions"), where("fromType", "==", "cho"))),
         getDocs(query(collection(db, "notifications"), where("fromType", "==", "cho"))),
         getDocs(collection(db, "cho_barangays"))
@@ -52,7 +52,6 @@ export default function CHODashboard() {
       setDistributions(distSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setNotifications(notifSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
-      // Calculate total Malolos population by summing up all barangay populations
       const totalPop = barangaySnap.docs.reduce((sum, doc) => {
         const data = doc.data();
         return sum + Number(data.population ?? data.totalPopulation ?? 0);
@@ -71,7 +70,6 @@ export default function CHODashboard() {
     return days <= 30 && days >= 0;
   });
 
-  // Bar chart — group inventory by category
   const categoryMap = {};
   inventory.forEach(i => {
     const cat = i.category || "Other";
@@ -79,17 +77,26 @@ export default function CHODashboard() {
   });
   const barData = Object.entries(categoryMap).map(([category, value]) => ({ category, value }));
 
-  // Pie chart — distribution by RHU
   const rhuMap = {};
   distributions.forEach(d => {
     (d.rhuDistribution || []).forEach(r => {
       rhuMap[r.name] = (rhuMap[r.name] || 0) + (r.boxes || 0);
     });
   });
-  const pieData = Object.entries(rhuMap).slice(0, 5).map(([name, value]) => ({ name, value }));
+
+  const pieData = Object.entries(rhuMap)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => {
+      const matchA = a.name.match(/\d+/);
+      const matchB = b.name.match(/\d+/);
+      const numA = matchA ? parseInt(matchA[0], 10) : 0;
+      const numB = matchB ? parseInt(matchB[0], 10) : 0;
+      return numA - numB;
+    })
+    .slice(0, 5);
+
   const pieTotal = pieData.reduce((s, d) => s + d.value, 0);
 
-  // Recent activity — latest 5 from inventory + distributions combined
   const recentActivity = [
     ...inventory.map(i => ({
       id: i.id,
@@ -167,7 +174,6 @@ export default function CHODashboard() {
             </div>
           </div>
 
-          {/* Stat Cards — real data */}
           <div className="cho-stats-grid">
             <div className="cho-stat-card">
               <p className="cho-stat-label">TOTAL MALOLOS POPULATION</p>
@@ -209,7 +215,6 @@ export default function CHODashboard() {
             </div>
           </div>
 
-          {/* Latest Notifications */}
           <section className="cho-section">
             <div className="cho-section-hd">
               <h2 className="cho-section-title">Latest Notifications</h2>
@@ -237,7 +242,6 @@ export default function CHODashboard() {
             )}
           </section>
 
-          {/* Charts */}
           <div className="cho-charts-row">
             <div className="cho-chart-card">
               <div className="cho-section-hd">
@@ -292,7 +296,6 @@ export default function CHODashboard() {
             </div>
           </div>
 
-          {/* Recent Activity */}
           <section className="cho-section">
             <div className="cho-section-hd">
               <h2 className="cho-section-title">Recent Activity</h2>

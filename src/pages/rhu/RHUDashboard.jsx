@@ -141,7 +141,6 @@ export default function RHUDashboard() {
             <div className="rhu-user">
               <div className="rhu-user-info">
                 <span className="rhu-user-name">{userData?.username || "RHU Admin"}</span>
-                <span className="rhu-user-role">{userData?.rhuName || "RHU Unit"}</span>
               </div>
               <div className="rhu-avatar">RH</div>
             </div>

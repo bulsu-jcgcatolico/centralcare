@@ -88,10 +88,6 @@ export default function MidwifePatients() {
     }
   }
 
-  function exportPatients() {
-    alert("Export feature: CSV data generation in progress.");
-  }
-
   // Split patients by type
   const childPatients = patients.filter(p => p.type === "child");
   const adultPatients = patients.filter(p => p.type === "adult");
@@ -117,6 +113,85 @@ export default function MidwifePatients() {
   ));
 
   const activeCases = patients.filter(p => p.status === "active").length;
+
+  // Print / Export Handler function
+  function exportPatients() {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      alert("Please allow popups to export or print patient logs.");
+      return;
+    }
+
+    const isChild = activeTab === "child";
+    const barangay = userData?.barangayName || "Barangay";
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Patient Records (${isChild ? "Children" : "Adults"}) - ${barangay}</title>
+          <style>
+            body { font-family: Arial, sans-serif; color: #111; padding: 20px; }
+            h2 { margin-bottom: 4px; color: #1a56db; }
+            p { color: #555; font-size: 13px; margin-top: 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
+            th, td { border: 1px solid #d1d5db; padding: 8px 10px; text-align: left; }
+            th { background: #f3f4f6; color: #374151; text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; }
+            tr:nth-child(even) { background: #f9fafb; }
+          </style>
+        </head>
+        <body>
+          <h2>CentralCare Health System - Patient Records (${isChild ? "Child Patients" : "Adult Patients"})</h2>
+          <p>Barangay: ${barangay} | Filter: ${filterBy.toUpperCase()} | Generated on: ${new Date().toLocaleString()}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Patient ID</th>
+                <th>Name</th>
+                <th>Age</th>
+                <th>Sex</th>
+                ${isChild ? `
+                  <th>Birthday</th>
+                  <th>Mother's Name</th>
+                  <th>Contact No.</th>
+                  <th>Immunization</th>
+                ` : `
+                  <th>Civil Status</th>
+                  <th>Contact No.</th>
+                `}
+                <th>Last Visit</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${displayList.map(patient => `
+                <tr>
+                  <td>${patient.patientId || "—"}</td>
+                  <td><strong>${patient.name || "—"}</strong></td>
+                  <td>${patient.age || "—"}</td>
+                  <td>${patient.sex || "—"}</td>
+                  ${isChild ? `
+                    <td>${patient.birthday || "—"}</td>
+                    <td>${patient.motherName || "—"}</td>
+                    <td>${patient.contact || "—"}</td>
+                    <td>${patient.immunizationStatus || "Incomplete"}</td>
+                  ` : `
+                    <td>${patient.civilStatus || "—"}</td>
+                    <td>${patient.contact || "—"}</td>
+                  `}
+                  <td>${patient.lastVisit || "—"}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  }
 
   return (
     <div className="midwife-layout">
@@ -292,7 +367,12 @@ export default function MidwifePatients() {
                 Register New Patient
               </button>
               <button className="midwife-btn-secondary" onClick={exportPatients}>
-                Export
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px', verticalAlign: 'text-bottom' }}>
+                  <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                  <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                Print / Export
               </button>
             </div>
           </div>

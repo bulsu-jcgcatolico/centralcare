@@ -110,7 +110,6 @@ export default function MidwifeAddPatient(props) {
     });
   }
 
-  // Load existing patient when in edit mode
   useEffect(function () {
     if (!isEdit || !patientId) return;
 
@@ -239,7 +238,7 @@ export default function MidwifeAddPatient(props) {
   return (
     <div className="midwife-layout">
       {/* ── Sidebar Navigation ── */}
-      <aside className="midwife-sidebar">
+      <aside className="midwife-sidebar no-print">
         <div className="midwife-brand">
           <div className="midwife-brand-icon">
             <svg viewBox="0 0 24 24" fill="white" width="20" height="20">
@@ -281,7 +280,7 @@ export default function MidwifeAddPatient(props) {
 
       {/* ── Main View Container ── */}
       <div className="midwife-main">
-        <header className="midwife-topbar">
+        <header className="midwife-topbar no-print">
           <div className="ap-topbar-left">
             <button className="ap-back-btn" onClick={handleCancel}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
@@ -307,7 +306,7 @@ export default function MidwifeAddPatient(props) {
         </header>
 
         <main className="midwife-content">
-          <div className="ap-page-header">
+          <div className="ap-page-header no-print">
             <div>
               <h1 className="ap-page-title">
                 {isEdit ? "Edit" : "New"} {type === "child" ? "Child Health" : "Adult Health"} Record
@@ -328,37 +327,40 @@ export default function MidwifeAddPatient(props) {
             </div>
           </div>
 
-          {/* Patient Details Form Section */}
-          <div className="ap-section-container">
-            <div className="ap-section-title-bar">
-              <span className="ap-section-icon"></span>
-              <h2 className="ap-section-title">Patient Demographic Information</h2>
+          {/* Print Wrapper Canvas */}
+          <div id="printable-record-sheet">
+            {/* Patient Details Form Section */}
+            <div className="ap-section-container">
+              <div className="ap-section-title-bar">
+                <span className="ap-section-icon"></span>
+                <h2 className="ap-section-title">Patient Demographic Information</h2>
+              </div>
+              <div className="ap-info-card">
+                {type === "child" ? (
+                  <ChildInfo fields={fields} setField={setField} immunization={immunization} updateImmunization={updateImmunization} />
+                ) : (
+                  <AdultInfo fields={fields} setField={setField} />
+                )}
+              </div>
             </div>
-            <div className="ap-info-card">
-              {type === "child" ? (
-                <ChildInfo fields={fields} setField={setField} immunization={immunization} updateImmunization={updateImmunization} />
-              ) : (
-                <AdultInfo fields={fields} setField={setField} />
-              )}
-            </div>
-          </div>
 
-          {/* Clinical History & Visit Log Section */}
-          <div className="ap-section-container">
-            <div className="ap-section-title-bar">
-              <span className="ap-section-icon"></span>
-              <h2 className="ap-section-title">Clinical History & Visit Consultations</h2>
+            {/* Clinical History & Visit Log Section */}
+            <div className="ap-section-container">
+              <div className="ap-section-title-bar">
+                <span className="ap-section-icon"></span>
+                <h2 className="ap-section-title">Clinical History & Visit Consultations</h2>
+              </div>
+              <ClinicalRecordsSection
+                records={records}
+                vitalsList={vitalsList}
+                onUpdateRecord={updateRecord}
+                onRemoveRecord={removeRecord}
+              />
             </div>
-            <ClinicalRecordsSection
-              records={records}
-              vitalsList={vitalsList}
-              onUpdateRecord={updateRecord}
-              onRemoveRecord={removeRecord}
-            />
           </div>
 
           {/* Form Actions Footer */}
-          <div className="ap-bottom">
+          <div className="ap-bottom no-print">
             <button className="ap-add-btn" onClick={addRecord}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16">
                 <line x1="12" y1="5" x2="12" y2="19" />
@@ -398,12 +400,17 @@ function ClinicalRecordsSection(props) {
   return (
     <div className="ap-clinical-records-list">
       {records.map(function (rec, index) {
+        const isDateEmpty = !rec.date;
+        const isComplaintsEmpty = !rec.complaints || rec.complaints.trim() === "";
+        const isDiagnosisEmpty = !rec.diagnosis || rec.diagnosis.trim() === "";
+        const isMedicationsEmpty = !rec.medications || rec.medications.trim() === "";
+
         return (
           <div key={rec.id} className="ap-clinical-card">
             <div className="ap-clinical-card-header">
               <span className="ap-record-badge">Consultation #{index + 1}</span>
               {records.length > 1 && (
-                <button className="ap-remove-btn" onClick={function () { onRemoveRecord(rec.id); }}>
+                <button className="ap-remove-btn no-print" onClick={function () { onRemoveRecord(rec.id); }}>
                   Remove Entry
                 </button>
               )}
@@ -422,7 +429,7 @@ function ClinicalRecordsSection(props) {
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="ap-td-date">
+                    <td className={"ap-td-date" + (isDateEmpty ? " print-empty-cell" : "")}>
                       <input
                         type="date"
                         className="ap-date-input"
@@ -449,7 +456,7 @@ function ClinicalRecordsSection(props) {
                         })}
                       </div>
                     </td>
-                    <td className="ap-td-text">
+                    <td className={"ap-td-text" + (isComplaintsEmpty ? " print-empty-cell" : "")}>
                       <textarea
                         className="ap-textarea"
                         placeholder="Enter chief complaints..."
@@ -457,7 +464,7 @@ function ClinicalRecordsSection(props) {
                         onChange={function (e) { onUpdateRecord(rec.id, "complaints", e.target.value); }}
                       />
                     </td>
-                    <td className="ap-td-text">
+                    <td className={"ap-td-text" + (isDiagnosisEmpty ? " print-empty-cell" : "")}>
                       <textarea
                         className="ap-textarea"
                         placeholder="Enter diagnosis..."
@@ -465,7 +472,7 @@ function ClinicalRecordsSection(props) {
                         onChange={function (e) { onUpdateRecord(rec.id, "diagnosis", e.target.value); }}
                       />
                     </td>
-                    <td className="ap-td-text">
+                    <td className={"ap-td-text" + (isMedicationsEmpty ? " print-empty-cell" : "")}>
                       <textarea
                         className="ap-textarea"
                         placeholder="Enter prescribed medications / instructions..."
@@ -536,7 +543,7 @@ function ChildInfo(props) {
       </div>
 
       <div className="ap-info-col">
-        <div className="ap-row">
+        <div className={"ap-row" + (!f.birthday ? " print-empty-field" : "")}>
           <span>Birthday:</span>
           <input type="date" className="ap-w130" value={f.birthday} onChange={function (e) { setField("birthday", e.target.value); }} />
           <span className="ap-span-sm">Age:</span>
@@ -611,8 +618,9 @@ function ChildInfo(props) {
             return (
               <div key={ci} className="ap-immun-col">
                 {col.map(function (v) {
+                  const isValEmpty = !immunization[v];
                   return (
-                    <div key={v} className="ap-immun-row">
+                    <div key={v} className={"ap-immun-row" + (isValEmpty ? " print-empty-field" : "")}>
                       <span>{v}:</span>
                       <input type="date" value={immunization[v] || ""}
                         onChange={function (e) { updateImmunization(v, e.target.value); }} />
@@ -667,7 +675,7 @@ function AdultInfo(props) {
           <input type="text" placeholder="Last Name, First Name, Middle Name"
             value={f.memberName} onChange={function (e) { setField("memberName", e.target.value); }} />
         </div>
-        <div className="ap-row">
+        <div className={"ap-row" + (!f.memberBirthday ? " print-empty-field" : "")}>
           <span>Member's Birthday:</span>
           <input type="date" value={f.memberBirthday} onChange={function (e) { setField("memberBirthday", e.target.value); }} />
         </div>
@@ -688,7 +696,7 @@ function AdultInfo(props) {
       </div>
 
       <div className="ap-info-col">
-        <div className="ap-row">
+        <div className={"ap-row" + (!f.birthday ? " print-empty-field" : "")}>
           <span>Birthday:</span>
           <input type="date" className="ap-w130" value={f.birthday} onChange={function (e) { setField("birthday", e.target.value); }} />
           <span className="ap-span-sm">Age:</span>
@@ -742,7 +750,7 @@ function AdultInfo(props) {
             <span>Age of Menarche:</span>
             <input type="text" value={f.menarche} onChange={function (e) { setField("menarche", e.target.value); }} placeholder="e.g. 12" />
           </div>
-          <div className="ap-row">
+          <div className={"ap-row" + (!f.lmp ? " print-empty-field" : "")}>
             <span>LMP:</span>
             <input type="text" value={f.lmp} onChange={function (e) { setField("lmp", e.target.value); }} placeholder="Last Menstrual Period" />
           </div>
@@ -750,7 +758,7 @@ function AdultInfo(props) {
             <span>Gravidity (G):</span>
             <input type="text" value={f.gravidity} onChange={function (e) { setField("gravidity", e.target.value); }} placeholder="Total pregnancies" />
           </div>
-          <div className="ap-row">
+          <div className={"ap-row" + (!f.edc ? " print-empty-field" : "")}>
             <span>EDC (If Pregnant):</span>
             <input type="text" value={f.edc} onChange={function (e) { setField("edc", e.target.value); }} placeholder="Expected Date of Confinement" />
           </div>

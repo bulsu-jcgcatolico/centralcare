@@ -1,22 +1,37 @@
-/* ── Layout ─────────────────────────────────────────────────────────────────── */
+/* ==========================================================================
+   CHO Batch Distribution Stylesheet (Fixed Layout)
+   ========================================================================== */
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
 .rhu-layout {
   display: flex;
+  width: 100vw;
   height: 100vh;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background: #f8fafc;
+  box-sizing: border-box;
 }
 
-/* ── Sidebar ─────────────────────────────────────────────────────────────────── */
+/* ── Sidebar ─────────────────────────────────────────────────────────── */
 .rhu-sidebar {
   width: 220px;
   min-width: 220px;
+  height: 100vh;
   background: #ffffff;
   border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
   padding: 1.25rem 0.875rem;
-  gap: 0.5rem;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  overflow-y: auto;
 }
 
 .rhu-brand {
@@ -26,6 +41,7 @@
   padding: 0 0.5rem 1rem;
   border-bottom: 1px solid #f1f5f9;
   margin-bottom: 0.5rem;
+  flex-shrink: 0;
 }
 
 .rhu-brand-icon {
@@ -59,7 +75,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  flex: 1;
+  flex: 1 1 auto;
 }
 
 .rhu-nav-item {
@@ -112,6 +128,8 @@
   gap: 4px;
   padding-top: 0.75rem;
   border-top: 1px solid #f1f5f9;
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 .rhu-signout {
@@ -123,12 +141,14 @@
   color: #dc2626 !important;
 }
 
-/* ── Main Container ──────────────────────────────────────────────────────────── */
+/* ── Main Container (Scrollable Area) ────────────────────────────────── */
 .rhu-main {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 /* ── Topbar ──────────────────────────────────────────────────────────────────── */
@@ -139,6 +159,10 @@
   padding: 0.875rem 2rem;
   background: #ffffff;
   border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  flex-shrink: 0;
 }
 
 .rhu-search {
@@ -208,10 +232,8 @@
   flex-shrink: 0;
 }
 
-/* ── Main Content Area ──────────────────────────────────────────────────────── */
+/* ── Main Content Area ────────────────────────────────────────────────        */
 .rhu-content {
-  flex: 1;
-  overflow-y: auto;
   padding: 2rem 2.5rem 3rem;
   display: flex;
   flex-direction: column;
@@ -331,7 +353,7 @@
 /* ── Stats Row ───────────────────────────────────────────────────────────────── */
 .rhu-dist-stats-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 360px));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1rem;
 }
 
@@ -385,7 +407,7 @@
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
@@ -420,6 +442,7 @@
 .rhu-table-wrapper {
   width: 100%;
   overflow-x: auto;
+  overflow-y: visible;
 }
 
 .rhu-table {
@@ -603,6 +626,22 @@
 
 .rhu-review-row:last-child {
   border-bottom: none;
+}
+
+/* ── Print / PDF Export Styles ────────────────────────────────────────── */
+@media print {
+  .rhu-screen-only {
+    display: none !important;
+  }
+  .rhu-print-only {
+    display: block !important;
+  }
+  
+  body, html {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
 }
 
 /* ── Responsive Rules ────────────────────────────────────────────────────────── */

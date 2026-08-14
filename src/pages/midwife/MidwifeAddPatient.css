@@ -638,34 +638,297 @@
   .ap-parity-row { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* ── Print Media Optimizations ── */
 @media print {
+  @page {
+    size: letter portrait;
+    margin: 4mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+    scrollbar-width: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Completely suppress scrollbars in all elements during print preview */
+  * {
+    scrollbar-width: none !important;
+  }
+
+  *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  /* Hide app navigation and action buttons */
   .midwife-sidebar,
   .midwife-topbar,
-  .ap-print-btn,
+  .ap-page-header,
   .ap-bottom,
-  .ap-remove-btn {
+  .no-print {
     display: none !important;
   }
 
-  .midwife-layout {
-    display: block;
-    background: #ffffff;
+  .midwife-layout,
+  .midwife-main {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
   }
 
-  .midwife-main {
-    padding: 0;
+  .midwife-content {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+
+  #printable-record-sheet {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+
+  .ap-section-container {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin-bottom: 4px !important;
   }
 
   .ap-info-card,
   .ap-clinical-card {
-    border: none;
-    box-shadow: none;
-    padding: 0;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
+    padding: 6px 8px !important;
+    background: #ffffff !important;
+    border-radius: 4px !important;
+  }
+
+  .ap-section-title-bar {
+    margin-bottom: 2px !important;
+  }
+
+  .ap-section-title {
+    font-size: 10px !important;
+    color: #000000 !important;
+    text-transform: uppercase;
+  }
+
+  /* Keep the 2-column grid active during print */
+  .ap-info-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .ap-info-col {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 3px !important;
+  }
+
+  .ap-row {
+    margin-bottom: 1px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+  }
+
+  .ap-row > span,
+  .ap-span-sm {
+    font-size: 8px !important;
+    color: #000000 !important;
+    min-width: 80px !important;
+  }
+
+  /* COMPLETELY HIDE INPUTS AND DATE OVERLAYS WHEN PRINTING BLANK FIELDS */
+  .print-empty-field input[type="text"],
+  .print-empty-field input[type="date"],
+  .print-empty-field input[type="number"],
+  .print-empty-cell input[type="date"],
+  .print-empty-cell textarea {
+    display: none !important;
+  }
+
+  /* Standard print styling for filled inputs */
+  .ap-row input[type="text"],
+  .ap-row input[type="date"],
+  .ap-row input[type="number"],
+  .ap-immun-row input,
+  .ap-vital-input,
+  .ap-date-input,
+  .ap-parity-item input {
+    border: none !important;
+    border-bottom: 1px solid #94a3b8 !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 1px 2px !important;
+    font-size: 8.5px !important;
+    height: 12px !important;
+    flex: 1 !important;
+  }
+
+  .ap-row input::placeholder,
+  .ap-textarea::placeholder,
+  .ap-vital-input::placeholder {
+    color: transparent !important;
+  }
+
+  .ap-cb {
+    font-size: 8px !important;
+    color: #000000 !important;
+    gap: 2px !important;
+  }
+
+  .ap-cb input {
+    width: 9px !important;
+    height: 9px !important;
+    accent-color: #000 !important;
+  }
+
+  .ap-w80  { width: 40px !important; }
+  .ap-w60  { width: 30px !important; }
+  .ap-w120 { width: 60px !important; }
+  .ap-w130 { width: 70px !important; }
+
+  /* Immunization Matrix Print */
+  .ap-immun-section {
+    border: 1px solid #cbd5e1 !important;
+    margin-top: 4px !important;
+    width: 100% !important;
+  }
+
+  .ap-immun-title {
+    background: #f1f5f9 !important;
+    padding: 2px 4px !important;
+    font-size: 8px !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+  }
+
+  .ap-immun-header {
+    background: #f8fafc !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+  }
+
+  .ap-immun-header div {
+    font-size: 7px !important;
+    padding: 1px !important;
+    border-right: 1px solid #cbd5e1 !important;
+  }
+
+  .ap-immun-body {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+
+  .ap-immun-col {
+    padding: 3px !important;
+    gap: 2px !important;
+    border-right: 1px solid #cbd5e1 !important;
+  }
+
+  .ap-immun-row span {
+    font-size: 7.5px !important;
+    min-width: 65px !important;
+  }
+
+  /* Female Reproductive Section Print */
+  .ap-female-section {
+    border: 1px solid #cbd5e1 !important;
+    background: transparent !important;
+    padding: 4px 6px !important;
+    margin-top: 3px !important;
+    width: 100% !important;
+  }
+
+  .ap-female-title {
+    font-size: 8px !important;
+    margin-bottom: 2px !important;
+    color: #000000 !important;
+  }
+
+  .ap-female-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 3px !important;
+    margin-bottom: 3px !important;
+  }
+
+  .ap-parity-row {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 3px !important;
+  }
+
+  .ap-parity-item label {
+    font-size: 7.5px !important;
+    color: #000000 !important;
+  }
+
+  /* Clinical Records Print & Scrollbar Elimination Fixes */
+  .ap-table-wrapper {
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    display: block !important;
+  }
+
+  .ap-clinical-card-header {
+    padding: 2px 6px !important;
+    background: #f8fafc !important;
+  }
+
+  .ap-record-badge {
+    font-size: 8px !important;
+    padding: 1px 4px !important;
   }
 
   .ap-textarea {
-    border: none;
+    border: 1px solid #cbd5e1 !important;
+    background: transparent !important;
+    box-shadow: none !important;
     resize: none;
-    padding: 0;
+    min-height: 28px !important;
+    font-size: 8.5px !important;
+    padding: 2px !important;
+    line-height: 1.2 !important;
+  }
+
+  .ap-clinical-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+  }
+
+  .ap-th-date { width: 18% !important; }
+  .ap-th-vitals { width: 28% !important; }
+
+  .ap-clinical-table th,
+  .ap-clinical-table td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 3px !important;
+    font-size: 8px !important;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .ap-vital-label {
+    font-size: 7.5px !important;
+    min-width: 55px !important;
   }
 }

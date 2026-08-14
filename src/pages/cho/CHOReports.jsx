@@ -43,7 +43,7 @@ export default function CHOReports() {
     setLoading(true);
     try {
       const [invSnap, distSnap] = await Promise.all([
-        getDocs(query(collection(db, "inventory"), where("ownerType", "==", "cho"))),
+        getDocs(query(collection(db, "cho_batches"), where("ownerType", "==", "cho"), where("status", "==", "Accepted"))),
         getDocs(query(collection(db, "distributions"), where("fromType", "==", "cho")))
       ]);
       setInventory(invSnap.docs.map(d => ({ id: d.id, ...d.data(), actType: "inventory" })));
@@ -57,8 +57,8 @@ export default function CHOReports() {
       ...i, actType: "inventory",
       displayName: i.name,
       displayQty:  `${i.quantity} boxes`,
-      displayDate: i.date || new Date(i.createdAt?.seconds * 1000).toLocaleDateString() || "—",
-      month: getMonthYear(i.date || (i.createdAt?.seconds ? new Date(i.createdAt.seconds * 1000).toLocaleDateString() : null))
+      displayDate: i.manufactureDate || i.expiryDate || new Date(i.createdAt?.seconds * 1000).toLocaleDateString() || "—",
+      month: getMonthYear(i.manufactureDate || i.expiryDate || (i.createdAt?.seconds ? new Date(i.createdAt.seconds * 1000).toLocaleDateString() : null))
     })),
     ...distributions.map(d => ({
       ...d, actType: "distribution",
@@ -135,7 +135,7 @@ export default function CHOReports() {
               <div className="cho-page-header">
                 <div>
                   <h1 className="cho-page-title">Activity Reports</h1>
-                  <p className="cho-page-sub">Monthly summary of inventory additions and distributions.</p>
+                  <p className="cho-page-sub">Monthly summary of accepted inventory additions and distributions.</p>
                 </div>
                 <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                   <select className="cho-input" style={{ width: "auto", minWidth: "160px" }}
@@ -151,7 +151,7 @@ export default function CHOReports() {
 
               <div className="cho-stats-grid cho-stats-grid--3">
                 <div className="cho-stat-card">
-                  <p className="cho-stat-label">ITEMS ADDED</p>
+                  <p className="cho-stat-label">ACCEPTED ITEMS ADDED</p>
                   <div className="cho-stat-row"><span className="cho-stat-value">{monthlyInvCount}</span></div>
                   <p className="cho-stat-sub">{periodLabel}</p>
                 </div>
@@ -177,7 +177,7 @@ export default function CHOReports() {
                     </svg>
                   </div>
                   <h2 className="cho-empty-title">No Records for {periodLabel}</h2>
-                  <p className="cho-empty-text">Records will appear here once you add inventory and create distributions.</p>
+                  <p className="cho-empty-text">Accepted inventory batches and distributions will appear here.</p>
                 </div>
               ) : (
                 <section className="cho-section">
@@ -209,7 +209,7 @@ export default function CHOReports() {
                           <td>
                             <span style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px",
                               fontWeight: "600", background: "#d1fae5", color: "#065f46" }}>
-                              {item.status || "Active"}
+                              {item.status || "Accepted"}
                             </span>
                           </td>
                         </tr>
@@ -235,7 +235,7 @@ export default function CHOReports() {
             <tbody>
               <tr>
                 <td style={{ border: "1px solid #999", padding: "8px", fontSize: "12px" }}>
-                  <strong>Items Added:</strong> {monthlyInvCount}
+                  <strong>Accepted Items Added:</strong> {monthlyInvCount}
                 </td>
                 <td style={{ border: "1px solid #999", padding: "8px", fontSize: "12px" }}>
                   <strong>Distributions Made:</strong> {monthlyDistCount}
@@ -270,7 +270,7 @@ export default function CHOReports() {
                     <td style={{ border: "1px solid #999", padding: "6px" }}>{item.displayQty}</td>
                     <td style={{ border: "1px solid #999", padding: "6px" }}>{item.month || "—"}</td>
                     <td style={{ border: "1px solid #999", padding: "6px" }}>{item.displayDate}</td>
-                    <td style={{ border: "1px solid #999", padding: "6px" }}>{item.status || "Active"}</td>
+                    <td style={{ border: "1px solid #999", padding: "6px" }}>{item.status || "Accepted"}</td>
                   </tr>
                 ))}
               </tbody>

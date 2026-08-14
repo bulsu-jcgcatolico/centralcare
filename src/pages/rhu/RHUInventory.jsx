@@ -28,6 +28,7 @@ function getStatus(remaining) {
   if (remaining <= 50) return "Low";
   return "Good";
 }
+
 function getStatusClass(remaining) {
   if (remaining <= 20) return "rhu-status--critical";
   if (remaining <= 50) return "rhu-status--low";
@@ -38,12 +39,14 @@ export default function RHUInventory() {
   const { logout, user, userData } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+
   const [search, setSearch] = useState("");
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState("active"); // "active" | "pending"
 
-  // Add modal
+  // Add Item modal
   const [showAddModal, setShowAddModal] = useState(false);
   const [productName, setProductName] = useState("");
   const [lotNumber, setLotNumber] = useState("");
@@ -54,30 +57,56 @@ export default function RHUInventory() {
   const [source, setSource] = useState("");
   const [expiry, setExpiry] = useState("");
 
-  // Confirm Receipt modal (for items CHO sent that are awaiting confirmation)
-  const [showReceiveModal, setShowReceiveModal] = useState(false);
-  const [receivingItem, setReceivingItem] = useState(null);
+  // Accept modal
+  const [showAcceptModal, setShowAcceptModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
   const [receivedBy, setReceivedBy] = useState("");
   const [dateReceived, setDateReceived] = useState("");
-  const [receiving, setReceiving] = useState(false);
+  const [processingAction, setProcessingAction] = useState(false);
+
+  // Decline modal
+  const [showDeclineModal, setShowDeclineModal] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
 
   function handleLogout() { logout(); navigate("/"); }
 
-  useEffect(() => { loadInventory(); }, []);
+  useEffect(() => { loadInventory(); }, [userData]);
 
   async function loadInventory() {
     setLoading(true);
     try {
-      const q = query(
+      const baseQuery = query(
         collection(db, "inventory"),
-        where("ownerType", "==", "rhu"),
-        where("rhuId", "==", userData?.rhuId)
+        where("ownerType", "==", "rhu")
       );
-      const snap = await getDocs(q);
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      const snap = await getDocs(baseQuery);
+      
+      const userRhuId = String(userData?.rhuId || "").trim().toLowerCase();
+      const userRhuName = String(userData?.rhuName || "").trim().toLowerCase();
+
+      const list = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(item => {
+          const itemRhuId = String(item.rhuId || "").trim().toLowerCase();
+          const itemRhuName = String(item.rhuName || item.assignedRhu || "").trim().toLowerCase();
+
+          const matchesId = userRhuId !== "" && itemRhuId === userRhuId;
+          const matchesName = userRhuName !== "" && itemRhuName === userRhuName;
+
+          return matchesId || matchesName;
+        });
+
       setInventory(list);
-      runExpiryChecks(list, "rhu", { rhuId: userData?.rhuId, rhuName: userData?.rhuName });
-    } catch (err) { console.error(err); }
+      
+      const acceptedItems = list.filter(i => {
+        const status = String(i.receivedStatus || "").trim().toLowerCase();
+        return status === "accepted" || status === "received";
+      });
+      runExpiryChecks(acceptedItems, "rhu", { rhuId: userData?.rhuId, rhuName: userData?.rhuName });
+    } catch (err) { 
+      console.error("Error loading RHU inventory:", err); 
+    }
     setLoading(false);
   }
 
@@ -91,13 +120,11 @@ export default function RHUInventory() {
       const qty = parseInt(quantity);
       const trimmedName = productName.trim();
 
-      // Check if an item with the exact same name already exists in this RHU's inventory
-      const existing = inventory.find(
+      const existing = activeInventory.find(
         i => i.name.trim().toLowerCase() === trimmedName.toLowerCase()
       );
 
       if (existing) {
-        // Merge: add the new quantity to the existing item instead of duplicating
         const newQuantity  = (existing.quantity  ?? 0) + qty;
         const newRemaining = (existing.remaining ?? 0) + qty;
         await updateDoc(doc(db, "inventory", existing.id), {
@@ -118,12 +145,13 @@ export default function RHUInventory() {
           quantity: qty,
           remaining: qty,
           tabletsPerBox: parseInt(tabletsPerBox) || 30,
-          source,
+          source: source || "Manual Addition",
           expiry,
           ownerType: "rhu",
-          rhuId: userData?.rhuId,
-          rhuName: userData?.rhuName,
-          createdBy: user.uid,
+          receivedStatus: "Accepted",
+          rhuId: userData?.rhuId || "",
+          rhuName: userData?.rhuName || "",
+          createdBy: user?.uid || "",
           createdAt: serverTimestamp(),
         });
         alert("Item saved successfully!");
@@ -141,45 +169,97 @@ export default function RHUInventory() {
     if (!confirm("Delete this item?")) return;
     try {
       await deleteDoc(doc(db, "inventory", id));
-      setInventory(inventory.filter(i => i.id !== id));
+      setInventory(prev => prev.filter(i => i.id !== id));
     } catch (err) { alert("Error: " + err.message); }
   }
 
-  function openReceiveModal(item) {
-    setReceivingItem(item);
-    setReceivedBy("");
+  function openAcceptModal(item) {
+    setSelectedItem(item);
+    setReceivedBy(userData?.username || "");
     setDateReceived(new Date().toISOString().split("T")[0]);
-    setShowReceiveModal(true);
+    setShowAcceptModal(true);
   }
 
-  async function confirmReceipt() {
+  function openDeclineModal(item) {
+    setSelectedItem(item);
+    setDeclineReason("");
+    setShowDeclineModal(true);
+  }
+
+  async function handleAccept() {
     if (!receivedBy.trim()) {
-      alert("Please enter the name of the person confirming receipt.");
+      alert("Please enter the name of the person receiving the supply.");
       return;
     }
-    setReceiving(true);
+    setProcessingAction(true);
     try {
-      await updateDoc(doc(db, "inventory", receivingItem.id), {
-        receivedStatus: "Received",
+      await updateDoc(doc(db, "inventory", selectedItem.id), {
+        receivedStatus: "Accepted",
         receivedBy: receivedBy.trim(),
         receivedAt: dateReceived,
       });
-      setInventory(prev => prev.map(i => i.id === receivingItem.id
-        ? { ...i, receivedStatus: "Received", receivedBy: receivedBy.trim(), receivedAt: dateReceived }
-        : i
-      ));
-      setShowReceiveModal(false);
-      alert("Receipt confirmed — thank you!");
+
+      await addDoc(collection(db, "notifications"), {
+        type: "shipment_accepted",
+        title: "Supply Shipment Accepted",
+        message: `${userData?.rhuName || "RHU"} accepted ${selectedItem.quantity} boxes of ${selectedItem.name}. Received by ${receivedBy.trim()}.`,
+        fromRhuName: userData?.rhuName || "",
+        fromRhuId: userData?.rhuId || "",
+        read: false,
+        createdAt: serverTimestamp()
+      });
+
+      alert("Shipment accepted and added to active inventory!");
+      setShowAcceptModal(false);
+      loadInventory();
     } catch (err) { alert("Error: " + err.message); }
-    setReceiving(false);
+    setProcessingAction(false);
   }
 
-  const filteredInventory = inventory.filter(item =>
+  async function handleDecline() {
+    setProcessingAction(true);
+    try {
+      await updateDoc(doc(db, "inventory", selectedItem.id), {
+        receivedStatus: "Declined",
+        declineReason: declineReason.trim() || "No reason provided",
+        declinedAt: serverTimestamp()
+      });
+
+      await addDoc(collection(db, "notifications"), {
+        type: "shipment_declined",
+        title: "Supply Shipment Declined",
+        message: `${userData?.rhuName || "RHU"} declined shipment of ${selectedItem.name} (${selectedItem.quantity} boxes). Reason: ${declineReason.trim() || "None"}`,
+        fromRhuName: userData?.rhuName || "",
+        fromRhuId: userData?.rhuId || "",
+        read: false,
+        createdAt: serverTimestamp()
+      });
+
+      alert("Shipment declined.");
+      setShowDeclineModal(false);
+      loadInventory();
+    } catch (err) { alert("Error: " + err.message); }
+    setProcessingAction(false);
+  }
+
+  const activeInventory = inventory.filter(i => {
+    const status = String(i.receivedStatus || "").trim().toLowerCase();
+    return status === "accepted" || status === "received";
+  });
+
+  const pendingInventory = inventory.filter(i => {
+    const status = String(i.receivedStatus || "").trim().toLowerCase();
+    return status === "" || status === "pending";
+  });
+
+  const displayList = (activeTab === "active" ? activeInventory : pendingInventory).filter(item =>
     item.name?.toLowerCase().includes(search.toLowerCase())
   );
-  const lowStockCount = inventory.filter(i => (i.remaining ?? i.quantity) <= 50).length;
-  const pendingReceiptCount = inventory.filter(i => i.receivedStatus === "Pending").length;
-  const expiringCount = inventory.filter(i => {
+
+  const lowStockCount = activeInventory.filter(i => (i.remaining ?? i.quantity) <= 50 && (i.remaining ?? i.quantity) > 20).length;
+  const criticalCount = activeInventory.filter(i => (i.remaining ?? i.quantity) <= 20).length;
+  const pendingCount  = pendingInventory.length;
+  const expiringCount = activeInventory.filter(i => {
     if (!i.expiry) return false;
     const days = (new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24);
     return days <= 30 && days >= 0;
@@ -225,7 +305,6 @@ export default function RHUInventory() {
             <div className="rhu-user">
               <div className="rhu-user-info">
                 <span className="rhu-user-name">{userData?.username || "RHU Admin"}</span>
-                <span className="rhu-user-role">{userData?.rhuName || "RHU Unit"}</span>
               </div>
               <div className="rhu-avatar">RH</div>
             </div>
@@ -238,18 +317,16 @@ export default function RHUInventory() {
               <h1 className="rhu-page-title">Inventory Monitoring</h1>
               <p className="rhu-page-sub">Manage and track healthcare supplies for {userData?.rhuName || "your RHU"}.</p>
             </div>
-            <button className="rhu-btn-primary" onClick={() => setShowAddModal(true)}>+ Add New Item</button>
           </div>
 
-          {/* Stats */}
           <div className="rhu-stats-grid rhu-stats-grid--5">
             <div className="rhu-stat-card">
-              <p className="rhu-stat-label">TOTAL ITEMS</p>
-              <div className="rhu-stat-row"><span className="rhu-stat-value">{inventory.length}</span></div>
+              <p className="rhu-stat-label">ACTIVE ITEMS</p>
+              <div className="rhu-stat-row"><span className="rhu-stat-value">{activeInventory.length}</span></div>
             </div>
-            <div className="rhu-stat-card rhu-stat--blue">
-              <p className="rhu-stat-label">PENDING RECEIPT</p>
-              <div className="rhu-stat-row"><span className="rhu-stat-value">{pendingReceiptCount}</span></div>
+            <div className={`rhu-stat-card ${pendingCount > 0 ? "rhu-stat--blue" : ""}`} onClick={() => setActiveTab("pending")} style={{ cursor: "pointer" }}>
+              <p className="rhu-stat-label">PENDING ACCEPTANCE</p>
+              <div className="rhu-stat-row"><span className="rhu-stat-value">{pendingCount}</span></div>
             </div>
             <div className="rhu-stat-card rhu-stat--orange">
               <p className="rhu-stat-label">LOW STOCK</p>
@@ -260,102 +337,156 @@ export default function RHUInventory() {
               <div className="rhu-stat-row"><span className="rhu-stat-value">{expiringCount}</span></div>
             </div>
             <div className="rhu-stat-card">
-              <p className="rhu-stat-label">TOTAL QUANTITY</p>
+              <p className="rhu-stat-label">TOTAL BOXES</p>
               <div className="rhu-stat-row">
-                <span className="rhu-stat-value">{inventory.reduce((s, i) => s + (i.quantity || 0), 0)}</span>
+                <span className="rhu-stat-value">{activeInventory.reduce((s, i) => s + (i.remaining ?? i.quantity ?? 0), 0)}</span>
               </div>
             </div>
           </div>
 
-          {/* Table */}
+          <div className="midwife-tabs" style={{ display: "flex", gap: "1rem", marginBottom: "1.25rem", borderBottom: "1px solid #e2e8f0", paddingBottom: "0.5rem" }}>
+            <button 
+              className={`midwife-tab-btn ${activeTab === "active" ? "active" : ""}`}
+              onClick={() => setActiveTab("active")}
+              style={{
+                background: "none", border: "none", fontWeight: activeTab === "active" ? "bold" : "normal",
+                borderBottom: activeTab === "active" ? "2px solid #1a56db" : "none",
+                color: activeTab === "active" ? "#1a56db" : "#64748b", padding: "0.5rem 1rem", cursor: "pointer"
+              }}
+            >
+              Active Stock ({activeInventory.length})
+            </button>
+            <button 
+              className={`midwife-tab-btn ${activeTab === "pending" ? "active" : ""}`}
+              onClick={() => setActiveTab("pending")}
+              style={{
+                background: "none", border: "none", fontWeight: activeTab === "pending" ? "bold" : "normal",
+                borderBottom: activeTab === "pending" ? "2px solid #1a56db" : "none",
+                color: activeTab === "pending" ? "#1a56db" : "#64748b", padding: "0.5rem 1rem", cursor: "pointer",
+                display: "flex", alignItems: "center", gap: "0.5rem"
+              }}
+            >
+              Pending Shipments
+              {pendingCount > 0 && (
+                <span style={{ background: "#dc2626", color: "#fff", borderRadius: "9999px", fontSize: "0.75rem", padding: "0.1rem 0.5rem" }}>
+                  {pendingCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          <div className="rhu-inv-toolbar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "1rem" }}>
+            <div className="rhu-inv-search-wrap" style={{ flex: 1, minWidth: "240px" }}>
+              <input
+                className="rhu-search"
+                type="text"
+                placeholder="Search Medicine"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ width: "100%" }}
+              />
+            </div>
+            <div className="rhu-inv-toolbar-right" style={{ display: "flex", gap: "10px" }}>
+              <button className="rhu-btn-primary" onClick={() => setShowAddModal(true)}>+ Add New Item</button>
+            </div>
+          </div>
+
           {loading ? (
             <div className="rhu-empty-state"><p>Loading inventory...</p></div>
-          ) : filteredInventory.length === 0 ? (
+          ) : displayList.length === 0 ? (
             <div className="rhu-empty-state">
               <div className="rhu-empty-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="64" height="64">
                   <path d="M20 7h-3V4a2 2 0 00-2-2H9a2 2 0 00-2 2v3H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
                 </svg>
               </div>
-              <h2 className="rhu-empty-title">No Inventory Items Yet</h2>
-              <p className="rhu-empty-text">Click "+ Add New Item" to add your first item, or wait for CHO to distribute supplies.</p>
-              <button className="rhu-btn-primary" onClick={() => setShowAddModal(true)}>+ Add Your First Item</button>
+              <h2 className="rhu-empty-title">
+                {activeTab === "active" ? "No Active Inventory Items" : "No Pending Shipments"}
+              </h2>
+              <p className="rhu-empty-text">
+                {activeTab === "active" 
+                  ? "Add supplies manually or accept pending shipments from CHO." 
+                  : "New incoming supply shipments from CHO will show up here for review."}
+              </p>
             </div>
           ) : (
             <section className="rhu-inv-section">
               <div style={{ width: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-              <table className="rhu-inv-table">
-                <thead>
-                  <tr>
-                    <th>PRODUCT KEY</th>
-                    <th>ITEM NAME</th>
-                    <th>LOT #</th>
-                    <th>CATEGORY</th>
-                    <th>SUB-CATEGORY</th>
-                    <th>QUANTITY</th>
-                    <th>REMAINING</th>
-                    <th>EXPIRY</th>
-                    <th>STATUS</th>
-                    <th>RECEIPT</th>
-                    <th>ACTION</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredInventory.map(item => {
-                    const remaining = item.remaining ?? item.quantity;
-                    return (
-                      <tr key={item.id}>
-                        <td className="rhu-product-key">{item.productKey || "—"}</td>
-                        <td><strong>{item.name}</strong></td>
-                        <td className="rhu-product-key">{item.lotNumber || "—"}</td>
-                        <td>{item.category}</td>
-                        <td>
-                          {item.subCategory
-                            ? <span className="rhu-subcategory-pill">{item.subCategory}</span>
-                            : "—"}
-                        </td>
-                        <td>{item.quantity} boxes</td>
-                        <td><strong>{remaining} boxes</strong></td>
-                        <td>{item.expiry}</td>
-                        <td>
-                          <span className={`rhu-inv-status-badge ${getStatusClass(remaining)}`}>
-                            <span className={`rhu-status-dot rhu-dot--${getStatus(remaining).toLowerCase()}`} />
-                            {getStatus(remaining)}
-                          </span>
-                        </td>
-                        <td>
-                          {item.receivedStatus === "Pending" ? (
-                            <span className="rhu-inv-status-badge rhu-status--low">Pending</span>
-                          ) : item.receivedStatus === "Received" ? (
-                            <span className="rhu-inv-status-badge rhu-status--good">Received</span>
-                          ) : (
-                            <span className="rhu-product-key">—</span>
-                          )}
-                        </td>
-                        <td>
-                          <div className="rhu-action-group">
-                            {item.receivedStatus === "Pending" && (
-                              <button className="rhu-btn-action rhu-btn-distribute" onClick={() => openReceiveModal(item)}>
-                                Receive
-                              </button>
+                <table className="rhu-inv-table">
+                  <thead>
+                    <tr>
+                      <th>PRODUCT KEY</th>
+                      <th>ITEM NAME</th>
+                      <th>LOT #</th>
+                      <th>CATEGORY</th>
+                      <th>SUB-CATEGORY</th>
+                      <th>QUANTITY</th>
+                      <th>REMAINING</th>
+                      <th>EXPIRY</th>
+                      <th>STATUS</th>
+                      <th>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayList.map(item => {
+                      const remaining = item.remaining ?? item.quantity;
+                      const isPending = activeTab === "pending";
+
+                      return (
+                        <tr key={item.id}>
+                          <td className="rhu-product-key">{item.productKey || "—"}</td>
+                          <td><strong>{item.name}</strong></td>
+                          <td className="rhu-product-key">{item.lotNumber || "—"}</td>
+                          <td>{item.category}</td>
+                          <td>
+                            {item.subCategory
+                              ? <span className="rhu-subcategory-pill">{item.subCategory}</span>
+                              : "—"}
+                          </td>
+                          <td>{item.quantity} boxes</td>
+                          <td><strong>{remaining} boxes</strong></td>
+                          <td>{item.expiry}</td>
+                          <td>
+                            {isPending ? (
+                              <span className="rhu-inv-status-badge rhu-status--low">
+                                Pending
+                              </span>
+                            ) : (
+                              <span className={`rhu-inv-status-badge ${getStatusClass(remaining)}`}>
+                                <span className={`rhu-status-dot rhu-dot--${getStatus(remaining).toLowerCase()}`} />
+                                {getStatus(remaining)}
+                              </span>
                             )}
-                            <button className="rhu-btn-action rhu-btn-del" onClick={() => deleteItem(item.id)}>
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          </td>
+                          <td>
+                            <div className="rhu-action-group">
+                              {isPending ? (
+                                <>
+                                  <button className="rhu-btn-action rhu-btn-distribute" onClick={() => openAcceptModal(item)}>
+                                    Accept
+                                  </button>
+                                  <button className="rhu-btn-action rhu-btn-del" onClick={() => openDeclineModal(item)}>
+                                    Decline
+                                  </button>
+                                </>
+                              ) : (
+                                <button className="rhu-btn-action rhu-btn-del" onClick={() => deleteItem(item.id)}>
+                                  Delete
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </section>
           )}
         </main>
       </div>
 
-      {/* ── Add Item Modal ── */}
       {showAddModal && (
         <div className="rhu-modal-overlay" onClick={() => setShowAddModal(false)}>
           <div className="rhu-modal rhu-modal--md" onClick={e => e.stopPropagation()}>
@@ -364,7 +495,6 @@ export default function RHUInventory() {
               <button className="rhu-modal-close" aria-label="Close" onClick={() => setShowAddModal(false)}>×</button>
             </div>
             <div className="rhu-modal-body">
-
               <h3 className="rhu-form-section-title">Basic Information</h3>
               <div className="rhu-form-field">
                 <label className="rhu-label">Product Name <span className="rhu-required">*</span></label>
@@ -432,22 +562,21 @@ export default function RHUInventory() {
         </div>
       )}
 
-      {/* ── Confirm Receipt Modal ── */}
-      {showReceiveModal && receivingItem && (
-        <div className="rhu-modal-overlay" onClick={() => setShowReceiveModal(false)}>
+      {showAcceptModal && selectedItem && (
+        <div className="rhu-modal-overlay" onClick={() => setShowAcceptModal(false)}>
           <div className="rhu-modal" onClick={e => e.stopPropagation()}>
             <div className="rhu-modal-header">
-              <h2 className="rhu-modal-title">Confirm Receipt</h2>
-              <button className="rhu-modal-close" aria-label="Close" onClick={() => setShowReceiveModal(false)}>×</button>
+              <h2 className="rhu-modal-title">Accept Supply Shipment</h2>
+              <button className="rhu-modal-close" aria-label="Close" onClick={() => setShowAcceptModal(false)}>×</button>
             </div>
             <div className="rhu-modal-body">
               <p className="rhu-dist-note">
-                Confirming that <strong>{receivingItem.quantity} boxes</strong> of <strong>{receivingItem.name}</strong>
-                {receivingItem.lotNumber ? ` (Lot ${receivingItem.lotNumber})` : ""} were physically received from CHO.
+                Confirming acceptance of <strong>{selectedItem.quantity} boxes</strong> of <strong>{selectedItem.name}</strong>
+                {selectedItem.lotNumber ? ` (Lot ${selectedItem.lotNumber})` : ""} sent by CHO.
               </p>
               <div className="rhu-form-field">
                 <label className="rhu-label">Received By <span className="rhu-required">*</span></label>
-                <input className="rhu-input" type="text" placeholder="Name of person confirming receipt"
+                <input className="rhu-input" type="text" placeholder="Name of person accepting supply"
                   value={receivedBy} onChange={e => setReceivedBy(e.target.value)} />
               </div>
               <div className="rhu-form-field">
@@ -455,12 +584,43 @@ export default function RHUInventory() {
                 <input className="rhu-input" type="date"
                   value={dateReceived} onChange={e => setDateReceived(e.target.value)} />
               </div>
-              <p className="rhu-form-hint"><span className="rhu-required">*</span> Required fields</p>
             </div>
             <div className="rhu-modal-footer">
-              <button className="rhu-btn-secondary" onClick={() => setShowReceiveModal(false)}>Cancel</button>
-              <button className="rhu-btn-primary" onClick={confirmReceipt} disabled={receiving}>
-                {receiving ? "Confirming..." : "Confirm Receipt"}
+              <button className="rhu-btn-secondary" onClick={() => setShowAcceptModal(false)}>Cancel</button>
+              <button className="rhu-btn-primary" onClick={handleAccept} disabled={processingAction}>
+                {processingAction ? "Accepting..." : "Accept Shipment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeclineModal && selectedItem && (
+        <div className="rhu-modal-overlay" onClick={() => setShowDeclineModal(false)}>
+          <div className="rhu-modal" onClick={e => e.stopPropagation()}>
+            <div className="rhu-modal-header">
+              <h2 className="rhu-modal-title">Decline Supply Shipment</h2>
+              <button className="rhu-modal-close" aria-label="Close" onClick={() => setShowDeclineModal(false)}>×</button>
+            </div>
+            <div className="rhu-modal-body">
+              <p className="rhu-dist-note">
+                Are you sure you want to decline <strong>{selectedItem.quantity} boxes</strong> of <strong>{selectedItem.name}</strong>?
+              </p>
+              <div className="rhu-form-field">
+                <label className="rhu-label">Reason for Declining</label>
+                <textarea 
+                  className="rhu-input" 
+                  rows="3" 
+                  placeholder="e.g., Damaged boxes, incorrect item, expired..."
+                  value={declineReason} 
+                  onChange={e => setDeclineReason(e.target.value)} 
+                />
+              </div>
+            </div>
+            <div className="rhu-modal-footer">
+              <button className="rhu-btn-secondary" onClick={() => setShowDeclineModal(false)}>Cancel</button>
+              <button className="rhu-btn-action rhu-btn-del" onClick={handleDecline} disabled={processingAction} style={{ padding: "10px 18px", borderRadius: "8px" }}>
+                {processingAction ? "Declining..." : "Decline Shipment"}
               </button>
             </div>
           </div>

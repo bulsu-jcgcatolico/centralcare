@@ -1,11 +1,13 @@
 /* ── Main Layout Canvas ── */
 .rl-wrapper {
   min-height: 100vh;
+  height: 100vh; /* Lock viewport height so the wrapper handles the scroll container */
   background: #f1f5f9;
   display: flex;
   flex-direction: column;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color: #0f172a;
+  overflow-y: auto; /* Enables smooth scrolling on the full view */
 }
 
 /* ── Refined Topbar Navigation ── */
@@ -117,7 +119,6 @@
   display: flex;
   justify-content: center;
   padding: 2.5rem 1.5rem 4rem;
-  overflow-y: auto;
 }
 
 /* ── Standardized Letter Paper Container ── */
@@ -278,6 +279,8 @@
   .rl-wrapper {
     background: #ffffff;
     min-height: auto;
+    height: auto;
+    overflow-y: visible;
   }
 
   .rl-main {
