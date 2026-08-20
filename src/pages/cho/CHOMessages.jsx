@@ -231,10 +231,10 @@ export default function CHOMessages() {
           <div className="cho-topbar-right" style={{ marginLeft: "auto" }}>
             <div className="cho-user">
               <div className="cho-user-info">
-                <span className="cho-user-name">CHO Admin</span>
+                <span className="cho-user-name">Dr. Sarah Smith</span>
                 <span className="cho-user-role">CHO Administrator</span>
               </div>
-              <div className="cho-avatar">CHO</div>
+              <div className="cho-avatar">SS</div>
             </div>
           </div>
         </header>
