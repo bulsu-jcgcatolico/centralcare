@@ -284,7 +284,6 @@ export default function CHOBatchInventory() {
                         <th>MANUFACTURE DATE</th>
                         <th>DATE ADDED</th>
                         <th>EXPIRY</th>
-                        <th>ACTION</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -307,11 +306,6 @@ export default function CHOBatchInventory() {
                             <td>{b.manufactureDate || "—"}</td>
                             <td>{b.addedDate || "—"}</td>
                             <td>{b.expiryDate}</td>
-                            <td>
-                              <button className="cho-btn-action cho-btn-danger" onClick={() => deleteBatch(b.id)}>
-                                Delete
-                              </button>
-                            </td>
                           </tr>
                         );
                       })}

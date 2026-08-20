@@ -461,18 +461,9 @@ export default function RHUInventory() {
                           </td>
                           <td>
                             <div className="rhu-action-group">
-                              {isPending ? (
-                                <>
-                                  <button className="rhu-btn-action rhu-btn-distribute" onClick={() => openAcceptModal(item)}>
-                                    Accept
-                                  </button>
-                                  <button className="rhu-btn-action rhu-btn-del" onClick={() => openDeclineModal(item)}>
-                                    Decline
-                                  </button>
-                                </>
-                              ) : (
-                                <button className="rhu-btn-action rhu-btn-del" onClick={() => deleteItem(item.id)}>
-                                  Delete
+                              {isPending && (
+                                <button className="rhu-btn-action rhu-btn-distribute" onClick={() => openAcceptModal(item)}>
+                                  Accept
                                 </button>
                               )}
                             </div>

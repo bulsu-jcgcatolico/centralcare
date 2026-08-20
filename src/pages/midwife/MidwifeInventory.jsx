@@ -467,10 +467,6 @@ export default function MidwifeInventory() {
                                 Receive
                               </button>
                             )}
-                            <button className="midwife-btn-icon midwife-btn-icon--danger"
-                              onClick={() => deleteItem(item.id)}>
-                              Delete
-                            </button>
                           </div>
                         </td>
                       </tr>
