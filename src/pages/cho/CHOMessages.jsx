@@ -41,7 +41,7 @@ export default function CHOMessages() {
   const unreadCount = useUnreadCount();
 
   const choId = "cho_admin";
-  const choName = user?.displayName || user?.name || "CHO Administrator";
+  const choName = user?.displayName || user?.name || "Dr. Sarah Smith";
 
   // Fixed list from RHU 1 to RHU 10 only
   const contacts = Array.from({ length: 10 }, (_, i) => ({
