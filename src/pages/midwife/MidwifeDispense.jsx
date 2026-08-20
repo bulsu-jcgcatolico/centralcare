@@ -15,6 +15,7 @@ const navItems = [
   { label: "Inventory",     to: "/midwife/inventory"     },
   { label: "Dispense",      to: "/midwife/dispense"      },
   { label: "Reports",       to: "/midwife/reports"       },
+  { label: "Messages",      to: "/midwife/messages"      },
   { label: "Notifications", to: "/midwife/notifications" },
 ];
 

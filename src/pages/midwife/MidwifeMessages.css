@@ -1,0 +1,120 @@
+/* ── Midwife Messages Styling ── */
+.messenger-container {
+  display: grid;
+  grid-template-columns: 1fr;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  height: calc(100vh - 180px);
+}
+
+.messenger-chat-pane {
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  height: 100%;
+}
+
+.messenger-chat-header {
+  padding: 16px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.active-chat-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #1e293b;
+}
+
+.active-chat-sub {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.rhu-chat-messages-box {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #f8fafc;
+}
+
+.rhu-chat-empty {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.9rem;
+  margin: auto;
+}
+
+.rhu-chat-bubble {
+  max-width: 65%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  position: relative;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.rhu-chat-bubble.incoming {
+  background: #ffffff;
+  color: #1e293b;
+  align-self: flex-start;
+  border: 1px solid #e2e8f0;
+  border-top-left-radius: 2px;
+}
+
+.rhu-chat-bubble.outgoing {
+  background: #2563eb;
+  color: #ffffff;
+  align-self: flex-end;
+  border-top-right-radius: 2px;
+}
+
+.rhu-chat-meta {
+  font-size: 0.7rem;
+  margin-bottom: 4px;
+  opacity: 0.8;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rhu-chat-time {
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.rhu-chat-sender {
+  font-weight: 600;
+}
+
+.rhu-chat-text {
+  word-break: break-word;
+}
+
+.rhu-chat-input-row {
+  display: flex;
+  padding: 16px;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  gap: 12px;
+}
+
+.rhu-chat-input-row .rhu-input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  outline: none;
+  font-size: 0.9rem;
+}
+
+.rhu-chat-input-row .rhu-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}

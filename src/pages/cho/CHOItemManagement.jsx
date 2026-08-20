@@ -17,6 +17,7 @@ const navItems = [
   { label: "Population Report", to: "/cho/population-report"  },
   { label: "Batch Distribution",to: "/cho/batch-distribution" },
   { label: "Reports",           to: "/cho/reports"            },
+  { label: "Messages",          to: "/cho/messages"           },
   { label: "Notifications",     to: "/cho/notifications"      },
 ];
 

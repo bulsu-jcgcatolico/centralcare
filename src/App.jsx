@@ -12,12 +12,16 @@ import CHOPopulationReport from "./pages/cho/CHOPopulationReport";
 import CHOBatchDistribution from "./pages/cho/CHOBatchDistribution";
 import CHOReports from "./pages/cho/CHOReports";
 import CHONotification from "./pages/cho/CHONotification";
+import CHOMessages from "./pages/cho/CHOMessages";
+
 import RHUDashboard from "./pages/rhu/RHUDashboard";
 import RHUInventory from "./pages/rhu/RHUInventory";
 import RHUBarangay from "./pages/rhu/RHUBarangay";
 import RHUDistribution from "./pages/rhu/RHUDistribution";
 import RHUReports from "./pages/rhu/RHUReports";
+import RHUMessages from "./pages/rhu/RHUMessages";
 import RHUNotification from "./pages/rhu/RHUNotification";
+
 import MidwifeDashboard from "./pages/midwife/MidwifeDashboard";
 import MidwifePatient from "./pages/midwife/MidwifePatient";
 import MidwifeAddPatient from "./pages/midwife/MidwifeAddPatient";
@@ -26,6 +30,7 @@ import MidwifeDispense from "./pages/midwife/MidwifeDispense";
 import MidwifeReports from "./pages/midwife/MidwifeReports";
 import MidwifeNotification from "./pages/midwife/MidwifeNotification";
 import MidwifeRequestLetter from "./pages/midwife/MidwifeRequestLetter";
+import MidwifeMessages from "./pages/midwife/MidwifeMessages"; // <--- 1. Import MidwifeMessages here
 
 const PR = ({ roles, children }) => (
   <PrivateRoute allowedRoles={roles}>{children}</PrivateRoute>
@@ -47,6 +52,7 @@ export default function App() {
           <Route path="/cho/population-report"  element={<PR roles={["cho"]}><CHOPopulationReport /></PR>} />
           <Route path="/cho/batch-distribution" element={<PR roles={["cho"]}><CHOBatchDistribution /></PR>} />
           <Route path="/cho/reports"            element={<PR roles={["cho"]}><CHOReports /></PR>} />
+          <Route path="/cho/messages"           element={<PR roles={["cho"]}><CHOMessages /></PR>} />
           <Route path="/cho/notifications"      element={<PR roles={["cho"]}><CHONotification /></PR>} />
 
           {/* RHU */}
@@ -55,6 +61,7 @@ export default function App() {
           <Route path="/rhu/barangay"      element={<PR roles={["rhu"]}><RHUBarangay /></PR>} />
           <Route path="/rhu/distribution"  element={<PR roles={["rhu"]}><RHUDistribution /></PR>} />
           <Route path="/rhu/reports"       element={<PR roles={["rhu"]}><RHUReports /></PR>} />
+          <Route path="/rhu/messages"      element={<PR roles={["rhu"]}><RHUMessages /></PR>} />
           <Route path="/rhu/notifications" element={<PR roles={["rhu"]}><RHUNotification /></PR>} />
 
           {/* Midwife */}
@@ -67,6 +74,7 @@ export default function App() {
           <Route path="/midwife/reports"            element={<PR roles={["midwife"]}><MidwifeReports /></PR>} />
           <Route path="/midwife/notifications"      element={<PR roles={["midwife"]}><MidwifeNotification /></PR>} />
           <Route path="/midwife/request-letter"     element={<PR roles={["midwife"]}><MidwifeRequestLetter /></PR>} />
+          <Route path="/midwife/messages"           element={<PR roles={["midwife"]}><MidwifeMessages /></PR>} /> {/* <--- 2. Add Route here */}
           <Route path="/midwife/patients/edit/:id"  element={<PR roles={["midwife"]}><MidwifeAddPatient mode="edit" /></PR>} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
