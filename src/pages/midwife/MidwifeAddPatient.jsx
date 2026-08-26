@@ -6,6 +6,7 @@ import { db } from "../../firebase/config";
 import { useNavigate, useParams, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useToast } from "../../context/ToastContext";
 import "./MidwifeAddPatient.css";
 
 const navItems = [
@@ -49,6 +50,7 @@ export default function MidwifeAddPatient(props) {
   const isEdit = mode === "edit";
 
   const { logout, user, userData } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const params = useParams();
   const patientId = params.id;
@@ -124,7 +126,7 @@ export default function MidwifeAddPatient(props) {
         if (cancelled) return;
 
         if (!snap.exists()) {
-          alert("Patient record not found.");
+          showToast("Patient record not found.", "error");
           navigate("/midwife/patients");
           return;
         }
@@ -149,7 +151,7 @@ export default function MidwifeAddPatient(props) {
           setRecords([emptyRecord(1)]);
         }
       } catch (err) {
-        alert("Error loading patient: " + err.message);
+        showToast("Error loading patient: " + err.message, "error");
       } finally {
         if (!cancelled) setPageLoading(false);
       }
@@ -170,7 +172,7 @@ export default function MidwifeAddPatient(props) {
 
   async function handleSave() {
     if (!fields.lastName.trim() || !fields.firstName.trim()) {
-      alert("Please enter at least the patient's Last Name and First Name.");
+      showToast("Please enter at least the patient's Last Name and First Name.", "error");
       return;
     }
     setSaving(true);
@@ -197,7 +199,7 @@ export default function MidwifeAddPatient(props) {
       if (isEdit) {
         basePayload.updatedAt = serverTimestamp();
         await updateDoc(doc(db, "patients", patientId), basePayload);
-        alert("Patient record updated successfully!");
+        showToast("Patient record updated successfully!", "success");
       } else {
         basePayload.patientId = generatePatientId();
         basePayload.createdBy = (user && user.uid) || "";
@@ -205,12 +207,12 @@ export default function MidwifeAddPatient(props) {
         basePayload.lastVisit = new Date().toLocaleDateString();
         basePayload.status = "active";
         await addDoc(collection(db, "patients"), basePayload);
-        alert("Patient record saved successfully!");
+        showToast("Patient record saved successfully!", "success");
       }
 
       navigate("/midwife/patients");
     } catch (error) {
-      alert("Error saving: " + error.message);
+      showToast("Error saving: " + error.message, "error");
     }
     setSaving(false);
   }

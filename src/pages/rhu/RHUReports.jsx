@@ -29,6 +29,7 @@ export default function RHUReports() {
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
   const [selectedMonth, setSelectedMonth] = useState("all");
+  const [search, setSearch] = useState("");
   const [inventory, setInventory] = useState([]);
   const [distributions, setDistributions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -62,7 +63,7 @@ export default function RHUReports() {
       ...i, actType: "inventory",
       displayName: i.name,
       displayQty:  `${i.quantity} boxes`,
-      displayDate: i.date || new Date(i.createdAt?.seconds * 1000).toLocaleDateString() || "—",
+      displayDate: i.date || (i.createdAt?.seconds ? new Date(i.createdAt.seconds * 1000).toLocaleDateString() : "—"),
       month: getMonthYear(i.date || (i.createdAt?.seconds ? new Date(i.createdAt.seconds * 1000).toLocaleDateString() : null))
     })),
     ...distributions.map(d => ({
@@ -76,9 +77,10 @@ export default function RHUReports() {
 
   const months = [...new Set(allActivities.map(a => a.month).filter(Boolean))].sort().reverse();
 
-  const displayed = selectedMonth === "all"
+  const displayed = (selectedMonth === "all"
     ? allActivities
-    : allActivities.filter(a => a.month === selectedMonth);
+    : allActivities.filter(a => a.month === selectedMonth)
+  ).filter(a => (a.displayName || "").toLowerCase().includes(search.trim().toLowerCase()));
 
   const monthlyInvCount  = displayed.filter(a => a.actType === "inventory").length;
   const monthlyDistCount = displayed.filter(a => a.actType === "distribution").length;
@@ -117,14 +119,15 @@ export default function RHUReports() {
               ))}
             </nav>
             <div className="rhu-sidebar-footer">
-              <button className="rhu-nav-item rhu-nav-btn">Settings</button>
+              <NavLink to="/rhu/settings" className={({ isActive }) => "rhu-nav-item rhu-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
               <button className="rhu-nav-item rhu-nav-btn rhu-signout" onClick={handleLogout}>Sign out</button>
             </div>
           </aside>
 
           <div className="rhu-main">
             <header className="rhu-topbar">
-              <input className="rhu-search" type="text" placeholder="Search reports..." />
+              <input className="rhu-search" type="text" placeholder="Search reports..."
+                value={search} onChange={e => setSearch(e.target.value)} />
               <div className="rhu-topbar-right">
                 <div className="rhu-user">
                   <div className="rhu-user-info">

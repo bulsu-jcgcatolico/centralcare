@@ -303,7 +303,7 @@ export default function RHUMessages() {
           ))}
         </nav>
         <div className="rhu-sidebar-footer">
-          <button className="rhu-nav-item rhu-nav-btn">Settings</button>
+          <NavLink to="/rhu/settings" className={({ isActive }) => "rhu-nav-item rhu-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
           <button className="rhu-nav-item rhu-nav-btn rhu-signout" onClick={handleLogout}>Sign out</button>
         </div>
       </aside>

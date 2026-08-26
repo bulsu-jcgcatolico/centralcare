@@ -42,6 +42,7 @@ export default function CHOPopulationReport() {
 
   const [rhus, setRhus] = useState([]);
   const [barangays, setBarangays] = useState([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
   // View Mode: 'rhu' or 'barangay'
@@ -209,18 +210,19 @@ export default function CHOPopulationReport() {
           ))}
         </nav>
         <div className="cho-sidebar-footer">
-          <button className="cho-nav-item cho-nav-btn">Settings</button>
+          <NavLink to="/cho/settings" className={({ isActive }) => "cho-nav-item cho-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
           <button className="cho-nav-item cho-nav-btn cho-signout" onClick={handleLogout}>Sign out</button>
         </div>
       </aside>
 
       <div className="cho-main">
         <header className="cho-topbar no-print">
-          <input className="cho-search" type="text" placeholder="Search report metrics..." />
+          <input className="cho-search" type="text" placeholder="Search RHU or barangay name..."
+            value={search} onChange={e => setSearch(e.target.value)} />
           <div className="cho-topbar-right">
             <div className="cho-user">
               <div className="cho-user-info">
-                <span className="cho-user-name">Dr. Sarah Smith</span>
+                <span className="cho-user-name">CHO Admin</span>
                 <span className="cho-user-role">CHO Administrator</span>
               </div>
               <div className="cho-avatar">SS</div>
@@ -360,7 +362,9 @@ export default function CHOPopulationReport() {
                       </tr>
                     </thead>
                     <tbody>
-                      {rhus.map(rhu => {
+                      {rhus.filter(rhu =>
+                        (rhu.rhuName || "").toLowerCase().includes(search.trim().toLowerCase())
+                      ).map(rhu => {
                         const pop = Number(rhu.totalPopulation) || 0;
                         const share = overallRhuPopulation > 0 ? ((pop / overallRhuPopulation) * 100).toFixed(1) : "0.0";
                         const isSelected = selectedRhuIds.includes(rhu.id);
@@ -421,8 +425,18 @@ export default function CHOPopulationReport() {
                             No barangays found. Add barangays in the Barangay module first.
                           </td>
                         </tr>
+                      ) : barangays.filter(b =>
+                          (b.barangayName || b.id || "").toLowerCase().includes(search.trim().toLowerCase())
+                        ).length === 0 ? (
+                        <tr>
+                          <td colSpan="5" style={{ textAlign: "center", padding: "2rem" }}>
+                            No barangays match "{search}".
+                          </td>
+                        </tr>
                       ) : (
-                        barangays.map(b => {
+                        barangays.filter(b =>
+                          (b.barangayName || b.id || "").toLowerCase().includes(search.trim().toLowerCase())
+                        ).map(b => {
                           const pop = Number(b.totalPopulation) || 0;
                           const share = overallBarangayPopulation > 0 ? ((pop / overallBarangayPopulation) * 100).toFixed(1) : "0.0";
                           const isSelected = selectedBarangayIds.includes(b.id);

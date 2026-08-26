@@ -29,6 +29,7 @@ export default function MidwifeReports() {
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
   const [selectedMonth, setSelectedMonth] = useState("all");
+  const [search, setSearch] = useState("");
   const [inventory, setInventory] = useState([]);
   const [dispenseLogs, setDispenseLogs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -76,9 +77,10 @@ export default function MidwifeReports() {
 
   const months = [...new Set(allActivities.map(a => a.month).filter(Boolean))].sort().reverse();
 
-  const displayed = selectedMonth === "all"
+  const displayed = (selectedMonth === "all"
     ? allActivities
-    : allActivities.filter(a => a.month === selectedMonth);
+    : allActivities.filter(a => a.month === selectedMonth)
+  ).filter(a => (a.displayName || "").toLowerCase().includes(search.trim().toLowerCase()));
 
   const monthlyInvCount  = displayed.filter(a => a.actType === "inventory").length;
   const monthlyDispCount = displayed.filter(a => a.actType === "dispense").length;
@@ -117,14 +119,15 @@ export default function MidwifeReports() {
               ))}
             </nav>
             <div className="midwife-sidebar-footer">
-              <button className="midwife-nav-item midwife-nav-btn">Settings</button>
+              <NavLink to="/midwife/settings" className={({ isActive }) => "midwife-nav-item midwife-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
               <button className="midwife-nav-item midwife-nav-btn midwife-signout" onClick={handleLogout}>Sign Out</button>
             </div>
           </aside>
 
           <div className="midwife-main">
             <header className="midwife-topbar">
-              <input className="midwife-search" type="text" placeholder="Search reports..." />
+              <input className="midwife-search" type="text" placeholder="Search reports..."
+                value={search} onChange={e => setSearch(e.target.value)} />
               <div className="midwife-topbar-right">
                 <div className="midwife-user">
                   <div className="midwife-user-info">

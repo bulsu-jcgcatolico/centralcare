@@ -7,6 +7,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useToast } from "../../context/ToastContext";
 import "./MidwifePatient.css";
 
 const navItems = [
@@ -21,6 +22,7 @@ const navItems = [
 
 export default function MidwifePatients() {
   const { logout, userData } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
 
@@ -85,7 +87,7 @@ export default function MidwifePatients() {
       await deleteDoc(doc(db, "patients", id));
       setPatients(patients.filter(p => p.id !== id));
     } catch (err) {
-      alert("Error: " + err.message);
+      showToast("Error: " + err.message, "error");
     }
   }
 
@@ -119,7 +121,7 @@ export default function MidwifePatients() {
   function exportPatients() {
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
-      alert("Please allow popups to export or print patient logs.");
+      showToast("Please allow popups to export or print patient logs.", "error");
       return;
     }
 
@@ -224,7 +226,7 @@ export default function MidwifePatients() {
           ))}
         </nav>
         <div className="midwife-sidebar-footer">
-          <button className="midwife-nav-item midwife-nav-btn">Settings</button>
+          <NavLink to="/midwife/settings" className={({ isActive }) => "midwife-nav-item midwife-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
           <button className="midwife-nav-item midwife-nav-btn midwife-signout" onClick={handleLogout}>
             Sign Out
           </button>

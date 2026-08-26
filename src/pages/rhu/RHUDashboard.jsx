@@ -39,18 +39,45 @@ export default function RHUDashboard() {
   async function loadData() {
     setLoading(true);
     try {
+      const userRhuId = String(userData?.rhuId || "").trim().toLowerCase();
+      const userRhuName = String(userData?.rhuName || "").trim().toLowerCase();
+
+      // NOTE: Firestore where("rhuId","==",userData?.rhuId) is a strict, unnormalized
+      // equality match. If userData.rhuId happens to be stored as a Number while the
+      // inventory/distribution/notification docs store rhuId as a String (or any other
+      // subtle format difference), this silently returns zero results with no error —
+      // exactly the "No inventory data yet" symptom. Fetch by ownerType/fromType only,
+      // then filter client-side with normalized (trimmed, lowercased) string comparison,
+      // matching the same robust approach already used in RHUInventory.jsx.
       const [invSnap, distSnap, notifSnap] = await Promise.all([
-        getDocs(query(collection(db, "inventory"),
-          where("ownerType", "==", "rhu"),
-          where("rhuId", "==", userData?.rhuId ?? ""))),
-        getDocs(query(collection(db, "rhu_distributions"),
-          where("fromRhuId", "==", userData?.rhuId ?? ""))),
-        getDocs(query(collection(db, "notifications"),
-          where("toRhuId", "==", userData?.rhuId ?? "")))
+        getDocs(query(collection(db, "inventory"), where("ownerType", "==", "rhu"))),
+        getDocs(query(collection(db, "rhu_distributions"))),
+        getDocs(query(collection(db, "notifications")))
       ]);
-      setInventory(invSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setDistributions(distSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setNotifications(notifSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      const matchesRhu = (idField, nameField) => {
+        const itemRhuId = String(idField || "").trim().toLowerCase();
+        const itemRhuName = String(nameField || "").trim().toLowerCase();
+        const matchesId = userRhuId !== "" && itemRhuId === userRhuId;
+        const matchesName = userRhuName !== "" && itemRhuName === userRhuName;
+        return matchesId || matchesName;
+      };
+
+      const invList = invSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(item => matchesRhu(item.rhuId, item.rhuName || item.assignedRhu));
+
+      const distList = distSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(item => matchesRhu(item.fromRhuId, item.fromRhuName));
+
+      const notifList = notifSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(item => matchesRhu(item.toRhuId, item.toRhuName));
+
+      setInventory(invList);
+      setDistributions(distList);
+      setNotifications(notifList);
     } catch (err) { console.error(err); }
     setLoading(false);
   }
@@ -123,7 +150,7 @@ export default function RHUDashboard() {
           ))}
         </nav>
         <div className="rhu-sidebar-footer">
-          <button className="rhu-nav-item rhu-nav-btn">Settings</button>
+          <NavLink to="/rhu/settings" className="rhu-nav-item rhu-nav-btn">Settings</NavLink>
           <button className="rhu-nav-item rhu-nav-btn rhu-signout" onClick={handleLogout}>Sign out</button>
         </div>
       </aside>

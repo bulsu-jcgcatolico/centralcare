@@ -1,0 +1,67 @@
+.rhu-settings-scroll {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 24px;
+}
+
+/* Same fix as RHUDashboard.css — belt-and-suspenders in case Settings is
+   ever loaded before RHUDashboard.css's rules are in effect. */
+.rhu-nav-item.rhu-nav-btn {
+  box-sizing: border-box;
+  font: inherit;
+  line-height: inherit;
+  margin: 0;
+  display: flex;
+}
+
+.rhu-content {
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
+.rhu-settings-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.rhu-settings-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.rhu-settings-profile-box {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 4px 16px;
+}
+
+.rhu-settings-profile-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  font-size: 13px;
+  color: #374151;
+  border-bottom: 1px solid #f1f5f9;
+}
+.rhu-settings-profile-row:last-child { border-bottom: none; }
+.rhu-settings-profile-row strong { color: #0f172a; font-weight: 600; }
+
+.rhu-settings-hint {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 10px 0 14px;
+}
+
+.rhu-settings-form {
+  max-width: 420px;
+}

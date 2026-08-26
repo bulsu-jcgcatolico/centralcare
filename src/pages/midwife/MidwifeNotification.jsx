@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { collection, getDocs, query, where, updateDoc, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useToast } from "../../context/ToastContext";
 import "./MidwifeNotification.css";
 
 const navItems = [
@@ -20,6 +21,7 @@ export default function MidwifeNotification() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const { showToast } = useToast();
   const [notifications, setNotifications] = useState([]);
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(false);
@@ -48,14 +50,14 @@ export default function MidwifeNotification() {
         await updateDoc(doc(db, "notifications", n.id), { read: true });
       }
       setNotifications(notifications.map(n => ({ ...n, read: true })));
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
   }
 
   async function dismissNotif(id) {
     try {
       await deleteDoc(doc(db, "notifications", id));
       setNotifications(notifications.filter(n => n.id !== id));
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
   }
 
   const filtered = notifications
@@ -112,7 +114,7 @@ export default function MidwifeNotification() {
           ))}
         </nav>
         <div className="midwife-sidebar-footer">
-          <button className="midwife-nav-item midwife-nav-btn">Settings</button>
+          <NavLink to="/midwife/settings" className={({ isActive }) => "midwife-nav-item midwife-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
           <button className="midwife-nav-item midwife-nav-btn midwife-signout" onClick={handleLogout}>Sign Out</button>
         </div>
       </aside>

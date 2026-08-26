@@ -23,6 +23,7 @@ export default function CHONotification() {
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
   const [notifications, setNotifications] = useState([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
   function handleLogout() { logout(); navigate("/"); }
@@ -61,6 +62,10 @@ export default function CHONotification() {
   }
 
   const unreadNum = notifications.filter(n => !n.read).length;
+  const searchedNotifications = notifications.filter(n =>
+    (n.title || "").toLowerCase().includes(search.trim().toLowerCase()) ||
+    (n.message || "").toLowerCase().includes(search.trim().toLowerCase())
+  );
 
   return (
     <div className="cho-layout">
@@ -81,25 +86,26 @@ export default function CHONotification() {
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "cho-nav-item" + (isActive ? " active" : "")}>
               <span>{item.label}</span>
-              {item.label === "Notifications" && unreadCount && (
+              {item.label === "Notifications" && unreadCount > 0 && (
                 <span className="nav-badge">{unreadCount}</span>
               )}
             </NavLink>
           ))}
         </nav>
         <div className="cho-sidebar-footer">
-          <button className="cho-nav-item cho-nav-btn">Settings</button>
+          <NavLink to="/cho/settings" className={({ isActive }) => "cho-nav-item cho-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
           <button className="cho-nav-item cho-nav-btn cho-signout" onClick={handleLogout}>Sign out</button>
         </div>
       </aside>
 
       <div className="cho-main">
         <header className="cho-topbar">
-          <input className="cho-search" type="text" placeholder="Search notifications..." />
+          <input className="cho-search" type="text" placeholder="Search notifications..."
+            value={search} onChange={e => setSearch(e.target.value)} />
           <div className="cho-topbar-right">
             <div className="cho-user">
               <div className="cho-user-info">
-                <span className="cho-user-name">Dr. Sarah Smith</span>
+                <span className="cho-user-name">CHO Admin</span>
                 <span className="cho-user-role">CHO Administrator</span>
               </div>
               <div className="cho-avatar">SS</div>
@@ -140,7 +146,7 @@ export default function CHONotification() {
 
           {loading ? (
             <div className="cho-empty-small"><p>Loading...</p></div>
-          ) : notifications.length === 0 ? (
+          ) : searchedNotifications.length === 0 ? (
             <div className="cho-empty-state">
               <div className="cho-empty-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="64" height="64">
@@ -154,7 +160,7 @@ export default function CHONotification() {
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {notifications.map(n => (
+              {searchedNotifications.map(n => (
                 <div key={n.id} style={{
                   background: n.read ? "#f9fafb" : (n.level === "Critical" ? "#fef2f2" : "#fffbeb"),
                   border: `1px solid ${n.read ? "#e5e7eb" : n.level === "Critical" ? "#fecaca" : "#fde68a"}`,

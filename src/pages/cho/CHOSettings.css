@@ -1,0 +1,70 @@
+.cho-settings-scroll {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 24px;
+}
+
+/* Safety-net fix for the shared .cho-content class (defined in CHODashboard.css,
+   which isn't available here) — it only constrains overflow-y, not overflow-x,
+   which lets wide content anywhere on the page force a horizontal scrollbar on
+   the whole layout. This mirrors the real fix applied at the source in
+   RHUDashboard.css. Ideally this same fix should be applied directly in
+   CHODashboard.css so every CHO page benefits, not just Settings. */
+/* Force <a> (Settings, now a NavLink) and <button> (Sign out) to compute the
+   exact same box model — browsers apply different default line-height/font/
+   box-sizing to buttons vs links unless explicitly reset, which is why
+   Settings looked a different size/shape than Sign out after Settings was
+   converted from a <button> to a NavLink <a>. */
+.cho-nav-item.cho-nav-btn {
+  box-sizing: border-box;
+  font: inherit;
+  line-height: inherit;
+  margin: 0;
+  display: flex;
+}
+
+.cho-content {
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
+.cho-settings-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.cho-settings-profile-box {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 4px 16px;
+}
+
+.cho-settings-profile-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  font-size: 13px;
+  color: #374151;
+  border-bottom: 1px solid #f1f5f9;
+}
+.cho-settings-profile-row:last-child { border-bottom: none; }
+.cho-settings-profile-row strong { color: #0f172a; font-weight: 600; }
+
+.cho-settings-hint {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 10px 0 14px;
+}
+
+.cho-settings-form {
+  max-width: 420px;
+}

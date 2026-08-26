@@ -120,7 +120,7 @@ export default function MidwifeDashboard() {
         </nav>
 
         <div className="midwife-sidebar-footer">
-          <button className="midwife-nav-item midwife-nav-btn">Settings</button>
+          <NavLink to="/midwife/settings" className={({ isActive }) => "midwife-nav-item midwife-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
           <button className="midwife-nav-item midwife-nav-btn midwife-signout" onClick={handleLogout}>
             Sign Out
           </button>

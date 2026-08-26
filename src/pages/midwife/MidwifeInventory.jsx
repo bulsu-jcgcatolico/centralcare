@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useToast } from "../../context/ToastContext";
 import {
   collection, addDoc, getDocs, doc, deleteDoc,
   serverTimestamp, query, where, updateDoc
@@ -40,6 +41,7 @@ export default function MidwifeInventory() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const { showToast } = useToast();
 
   const [inventory, setInventory]   = useState([]);
   const [loading, setLoading]       = useState(false);
@@ -102,16 +104,22 @@ export default function MidwifeInventory() {
 
   async function saveShipment() {
     if (!shipProductName.trim() || !shipBoxes || !shipExpiry) {
-      alert("Please fill in Product Name, Boxes, and Expiry Date");
+      showToast("Please fill in Product Name, Boxes, and Expiry Date", "error");
       return;
     }
     setSaving(true);
     try {
       const boxes = parseInt(shipBoxes);
       const trimmedName = shipProductName.trim();
+      const trimmedLot = shipLotNumber.trim();
 
+      // Only treat this as "the same batch" if name, lot number, AND expiry date all
+      // match exactly — matching on name alone would silently merge different batches
+      // (different lot / expiry) and overwrite the row's expiry/lot info.
       const existing = activeInventory.find(
         i => i.name.trim().toLowerCase() === trimmedName.toLowerCase()
+          && (i.lotNumber || "").trim().toLowerCase() === trimmedLot.toLowerCase()
+          && i.expiry === shipExpiry
       );
 
       if (existing) {
@@ -120,11 +128,8 @@ export default function MidwifeInventory() {
         await updateDoc(doc(db, "inventory", existing.id), {
           quantity:  newQuantity,
           remaining: newRemaining,
-          expiry: shipExpiry, source: shipSource,
-          category: shipCategory, subCategory: shipSubCategory.trim(),
-          lotNumber: shipLotNumber.trim(),
         });
-        alert(`${trimmedName} already exists — added ${boxes} boxes to existing stock (new total: ${newRemaining} boxes).`);
+        showToast(`${trimmedName} (Lot ${trimmedLot || "—"}, same expiry) already exists — added ${boxes} boxes to existing stock (new total: ${newRemaining} boxes).`, "success");
       } else {
         await addDoc(collection(db, "inventory"), {
           productKey:    generateProductKey(),
@@ -141,14 +146,14 @@ export default function MidwifeInventory() {
           barangayName:  userData?.barangayName || userData?.barangay || "",
           createdAt:     serverTimestamp(),
         });
-        alert("Shipment logged successfully!");
+        showToast("Shipment logged successfully!", "success");
       }
 
       setShipProductName(""); setShipLotNumber(""); setShipCategory("General Consumption");
       setShipSubCategory(""); setShipBoxes(""); setShipExpiry(""); setShipSource("");
       setShowShipmentModal(false);
       loadInventory();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
     setSaving(false);
   }
 
@@ -157,7 +162,7 @@ export default function MidwifeInventory() {
     try {
       await deleteDoc(doc(db, "inventory", id));
       setInventory(inventory.filter(i => i.id !== id));
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
   }
 
   function openReceiveModal(item) {
@@ -169,7 +174,7 @@ export default function MidwifeInventory() {
 
   async function confirmReceipt() {
     if (!receivedBy.trim()) {
-      alert("Please enter the name of the person confirming receipt.");
+      showToast("Please enter the name of the person confirming receipt.", "error");
       return;
     }
     setReceiving(true);
@@ -180,9 +185,9 @@ export default function MidwifeInventory() {
         receivedAt: dateReceived,
       });
       setShowReceiveModal(false);
-      alert("Receipt confirmed — thank you!");
+      showToast("Receipt confirmed — thank you!", "success");
       loadInventory();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
     setReceiving(false);
   }
 
@@ -241,7 +246,7 @@ export default function MidwifeInventory() {
           ))}
         </nav>
         <div className="midwife-sidebar-footer">
-          <button className="midwife-nav-item midwife-nav-btn">Settings</button>
+          <NavLink to="/midwife/settings" className={({ isActive }) => "midwife-nav-item midwife-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
           <button className="midwife-nav-item midwife-nav-btn midwife-signout" onClick={handleLogout}>
             Sign Out
           </button>
@@ -377,7 +382,7 @@ export default function MidwifeInventory() {
               <button className="midwife-btn-secondary" onClick={() => setShowShipmentModal(true)}>
                 Log New Shipment
               </button>
-              <button className="midwife-btn-secondary" onClick={() => alert("Export to CSV")}>
+              <button className="midwife-btn-secondary" onClick={() => showToast("CSV export isn't built yet — coming soon.", "info")}>
                 Export
               </button>
             </div>
@@ -409,6 +414,19 @@ export default function MidwifeInventory() {
           ) : (
             <section className="midwife-inv-section">
               <table className="midwife-table">
+                <colgroup>
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "15%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "7%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "6%" }} />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>PRODUCT KEY</th>

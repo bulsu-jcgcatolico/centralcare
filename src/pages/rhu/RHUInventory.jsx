@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useToast } from "../../context/ToastContext";
 import {
   collection, addDoc, getDocs, deleteDoc, doc,
   serverTimestamp, query, where, updateDoc
@@ -40,6 +41,7 @@ export default function RHUInventory() {
   const { logout, user, userData } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const { showToast } = useToast();
 
   const [search, setSearch] = useState("");
   const [inventory, setInventory] = useState([]);
@@ -113,16 +115,23 @@ export default function RHUInventory() {
 
   async function saveItem() {
     if (!productName.trim() || !quantity || !expiry) {
-      alert("Please fill in Product Name, Quantity, and Expiry Date");
+      showToast("Please fill in Product Name, Quantity, and Expiry Date", "error");
       return;
     }
     setSaving(true);
     try {
       const qty = parseInt(quantity);
       const trimmedName = productName.trim();
+      const trimmedLot = lotNumber.trim();
 
+      // Only treat this as "the same batch" if name, lot number, AND expiry date all
+      // match exactly. Matching on name alone would merge genuinely different batches
+      // (different lot / expiry) into one row and silently overwrite that row's expiry
+      // and lot number — hiding which boxes are actually near expiry or from which lot.
       const existing = activeInventory.find(
         i => i.name.trim().toLowerCase() === trimmedName.toLowerCase()
+          && (i.lotNumber || "").trim().toLowerCase() === trimmedLot.toLowerCase()
+          && i.expiry === expiry
       );
 
       if (existing) {
@@ -132,10 +141,8 @@ export default function RHUInventory() {
           quantity:  newQuantity,
           remaining: newRemaining,
           tabletsPerBox: parseInt(tabletsPerBox) || existing.tabletsPerBox || 30,
-          expiry, source, category, subCategory,
-          lotNumber: lotNumber.trim(),
         });
-        alert(`${trimmedName} already exists — added ${qty} boxes to existing stock (new total: ${newRemaining} boxes).`);
+        showToast(`${trimmedName} (Lot ${trimmedLot || "—"}, same expiry) already exists — added ${qty} boxes to existing stock (new total: ${newRemaining} boxes).`, "success");
       } else {
         await addDoc(collection(db, "inventory"), {
           productKey: generateProductKey(),
@@ -155,14 +162,14 @@ export default function RHUInventory() {
           createdBy: user?.uid || "",
           createdAt: serverTimestamp(),
         });
-        alert("Item saved successfully!");
+        showToast("Item saved successfully!", "success");
       }
 
       setProductName(""); setLotNumber(""); setCategory("General Consumption");
       setSubCategory(""); setQuantity(""); setTabletsPerBox(""); setSource(""); setExpiry("");
       setShowAddModal(false);
       loadInventory();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
     setSaving(false);
   }
 
@@ -171,7 +178,7 @@ export default function RHUInventory() {
     try {
       await deleteDoc(doc(db, "inventory", id));
       setInventory(prev => prev.filter(i => i.id !== id));
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
   }
 
   function openAcceptModal(item) {
@@ -189,7 +196,7 @@ export default function RHUInventory() {
 
   async function handleAccept() {
     if (!receivedBy.trim()) {
-      alert("Please enter the name of the person receiving the supply.");
+      showToast("Please enter the name of the person receiving the supply.", "error");
       return;
     }
     setProcessingAction(true);
@@ -210,10 +217,10 @@ export default function RHUInventory() {
         createdAt: serverTimestamp()
       });
 
-      alert("Shipment accepted and added to active inventory!");
+      showToast("Shipment accepted and added to active inventory!", "success");
       setShowAcceptModal(false);
       loadInventory();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
     setProcessingAction(false);
   }
 
@@ -236,10 +243,10 @@ export default function RHUInventory() {
         createdAt: serverTimestamp()
       });
 
-      alert("Shipment declined.");
+      showToast("Shipment declined.", "info");
       setShowDeclineModal(false);
       loadInventory();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
     setProcessingAction(false);
   }
 
@@ -292,7 +299,7 @@ export default function RHUInventory() {
           ))}
         </nav>
         <div className="rhu-sidebar-footer">
-          <button className="rhu-nav-item rhu-nav-btn">Settings</button>
+          <NavLink to="/rhu/settings" className={({ isActive }) => "rhu-nav-item rhu-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
           <button className="rhu-nav-item rhu-nav-btn rhu-signout" onClick={handleLogout}>Sign out</button>
         </div>
       </aside>
@@ -414,6 +421,18 @@ export default function RHUInventory() {
             <section className="rhu-inv-section">
               <div style={{ width: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                 <table className="rhu-inv-table">
+                  <colgroup>
+                    <col style={{ width: "11%" }} />
+                    <col style={{ width: "17%" }} />
+                    <col style={{ width: "9%" }} />
+                    <col style={{ width: "11%" }} />
+                    <col style={{ width: "11%" }} />
+                    <col style={{ width: "8%" }} />
+                    <col style={{ width: "9%" }} />
+                    <col style={{ width: "10%" }} />
+                    <col style={{ width: "8%" }} />
+                    <col style={{ width: "6%" }} />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th>PRODUCT KEY</th>

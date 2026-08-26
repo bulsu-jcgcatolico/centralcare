@@ -41,7 +41,7 @@ export default function CHOMessages() {
   const unreadCount = useUnreadCount();
 
   const choId = "cho_admin";
-  const choName = user?.displayName || user?.name || "Dr. Sarah Smith";
+  const choName = user?.displayName || user?.name || "CHO Administrator";
 
   // Fixed list from RHU 1 to RHU 10 only
   const contacts = Array.from({ length: 10 }, (_, i) => ({
@@ -221,7 +221,7 @@ export default function CHOMessages() {
           ))}
         </nav>
         <div className="cho-sidebar-footer">
-          <button className="cho-nav-item cho-nav-btn">Settings</button>
+          <NavLink to="/cho/settings" className={({ isActive }) => "cho-nav-item cho-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
           <button className="cho-nav-item cho-nav-btn cho-signout" onClick={handleLogout}>Sign out</button>
         </div>
       </aside>
@@ -231,10 +231,10 @@ export default function CHOMessages() {
           <div className="cho-topbar-right" style={{ marginLeft: "auto" }}>
             <div className="cho-user">
               <div className="cho-user-info">
-                <span className="cho-user-name">Dr. Sarah Smith</span>
+                <span className="cho-user-name">CHO Admin</span>
                 <span className="cho-user-role">CHO Administrator</span>
               </div>
-              <div className="cho-avatar">SS</div>
+              <div className="cho-avatar">CHO</div>
             </div>
           </div>
         </header>

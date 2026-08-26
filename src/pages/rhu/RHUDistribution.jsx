@@ -8,6 +8,7 @@ import {
 import { db } from "../../firebase/config";
 import { checkAndNotifyLowStock } from "../../utils/lowStockNotifier";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useToast } from "../../context/ToastContext";
 import "./RHUDistribution.css";
 
 const navItems = [
@@ -25,6 +26,26 @@ const RHU_REGISTRY_COLLECTION = "cho_rhu_registry";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
+// FEFO (First-Expired, First-Out) helpers — same logic as MidwifeDispense.jsx.
+// Items with no expiry are treated as expiring last, so an unknown date never
+// gets falsely recommended over a lot with a known, dated expiry.
+function getExpiryTime(item) {
+  if (!item?.expiry) return Infinity;
+  const t = new Date(item.expiry).getTime();
+  return isNaN(t) ? Infinity : t;
+}
+
+function sortByFEFO(items) {
+  return [...items].sort((a, b) => getExpiryTime(a) - getExpiryTime(b));
+}
+
+function formatExpiry(expiry) {
+  if (!expiry) return "no expiry set";
+  const d = new Date(expiry);
+  if (isNaN(d)) return "no expiry set";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 function getMonthYear(dateStr, seconds) {
   let d = null;
   if (seconds) {
@@ -38,6 +59,7 @@ function getMonthYear(dateStr, seconds) {
 
 export default function RHUDistribution() {
   const { logout, user, userData } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
 
@@ -181,13 +203,13 @@ export default function RHUDistribution() {
 
   function calculatePlans() {
     const entries = Object.entries(selectedItems);
-    if (entries.length === 0) { alert("Select at least one medicine to distribute."); return; }
+    if (entries.length === 0) { showToast("Select at least one medicine to distribute.", "error"); return; }
 
     const activeBarangays = barangays.filter(b => b.population > 0);
     const populationSum = activeBarangays.reduce((s, b) => s + b.population, 0);
 
     if (activeBarangays.length === 0 || populationSum <= 0) {
-      alert("No assigned barangay has a valid population set yet. Update population numbers in the Barangay module first.");
+      showToast("No assigned barangay has a valid population set yet. Update population numbers in the Barangay module first.", "error");
       return;
     }
 
@@ -197,12 +219,12 @@ export default function RHUDistribution() {
       const item = inventory.find(i => i.id === invId);
       if (!item) continue;
       if (!total || total <= 0) {
-        alert(`Enter a valid number of boxes for ${item.name}.`);
+        showToast(`Enter a valid number of boxes for ${item.name}.`, "error");
         return;
       }
       const avail = item.remaining ?? item.quantity;
       if (total > avail) {
-        alert(`Only ${avail} boxes of ${item.name} remaining!`);
+        showToast(`Only ${avail} boxes of ${item.name} remaining!`, "error");
         return;
       }
 
@@ -270,12 +292,12 @@ export default function RHUDistribution() {
         }
       }
 
-      alert(`Distribution plan${calculatedPlans.length > 1 ? "s" : ""} saved! Barangays notified.`);
+      showToast(`Distribution plan${calculatedPlans.length > 1 ? "s" : ""} saved! Barangays notified.`, "success");
       setShowNewModal(false);
       resetNewModal();
       loadDistributions();
       loadInventory();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
     setSaving(false);
   }
 
@@ -326,7 +348,7 @@ export default function RHUDistribution() {
       });
 
       loadDistributions();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
     setDistributingId(null);
   }
 
@@ -374,9 +396,9 @@ export default function RHUDistribution() {
         });
       }
 
-      alert("Distributed to all barangays successfully!");
+      showToast("Distributed to all barangays successfully!", "success");
       loadDistributions();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
     setDistributingId(null);
   }
 
@@ -385,7 +407,7 @@ export default function RHUDistribution() {
     try {
       await deleteDoc(doc(db, "rhu_distributions", id));
       setDistributions(distributions.filter(d => d.id !== id));
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
   }
 
   // Derive available months for dropdown filter
@@ -446,7 +468,7 @@ export default function RHUDistribution() {
               ))}
             </nav>
             <div className="rhu-sidebar-footer">
-              <button className="rhu-nav-item rhu-nav-btn">Settings</button>
+              <NavLink to="/rhu/settings" className="rhu-nav-item rhu-nav-btn">Settings</NavLink>
               <button className="rhu-nav-item rhu-nav-btn rhu-signout" onClick={handleLogout}>Sign Out</button>
             </div>
           </aside>
@@ -696,38 +718,58 @@ export default function RHUDistribution() {
             <div className="rhu-modal-body">
 
               <p className="rhu-dist-note">Select one or more medicines and enter how many boxes of each to distribute.</p>
+              <p style={{ fontSize: "12px", color: "#6b7280", margin: "-4px 0 10px" }}>
+                ★ marks the lot expiring soonest for each medicine — distribute that one first (FEFO).
+              </p>
 
               <div className="rhu-med-select-list">
-                {inventory.map(item => {
-                  const checked = item.id in selectedItems;
-                  const avail = item.remaining ?? item.quantity;
-                  return (
-                    <div className={`rhu-med-select-row ${checked ? "rhu-med-select-row--active" : ""}`} key={item.id}>
-                      <label className="rhu-med-checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={e => toggleMedicine(item.id, e.target.checked)}
-                        />
-                        <span className="rhu-med-checkbox-text">
-                          <strong>{item.name}</strong>
-                          <span className="rhu-med-checkbox-sub">{avail} boxes available</span>
-                        </span>
-                      </label>
-                      {checked && (
-                        <input
-                          className="rhu-input rhu-med-boxes-input"
-                          type="number"
-                          min="1"
-                          placeholder="Boxes"
-                          value={selectedItems[item.id]}
-                          onChange={e => updateMedicineBoxes(item.id, e.target.value)}
-                          aria-label={`Boxes of ${item.name} to distribute`}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
+                {(() => {
+                  const fefoGroups = {};
+                  inventory.forEach(item => {
+                    const key = item.name || "Unnamed";
+                    if (!fefoGroups[key]) fefoGroups[key] = [];
+                    fefoGroups[key].push(item);
+                  });
+                  Object.keys(fefoGroups).forEach(name => { fefoGroups[name] = sortByFEFO(fefoGroups[name]); });
+                  const sortedInventory = Object.keys(fefoGroups)
+                    .sort((a, b) => a.localeCompare(b))
+                    .flatMap(name => fefoGroups[name]);
+
+                  return sortedInventory.map((item, i, arr) => {
+                    const checked = item.id in selectedItems;
+                    const avail = item.remaining ?? item.quantity;
+                    const isEarliestInGroup = fefoGroups[item.name || "Unnamed"][0]?.id === item.id;
+                    return (
+                      <div className={`rhu-med-select-row ${checked ? "rhu-med-select-row--active" : ""}`} key={item.id}>
+                        <label className="rhu-med-checkbox-label">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={e => toggleMedicine(item.id, e.target.checked)}
+                          />
+                          <span className="rhu-med-checkbox-text">
+                            <strong>{isEarliestInGroup ? "★ " : ""}{item.name} — Lot {item.lotNumber || "—"}</strong>
+                            <span className="rhu-med-checkbox-sub">
+                              Expires {formatExpiry(item.expiry)} · {avail} boxes available
+                              {isEarliestInGroup ? " · dispense first (FEFO)" : ""}
+                            </span>
+                          </span>
+                        </label>
+                        {checked && (
+                          <input
+                            className="rhu-input rhu-med-boxes-input"
+                            type="number"
+                            min="1"
+                            placeholder="Boxes"
+                            value={selectedItems[item.id]}
+                            onChange={e => updateMedicineBoxes(item.id, e.target.value)}
+                            aria-label={`Boxes of ${item.name} to distribute`}
+                          />
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
                 {inventory.length === 0 && (
                   <p className="rhu-dist-note">No accepted medicines in inventory available for distribution.</p>
                 )}

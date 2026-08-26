@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useToast } from "../../context/ToastContext";
 import {
   collection, doc, setDoc, getDoc, getDocs, deleteDoc, serverTimestamp
 } from "firebase/firestore";
@@ -24,10 +25,19 @@ const navItems = [
 const BARANGAYS_COLLECTION = "cho_barangays";
 const RHU_REGISTRY_COLLECTION = "cho_rhu_registry";
 
+// CHODashboard.jsx and CHORHUManagement.jsx both compute population totals as
+// `population ?? totalPopulation` (RHU-entered headcounts take priority when present).
+// Mirror that same priority here so this page never shows a stale number that
+// disagrees with what the Dashboard / RHU Management pages are showing.
+function getBarangayPopulation(b) {
+  return Number(b?.population ?? b?.totalPopulation ?? 0);
+}
+
 export default function CHOBarangay() {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const { showToast } = useToast();
 
   const [search, setSearch] = useState("");
   const [barangays, setBarangays] = useState([]);
@@ -84,7 +94,7 @@ export default function CHOBarangay() {
   function openEditModal(b) {
     setEditingId(b.id);
     setBarangayName(b.barangayName || b.id);
-    setTotalPopulation(b.totalPopulation ?? "");
+    setTotalPopulation(getBarangayPopulation(b) || "");
     setAddress(b.address || "");
     setMidwifeName(b.midwifeName || "");
     setNotes(b.notes || "");
@@ -94,7 +104,7 @@ export default function CHOBarangay() {
   async function saveBarangay() {
     const trimmed = barangayName.trim();
     if (!trimmed) {
-      alert("Please enter a barangay name.");
+      showToast("Please enter a barangay name.", "error");
       return;
     }
     setSaving(true);
@@ -102,7 +112,7 @@ export default function CHOBarangay() {
       if (!editingId) {
         const existing = await getDoc(doc(db, BARANGAYS_COLLECTION, trimmed));
         if (existing.exists()) {
-          alert(`"${trimmed}" is already in the barangay list.`);
+          showToast(`"${trimmed}" is already in the barangay list.`, "error");
           setSaving(false);
           return;
         }
@@ -111,6 +121,9 @@ export default function CHOBarangay() {
       await setDoc(doc(db, BARANGAYS_COLLECTION, trimmed), {
         barangayName: trimmed,
         totalPopulation: Number(totalPopulation) || 0,
+        // Also write `population` — Dashboard/RHU Management read `population ?? totalPopulation`,
+        // so without this a CHO edit here can be silently overridden by a stale RHU-entered value.
+        population: Number(totalPopulation) || 0,
         address: address.trim(),
         midwifeName: midwifeName.trim(),
         notes: notes.trim(),
@@ -118,10 +131,10 @@ export default function CHOBarangay() {
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      alert(editingId ? "Barangay updated!" : "Barangay added!");
+      showToast(editingId ? "Barangay updated!" : "Barangay added!", "success");
       setShowAddModal(false);
       loadBarangays();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
     setSaving(false);
   }
 
@@ -134,7 +147,7 @@ export default function CHOBarangay() {
     try {
       await deleteDoc(doc(db, BARANGAYS_COLLECTION, b.id));
       setBarangays(barangays.filter(x => x.id !== b.id));
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
   }
 
   const filteredBarangays = barangays.filter(b =>
@@ -168,7 +181,7 @@ export default function CHOBarangay() {
           ))}
         </nav>
         <div className="rhu-sidebar-footer">
-          <button className="rhu-nav-item rhu-nav-btn">Settings</button>
+          <NavLink to="/cho/settings" className={({ isActive }) => "rhu-nav-item rhu-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
           <button className="rhu-nav-item rhu-nav-btn rhu-signout" onClick={handleLogout}>Sign out</button>
         </div>
       </aside>
@@ -181,7 +194,7 @@ export default function CHOBarangay() {
           <div className="rhu-topbar-right">
             <div className="rhu-user">
               <div className="rhu-user-info">
-                <span className="rhu-user-name">Dr. Sarah Smith</span>
+                <span className="rhu-user-name">CHO Admin</span>
                 <span className="rhu-user-role">CHO Administrator</span>
               </div>
               <div className="rhu-avatar">SS</div>
@@ -243,7 +256,7 @@ export default function CHOBarangay() {
                       return (
                         <tr key={b.id}>
                           <td><strong>{b.barangayName}</strong></td>
-                          <td>{b.totalPopulation ? Number(b.totalPopulation).toLocaleString() : "0"}</td>
+                          <td>{getBarangayPopulation(b).toLocaleString()}</td>
                           <td>{b.address || "—"}</td>
                           <td>{b.midwifeName || "—"}</td>
                           <td>

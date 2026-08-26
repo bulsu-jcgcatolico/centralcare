@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useToast } from "../../context/ToastContext";
 import "./RHUBarangay.css";
 
 const navItems = [
@@ -33,15 +34,26 @@ const getBarangayPopulation = (b) => {
   return Number(pop) || 0;
 };
 
-// Helper function to extract population percentage/share
-const getBarangayPercent = (b) => {
-  if (!b) return 0;
-  const pct = b.populationPercent ?? b.allocationShare ?? b.percent ?? 0;
-  return Number(pct) || 0;
+// Some RHU profiles have a barangay accidentally appended to rhuName (e.g. "RHU 1 - Longos").
+// Strip anything after a dash so the RHU's own name always displays clean, matching the
+// same fix already applied in RHUMessages.jsx.
+const cleanRhuName = (name) => {
+  if (!name) return "";
+  return String(name).split(/[-–—]/)[0].trim();
+};
+
+// NOTE: Allocation share is no longer read from a manually-set stored field
+// (populationPercent/allocationShare/percent) — nothing ever wrote to it after
+// a distribution, which is why it always showed 0%. It's now computed live as
+// this barangay's population divided by the total assigned population.
+const computeLivePercent = (b, totalPopulation) => {
+  if (!totalPopulation) return 0;
+  return (getBarangayPopulation(b) / totalPopulation) * 100;
 };
 
 export default function RHUBarangay() {
   const { logout, userData } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
 
@@ -127,8 +139,6 @@ export default function RHUBarangay() {
   function openEditModal(b) {
     setEditingBarangay(b);
     setEditPopulation(getBarangayPopulation(b));
-    const rawPct = getBarangayPercent(b);
-    setEditPercent(rawPct > 1 ? rawPct.toFixed(1) : (rawPct * 100).toFixed(1));
     setShowEditModal(true);
   }
 
@@ -137,20 +147,18 @@ export default function RHUBarangay() {
     setSaving(true);
     try {
       const rawPop = parseInt(editPopulation, 10) || 0;
-      const fraction = parseFloat(editPercent) / 100 || 0;
 
       await updateDoc(doc(db, BARANGAYS_COLLECTION, editingBarangay.id), {
         population: rawPop,
-        populationPercent: fraction,
       });
 
       setBarangays(prev => prev.map(b => b.id === editingBarangay.id
-        ? { ...b, population: rawPop, populationPercent: fraction }
+        ? { ...b, population: rawPop }
         : b
       ));
       setShowEditModal(false);
     } catch (err) {
-      alert("Error updating barangay: " + err.message);
+      showToast("Error updating barangay: " + err.message, "error");
     }
     setSaving(false);
   }
@@ -166,11 +174,8 @@ export default function RHUBarangay() {
   }, [barangays]);
 
   const totalPercent = useMemo(() => {
-    return barangays.reduce((sum, b) => {
-      const pct = getBarangayPercent(b);
-      return sum + (pct > 1 ? pct : pct * 100);
-    }, 0);
-  }, [barangays]);
+    return barangays.reduce((sum, b) => sum + computeLivePercent(b, totalRawPopulation), 0);
+  }, [barangays, totalRawPopulation]);
 
   return (
     <div className="rhu-layout">
@@ -199,7 +204,7 @@ export default function RHUBarangay() {
           ))}
         </nav>
         <div className="rhu-sidebar-footer">
-          <button className="rhu-nav-item rhu-nav-btn">Settings</button>
+          <NavLink to="/rhu/settings" className="rhu-nav-item rhu-nav-btn">Settings</NavLink>
           <button className="rhu-nav-item rhu-nav-btn rhu-signout" onClick={handleLogout}>Sign Out</button>
         </div>
       </aside>
@@ -230,7 +235,7 @@ export default function RHUBarangay() {
             <div>
               <h1 className="rhu-page-title">Assigned Barangays</h1>
               <p className="rhu-page-sub">
-                Barangays assigned to <strong>{userData?.rhuName || "your RHU"}</strong> from CHO.
+                Barangays assigned to <strong>{cleanRhuName(userData?.rhuName) || "your RHU"}</strong> from CHO.
               </p>
             </div>
             <button className="bgy-btn-refresh" onClick={loadAssignedBarangays}>
@@ -312,8 +317,7 @@ export default function RHUBarangay() {
                 <tbody>
                   {filteredBarangays.map(b => {
                     const pop = getBarangayPopulation(b);
-                    const rawPct = getBarangayPercent(b);
-                    const pct = rawPct > 1 ? rawPct : rawPct * 100;
+                    const pct = computeLivePercent(b, totalRawPopulation);
 
                     return (
                       <tr key={b.id}>
@@ -376,19 +380,17 @@ export default function RHUBarangay() {
                 />
               </div>
               <div className="bgy-field">
-                <label>Allocation Share %</label>
+                <label>Allocation Share</label>
                 <div className="bgy-input-group">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    value={editPercent}
-                    onChange={e => setEditPercent(e.target.value)}
-                    placeholder="0.0"
-                  />
-                  <span>%</span>
+                  <input type="text" value={
+                    editingBarangay
+                      ? `${computeLivePercent({ ...editingBarangay, population: parseInt(editPopulation, 10) || 0 }, totalRawPopulation - getBarangayPopulation(editingBarangay) + (parseInt(editPopulation, 10) || 0)).toFixed(1)}%`
+                      : "0.0%"
+                  } disabled readOnly />
                 </div>
+                <p style={{ fontSize: "12px", color: "#6b7280", marginTop: "6px" }}>
+                  Automatically calculated from population — updates as you change the headcount above.
+                </p>
               </div>
             </div>
             <div className="bgy-modal-footer">

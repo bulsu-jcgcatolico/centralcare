@@ -6,6 +6,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useToast } from "../../context/ToastContext";
 import "./CHOItemManagement.css";
 
 const navItems = [
@@ -36,6 +37,7 @@ const FORM_PREFIXES = {
 
 export default function CHOItemManagement() {
   const { logout, user } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
 
@@ -132,7 +134,7 @@ export default function CHOItemManagement() {
     const trimmedName = name.trim();
 
     if (!trimmedId || !trimmedName) {
-      alert("Please fill in Product ID and Product Name.");
+      showToast("Please fill in Product ID and Product Name.", "error");
       return;
     }
 
@@ -141,7 +143,7 @@ export default function CHOItemManagement() {
       if (!editingId) {
         const existing = await getDoc(doc(db, PRODUCTS_COLLECTION, trimmedId));
         if (existing.exists()) {
-          alert(`Product ID "${trimmedId}" already exists. Please use a unique Product ID.`);
+          showToast(`Product ID "${trimmedId}" already exists. Please use a unique Product ID.`, "error");
           setSaving(false);
           return;
         }
@@ -159,10 +161,10 @@ export default function CHOItemManagement() {
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      alert(editingId ? "Product updated successfully!" : "Product added successfully!");
+      showToast(editingId ? "Product updated successfully!" : "Product added successfully!", "success");
       setShowAddModal(false);
       loadProducts();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
     setSaving(false);
   }
 
@@ -171,7 +173,7 @@ export default function CHOItemManagement() {
     try {
       await deleteDoc(doc(db, PRODUCTS_COLLECTION, p.id));
       setProducts(products.filter(x => x.id !== p.id));
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
   }
 
   const filteredProducts = products.filter(p =>
@@ -207,7 +209,7 @@ export default function CHOItemManagement() {
           ))}
         </nav>
         <div className="cho-sidebar-footer">
-          <button className="cho-nav-item cho-nav-btn">Settings</button>
+          <NavLink to="/cho/settings" className={({ isActive }) => "cho-nav-item cho-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
           <button className="cho-nav-item cho-nav-btn cho-signout" onClick={handleLogout}>Sign out</button>
         </div>
       </aside>
@@ -220,7 +222,7 @@ export default function CHOItemManagement() {
           <div className="cho-topbar-right">
             <div className="cho-user">
               <div className="cho-user-info">
-                <span className="cho-user-name">Dr. Sarah Smith</span>
+                <span className="cho-user-name">CHO Admin</span>
                 <span className="cho-user-role">CHO Administrator</span>
               </div>
               <div className="cho-avatar">SS</div>

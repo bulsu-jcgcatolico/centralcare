@@ -7,6 +7,7 @@ import {
 import { db } from "../../firebase/config";
 import { checkAndNotifyLowStock } from "../../utils/lowStockNotifier";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useToast } from "../../context/ToastContext";
 import "./MidwifeDispense.css";
 
 const navItems = [
@@ -21,8 +22,23 @@ const navItems = [
 
 const TABLETS_PER_BOX = 30;
 
+// FEFO (First-Expired, First-Out) helper: for a given medicine name, find which
+// available lot expires soonest. Items with no expiry date are treated as if
+// they expire last (sorted to the bottom), since an unknown expiry shouldn't
+// be recommended over a known, dated lot.
+function getExpiryTime(item) {
+  if (!item?.expiry) return Infinity;
+  const t = new Date(item.expiry).getTime();
+  return isNaN(t) ? Infinity : t;
+}
+
+function sortByFEFO(items) {
+  return [...items].sort((a, b) => getExpiryTime(a) - getExpiryTime(b));
+}
+
 export default function MidwifeDispense() {
   const { logout, userData } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
 
@@ -112,19 +128,19 @@ export default function MidwifeDispense() {
   }
 
   async function saveDispense() {
-    if (!selectedPatient) { alert("Please search and select a patient first."); return; }
-    if (dispenseItems.length === 0) { alert("Please add at least one medicine to dispense."); return; }
+    if (!selectedPatient) { showToast("Please search and select a patient first.", "error"); return; }
+    if (dispenseItems.length === 0) { showToast("Please add at least one medicine to dispense.", "error"); return; }
 
     // Validate all rows before saving
     for (const row of dispenseItems) {
-      if (!row.itemId) { alert("Please select a medicine for all rows."); return; }
+      if (!row.itemId) { showToast("Please select a medicine for all rows.", "error"); return; }
       const boxes = parseInt(row.boxes);
-      if (!boxes || boxes <= 0) { alert("Please enter a valid number of boxes for all selected medicines."); return; }
+      if (!boxes || boxes <= 0) { showToast("Please enter a valid number of boxes for all selected medicines.", "error"); return; }
 
       const invItem = inventory.find(i => i.id === row.itemId);
       const available = invItem ? (invItem.remaining ?? invItem.quantity ?? 0) : 0;
       if (boxes > available) {
-        alert(`Only ${available} boxes of ${invItem?.name || 'selected medicine'} remaining!`);
+        showToast(`Only ${available} boxes of ${invItem?.name || 'selected medicine'} remaining!`, "error");
         return;
       }
     }
@@ -167,10 +183,10 @@ export default function MidwifeDispense() {
         });
       }
 
-      alert(`Successfully dispensed medicines to ${selectedPatient.name}.`);
+      showToast(`Successfully dispensed medicines to ${selectedPatient.name}.`, "success");
       resetForm();
       loadData();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
     setSaving(false);
   }
 
@@ -178,7 +194,7 @@ export default function MidwifeDispense() {
   function handlePrintExport() {
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
-      alert("Please allow popups to export or print dispense logs.");
+      showToast("Please allow popups to export or print dispense logs.", "error");
       return;
     }
 
@@ -234,6 +250,43 @@ export default function MidwifeDispense() {
     printWindow.document.close();
   }
 
+  // FEFO grouping: available stock grouped by medicine name, each group sorted
+  // so the earliest-expiring lot comes first — that's the one that should be
+  // dispensed first per First-Expired-First-Out practice.
+  const availableInventory = inventory.filter(i => (i.remaining ?? i.quantity ?? 0) > 0);
+  const fefoGroups = {};
+  availableInventory.forEach(item => {
+    const key = item.name || "Unnamed";
+    if (!fefoGroups[key]) fefoGroups[key] = [];
+    fefoGroups[key].push(item);
+  });
+  Object.keys(fefoGroups).forEach(name => { fefoGroups[name] = sortByFEFO(fefoGroups[name]); });
+  const sortedMedicineNames = Object.keys(fefoGroups).sort((a, b) => a.localeCompare(b));
+
+  function formatExpiry(expiry) {
+    if (!expiry) return "no expiry set";
+    const d = new Date(expiry);
+    if (isNaN(d)) return "no expiry set";
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  // For a given selected row, check whether a different lot of the SAME medicine
+  // expires sooner and has enough stock to cover the requested quantity — if so,
+  // the person should be nudged to dispense that one first instead.
+  function getFefoWarning(row) {
+    const current = inventory.find(i => i.id === row.itemId);
+    if (!current) return null;
+    const requested = parseInt(row.boxes) || 0;
+    const group = fefoGroups[current.name] || [];
+    const earlierBetterOption = group.find(item =>
+      item.id !== current.id
+      && getExpiryTime(item) < getExpiryTime(current)
+      && (item.remaining ?? item.quantity ?? 0) >= (requested || 1)
+    );
+    if (!earlierBetterOption) return null;
+    return `Lot ${earlierBetterOption.lotNumber || "—"} of this medicine expires sooner (${formatExpiry(earlierBetterOption.expiry)}) and has enough stock — consider dispensing that one first (FEFO).`;
+  }
+
   return (
     <div className="midwife-layout">
       <aside className="midwife-sidebar">
@@ -260,7 +313,7 @@ export default function MidwifeDispense() {
           ))}
         </nav>
         <div className="midwife-sidebar-footer">
-          <button className="midwife-nav-item midwife-nav-btn">Settings</button>
+          <NavLink to="/midwife/settings" className="midwife-nav-item midwife-nav-btn">Settings</NavLink>
           <button className="midwife-nav-item midwife-nav-btn midwife-signout" onClick={handleLogout}>Sign Out</button>
         </div>
       </aside>
@@ -347,6 +400,9 @@ export default function MidwifeDispense() {
                 <span className="midwife-step-badge">2</span>
                 <h2 className="midwife-section-title">Select Medicine(s)</h2>
               </div>
+              <p style={{ fontSize: "12px", color: "#6b7280", margin: "-8px 0 12px" }}>
+                ★ marks the lot expiring soonest for each medicine — dispense that one first (FEFO).
+              </p>
 
               {/* Multi-medicine rows container */}
               <div className="dispense-medicine-rows-container">
@@ -378,10 +434,14 @@ export default function MidwifeDispense() {
                           onChange={e => handleRowChange(row.id, "itemId", e.target.value)}
                         >
                           <option value="">-- Select Medicine --</option>
-                          {inventory.filter(i => (i.remaining ?? i.quantity ?? 0) > 0).map(item => (
-                            <option key={item.id} value={item.id}>
-                              {item.name}{item.lotNumber ? ` (Lot ${item.lotNumber})` : ""} — {item.remaining ?? item.quantity ?? 0} boxes remaining
-                            </option>
+                          {sortedMedicineNames.map(name => (
+                            <optgroup key={name} label={name}>
+                              {fefoGroups[name].map((item, idx) => (
+                                <option key={item.id} value={item.id}>
+                                  {idx === 0 ? "★ " : ""}Lot {item.lotNumber || "—"} — expires {formatExpiry(item.expiry)} — {item.remaining ?? item.quantity ?? 0} boxes{idx === 0 ? " (dispense first — FEFO)" : ""}
+                                </option>
+                              ))}
+                            </optgroup>
                           ))}
                         </select>
                       </div>
@@ -400,6 +460,11 @@ export default function MidwifeDispense() {
                           <p className="midwife-input-hint">
                             = {parseInt(row.boxes || 0) * TABLETS_PER_BOX} tablets dispensed.
                             Remaining after: {availableStock - parseInt(row.boxes || 0)} boxes
+                          </p>
+                        )}
+                        {getFefoWarning(row) && (
+                          <p className="midwife-input-hint" style={{ color: "#b45309", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 10px", marginTop: "6px" }}>
+                            ⚠ {getFefoWarning(row)}
                           </p>
                         )}
                       </div>

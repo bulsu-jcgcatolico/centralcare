@@ -20,7 +20,7 @@ export default function MidwifeRequestLetter() {
   }
 
   function handleExportPDF() {
-    window.print();
+    // Implementation for exporting as PDF
   }
 
   return (

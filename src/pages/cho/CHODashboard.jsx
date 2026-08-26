@@ -141,7 +141,7 @@ export default function CHODashboard() {
           ))}
         </nav>
         <div className="cho-sidebar-footer">
-          <button className="cho-nav-item cho-nav-btn">Settings</button>
+          <NavLink to="/cho/settings" className={({ isActive }) => "cho-nav-item cho-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
           <button className="cho-nav-item cho-nav-btn cho-signout" onClick={handleLogout}>Sign out</button>
         </div>
       </aside>
@@ -159,7 +159,7 @@ export default function CHODashboard() {
             </button>
             <div className="cho-user">
               <div className="cho-user-info">
-                <span className="cho-user-name">Dr. Sarah Smith</span>
+                <span className="cho-user-name">CHO Admin</span>
                 <span className="cho-user-role">CHO Administrator</span>
               </div>
               <div className="cho-avatar">SS</div>

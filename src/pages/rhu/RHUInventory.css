@@ -143,6 +143,12 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+  table-layout: fixed;
+}
+.rhu-inv-table td, .rhu-inv-table th {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .rhu-inv-table thead { background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
 .rhu-inv-table th {

@@ -32,6 +32,7 @@ export default function CHOReports() {
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
   const [selectedMonth, setSelectedMonth] = useState("all");
+  const [search, setSearch] = useState("");
   const [inventory, setInventory] = useState([]);
   const [distributions, setDistributions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -58,7 +59,7 @@ export default function CHOReports() {
       ...i, actType: "inventory",
       displayName: i.name,
       displayQty:  `${i.quantity} boxes`,
-      displayDate: i.manufactureDate || i.expiryDate || new Date(i.createdAt?.seconds * 1000).toLocaleDateString() || "—",
+      displayDate: i.manufactureDate || i.expiryDate || (i.createdAt?.seconds ? new Date(i.createdAt.seconds * 1000).toLocaleDateString() : "—"),
       month: getMonthYear(i.manufactureDate || i.expiryDate || (i.createdAt?.seconds ? new Date(i.createdAt.seconds * 1000).toLocaleDateString() : null))
     })),
     ...distributions.map(d => ({
@@ -72,9 +73,10 @@ export default function CHOReports() {
 
   const months = [...new Set(allActivities.map(a => a.month).filter(Boolean))].sort().reverse();
 
-  const displayed = selectedMonth === "all"
+  const displayed = (selectedMonth === "all"
     ? allActivities
-    : allActivities.filter(a => a.month === selectedMonth);
+    : allActivities.filter(a => a.month === selectedMonth)
+  ).filter(a => (a.displayName || "").toLowerCase().includes(search.trim().toLowerCase()));
 
   const monthlyInvCount  = displayed.filter(a => a.actType === "inventory").length;
   const monthlyDistCount = displayed.filter(a => a.actType === "distribution").length;
@@ -106,25 +108,26 @@ export default function CHOReports() {
                 <NavLink key={item.to} to={item.to}
                   className={({ isActive }) => "cho-nav-item" + (isActive ? " active" : "")}>
                   <span>{item.label}</span>
-                  {item.label === "Notifications" && unreadCount && (
+                  {item.label === "Notifications" && unreadCount > 0 && (
                     <span className="nav-badge">{unreadCount}</span>
                   )}
                 </NavLink>
               ))}
             </nav>
             <div className="cho-sidebar-footer">
-              <button className="cho-nav-item cho-nav-btn">Settings</button>
+              <NavLink to="/cho/settings" className={({ isActive }) => "cho-nav-item cho-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
               <button className="cho-nav-item cho-nav-btn cho-signout" onClick={handleLogout}>Sign out</button>
             </div>
           </aside>
 
           <div className="cho-main">
             <header className="cho-topbar">
-              <input className="cho-search" type="text" placeholder="Search reports..." />
+              <input className="cho-search" type="text" placeholder="Search reports..."
+                value={search} onChange={e => setSearch(e.target.value)} />
               <div className="cho-topbar-right">
                 <div className="cho-user">
                   <div className="cho-user-info">
-                    <span className="cho-user-name">Dr. Sarah Smith</span>
+                    <span className="cho-user-name">CHO Admin</span>
                     <span className="cho-user-role">CHO Administrator</span>
                   </div>
                   <div className="cho-avatar">SS</div>

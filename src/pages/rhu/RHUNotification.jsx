@@ -21,6 +21,7 @@ export default function RHUNotification() {
   const unreadCount = useUnreadCount();
   const [notifications, setNotifications] = useState([]);
   const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
   function handleLogout() { logout(); navigate("/"); }
@@ -30,9 +31,13 @@ export default function RHUNotification() {
   async function loadNotifications() {
     setLoading(true);
     try {
+      // CHOBatchDistribution.jsx writes toRhuId using the RHU registry's raw doc ID
+      // (a plain number, e.g. "9"), not userData.rhuId verbatim — those can differ in
+      // format (e.g. "RHU 9" vs "9"). Extract just the number so both sides always agree.
+      const rhuNumber = String(userData?.rhuId ?? "").match(/\d+/)?.[0] ?? "";
       const q = query(
         collection(db, "notifications"),
-        where("toRhuId", "==", userData?.rhuId ?? "")
+        where("toRhuId", "==", rhuNumber)
       );
       const snap = await getDocs(q);
       setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -56,8 +61,12 @@ export default function RHUNotification() {
     } catch (err) { alert("Error: " + err.message); }
   }
 
-  const filtered = filter === "all" ? notifications
-    : notifications.filter(n => n.type === filter);
+  const filtered = (filter === "all" ? notifications
+    : notifications.filter(n => n.type === filter)
+  ).filter(n =>
+    (n.title || "").toLowerCase().includes(search.trim().toLowerCase()) ||
+    (n.message || "").toLowerCase().includes(search.trim().toLowerCase())
+  );
   const unreadNum = notifications.filter(n => !n.read).length;
 
   const borderColor = (n) => {
@@ -84,21 +93,22 @@ export default function RHUNotification() {
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "rhu-nav-item" + (isActive ? " active" : "")}>
               <span>{item.label}</span>
-              {item.label === "Notifications" && unreadCount && (
+              {item.label === "Notifications" && unreadCount > 0 && (
                 <span className="nav-badge">{unreadCount}</span>
               )}
             </NavLink>
           ))}
         </nav>
         <div className="rhu-sidebar-footer">
-          <button className="rhu-nav-item rhu-nav-btn">Settings</button>
+          <NavLink to="/rhu/settings" className={({ isActive }) => "rhu-nav-item rhu-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
           <button className="rhu-nav-item rhu-nav-btn rhu-signout" onClick={handleLogout}>Sign out</button>
         </div>
       </aside>
 
       <div className="rhu-main">
         <header className="rhu-topbar">
-          <input className="rhu-search" type="text" placeholder="Search notifications..." />
+          <input className="rhu-search" type="text" placeholder="Search notifications..."
+            value={search} onChange={e => setSearch(e.target.value)} />
           <div className="rhu-topbar-right">
             <div className="rhu-user">
               <div className="rhu-user-info">

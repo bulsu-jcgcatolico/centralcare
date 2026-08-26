@@ -2,7 +2,11 @@ import { createContext, useContext, useState, useEffect } from "react";
 import {
   signInWithEmailAndPassword,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+  updateProfile
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase/config";
@@ -69,6 +73,38 @@ export function AuthProvider({ children }) {
     return null;
   }
 
+  // Firebase requires a recent login before allowing sensitive changes like a
+  // password update, so we re-authenticate with the current password first.
+  async function changePassword(currentPassword, newPassword) {
+    if (!user) return { success: false, message: "Not logged in." };
+    try {
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, newPassword);
+      return { success: true };
+    } catch (error) {
+      let message = "Failed to change password.";
+      if (error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
+        message = "Current password is incorrect.";
+      } else if (error.code === "auth/weak-password") {
+        message = "New password is too weak (minimum 6 characters).";
+      } else if (error.code === "auth/requires-recent-login") {
+        message = "For security, please log out and log back in, then try again.";
+      }
+      return { success: false, message };
+    }
+  }
+
+  async function updateDisplayName(newName) {
+    if (!user) return { success: false, message: "Not logged in." };
+    try {
+      await updateProfile(user, { displayName: newName });
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: "Failed to update name: " + error.message };
+    }
+  }
+
   const value = {
     user,
     userData,
@@ -76,6 +112,8 @@ export function AuthProvider({ children }) {
     login,
     logout,
     getToken,
+    changePassword,
+    updateDisplayName,
     role: userData?.role,
     rhuId: userData?.rhuId,
     rhuName: userData?.rhuName,

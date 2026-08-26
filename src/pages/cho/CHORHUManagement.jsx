@@ -6,6 +6,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useToast } from "../../context/ToastContext";
 import "./CHORHUManagement.css";
 
 const navItems = [
@@ -38,10 +39,12 @@ function defaultRhuList() {
 
 export default function CHORHUManagement() {
   const { logout } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
 
   const [rhus, setRhus] = useState([]);
+  const [search, setSearch] = useState("");
   const [barangayCatalog, setBarangayCatalog] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -176,7 +179,7 @@ export default function CHORHUManagement() {
         : r
       ));
       setShowEditModal(false);
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
     setSaving(false);
   }
 
@@ -208,18 +211,19 @@ export default function CHORHUManagement() {
           ))}
         </nav>
         <div className="cho-sidebar-footer">
-          <button className="cho-nav-item cho-nav-btn">Settings</button>
+          <NavLink to="/cho/settings" className={({ isActive }) => "cho-nav-item cho-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
           <button className="cho-nav-item cho-nav-btn cho-signout" onClick={handleLogout}>Sign out</button>
         </div>
       </aside>
 
       <div className="cho-main">
         <header className="cho-topbar">
-          <input className="cho-search" type="text" placeholder="Search RHU or barangay..." />
+          <input className="cho-search" type="text" placeholder="Search RHU or barangay..."
+            value={search} onChange={e => setSearch(e.target.value)} />
           <div className="cho-topbar-right">
             <div className="cho-user">
               <div className="cho-user-info">
-                <span className="cho-user-name">Dr. Sarah Smith</span>
+                <span className="cho-user-name">CHO Admin</span>
                 <span className="cho-user-role">CHO Administrator</span>
               </div>
               <div className="cho-avatar">SS</div>
@@ -266,7 +270,13 @@ export default function CHORHUManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {rhus.map(rhu => (
+                    {rhus.filter(rhu => {
+                      const q = search.trim().toLowerCase();
+                      if (!q) return true;
+                      return (rhu.rhuName || "").toLowerCase().includes(q)
+                        || (rhu.address || "").toLowerCase().includes(q)
+                        || (rhu.assignedBarangays || []).some(b => b.toLowerCase().includes(q));
+                    }).map(rhu => (
                       <tr key={rhu.id}>
                         <td><strong>{rhu.rhuName}</strong></td>
                         <td>{rhu.address || "—"}</td>

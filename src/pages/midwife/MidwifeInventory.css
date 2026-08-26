@@ -135,6 +135,12 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+  table-layout: fixed;
+}
+.midwife-table td, .midwife-table th {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .midwife-table thead { background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
 .midwife-table th {

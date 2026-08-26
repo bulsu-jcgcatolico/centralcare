@@ -1,0 +1,97 @@
+.midwife-settings-scroll {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 24px;
+}
+
+/* Safety-net fix for the shared .midwife-content class — likely defined in
+   MidwifeDashboard.css, which isn't available here. Same fix as RHUDashboard.css. */
+.midwife-nav-item.midwife-nav-btn {
+  box-sizing: border-box;
+  font: inherit;
+  line-height: inherit;
+  margin: 0;
+  display: flex;
+}
+
+.midwife-content {
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
+.midwife-settings-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.midwife-settings-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.midwife-settings-profile-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 4px 16px;
+}
+
+.midwife-settings-profile-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  font-size: 13px;
+  color: #334155;
+  border-bottom: 1px solid #eef2f6;
+}
+.midwife-settings-profile-row:last-child { border-bottom: none; }
+.midwife-settings-profile-row strong { color: #0f172a; font-weight: 600; }
+
+.midwife-settings-hint {
+  font-size: 12px;
+  color: #64748b;
+  margin: 10px 0 14px;
+}
+
+.midwife-settings-form {
+  max-width: 420px;
+}
+
+.midwife-settings-field {
+  margin-bottom: 1rem;
+}
+
+.midwife-settings-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.midwife-settings-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 14px;
+  color: #0f172a;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.midwife-settings-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}

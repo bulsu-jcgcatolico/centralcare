@@ -7,6 +7,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useToast } from "../../context/ToastContext";
 import "./CHOBatchDistribution.css";
 
 const navItems = [
@@ -22,17 +23,34 @@ const navItems = [
   { label: "Notifications",     to: "/cho/notifications"      },
 ];
 
+// FEFO (First-Expired, First-Out) helpers. Note: this collection stores the
+// field as expiryDate, unlike the inventory collection (RHU/Midwife) which
+// uses expiry — same logic, different field name. Batches with no expiry
+// date are treated as expiring last, never falsely recommended over a lot
+// with a known, dated expiry.
+function getExpiryTime(batch) {
+  if (!batch?.expiryDate) return Infinity;
+  const t = new Date(batch.expiryDate).getTime();
+  return isNaN(t) ? Infinity : t;
+}
+
+function sortByFEFO(items) {
+  return [...items].sort((a, b) => getExpiryTime(a) - getExpiryTime(b));
+}
+
 const BATCHES_COLLECTION      = "cho_batches";
 const RHU_REGISTRY_COLLECTION = "cho_rhu_registry";
 
 export default function CHOBatchDistribution() {
   const { logout, user } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
 
   const [batches, setBatches]           = useState([]);
   const [rhus, setRhus]                 = useState([]);
   const [distributions, setDistributions] = useState([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading]           = useState(false);
   const [saving, setSaving]             = useState(false);
   const [distributingId, setDistributingId] = useState(null);
@@ -87,17 +105,17 @@ export default function CHOBatchDistribution() {
     const populationSum = activeRhus.reduce((s, r) => s + (Number(r.totalPopulation) || 0), 0);
 
     if (activeRhus.length === 0 || populationSum <= 0) {
-      alert('No RHU has a Total Population set yet. Set it in RHU Management first.');
+      showToast('No RHU has a Total Population set yet. Set it in RHU Management first.', "error");
       return;
     }
     const total = parseInt(boxesToDistribute, 10);
     const remaining = distributingBatch.remaining ?? distributingBatch.quantity;
     if (!total || total <= 0) {
-      alert("Enter a valid number of boxes.");
+      showToast("Enter a valid number of boxes.", "error");
       return;
     }
     if (total > remaining) {
-      alert(`Only ${remaining} boxes of this batch remain.`);
+      showToast(`Only ${remaining} boxes of this batch remain.`, "error");
       return;
     }
 
@@ -180,11 +198,11 @@ export default function CHOBatchDistribution() {
         });
       }
 
-      alert("Batch distributed according to RHU population proportions, and RHUs have been notified.");
+      showToast("Batch distributed according to RHU population proportions, and RHUs have been notified.", "success");
       setShowDistributeModal(false);
       loadBatches();
       loadDistributions();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
     setSaving(false);
   }
 
@@ -219,7 +237,7 @@ export default function CHOBatchDistribution() {
       });
 
       loadDistributions();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
     setDistributingId(null);
   }
 
@@ -249,9 +267,9 @@ export default function CHOBatchDistribution() {
         });
       }
 
-      alert("Distributed to all RHUs successfully!");
+      showToast("Distributed to all RHUs successfully!", "success");
       loadDistributions();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
     setDistributingId(null);
   }
 
@@ -260,14 +278,29 @@ export default function CHOBatchDistribution() {
     try {
       await deleteDoc(doc(db, "distributions", id));
       setDistributions(distributions.filter(d => d.id !== id));
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { showToast("Error: " + err.message, "error"); }
   }
 
-  const availableBatches = batches.filter(b => {
-    const hasRemaining = (b.remaining ?? b.quantity) > 0;
-    const isAccepted = !b.status || b.status.toLowerCase() === "accepted" || b.status.toLowerCase() === "received";
-    return hasRemaining && isAccepted;
-  });
+  const availableBatches = (() => {
+    const filtered = batches.filter(b => {
+      const hasRemaining = (b.remaining ?? b.quantity) > 0;
+      const isAccepted = !b.status || b.status.toLowerCase() === "accepted" || b.status.toLowerCase() === "received";
+      return hasRemaining && isAccepted;
+    });
+
+    // Group by medicine name, sort each group FEFO (soonest-expiring first),
+    // then flatten back into a single list ordered name-by-name.
+    const groups = {};
+    filtered.forEach(b => {
+      const key = b.name || "Unnamed";
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(b);
+    });
+    Object.keys(groups).forEach(name => { groups[name] = sortByFEFO(groups[name]); });
+    return Object.keys(groups)
+      .sort((a, b) => a.localeCompare(b))
+      .flatMap(name => groups[name].map((batch, idx) => ({ ...batch, _isFefoFirst: idx === 0 })));
+  })();
 
   const availableMonths = ["All", ...new Set(distributions.map(d => {
     if (!d.date) return null;
@@ -276,12 +309,17 @@ export default function CHOBatchDistribution() {
   }).filter(Boolean))];
 
   const filteredDistributions = distributions.filter(d => {
-    if (selectedMonth === "All") return true;
-    if (!d.date) return false;
-    const parsedDate = new Date(d.date);
-    if (isNaN(parsedDate)) return false;
-    const formatted = parsedDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-    return formatted === selectedMonth;
+    if (selectedMonth !== "All") {
+      if (!d.date) return false;
+      const parsedDate = new Date(d.date);
+      if (isNaN(parsedDate)) return false;
+      const formatted = parsedDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+      if (formatted !== selectedMonth) return false;
+    }
+    if (search.trim() && !(d.medicineName || "").toLowerCase().includes(search.trim().toLowerCase())) {
+      return false;
+    }
+    return true;
   });
 
   const pendingCount = filteredDistributions.filter(d => d.status === "Pending" || d.status === "Partial").length;
@@ -316,18 +354,19 @@ export default function CHOBatchDistribution() {
               ))}
             </nav>
             <div className="rhu-sidebar-footer">
-              <button className="rhu-nav-item rhu-nav-btn">Settings</button>
+              <NavLink to="/cho/settings" className="rhu-nav-item rhu-nav-btn">Settings</NavLink>
               <button className="rhu-nav-item rhu-nav-btn rhu-signout" onClick={handleLogout}>Sign out</button>
             </div>
           </aside>
 
           <div className="rhu-main">
             <header className="rhu-topbar">
-              <input className="rhu-search" type="text" placeholder="Search batches..." aria-label="Search" />
+              <input className="rhu-search" type="text" placeholder="Search batches by medicine name..." aria-label="Search"
+                value={search} onChange={e => setSearch(e.target.value)} />
               <div className="rhu-topbar-right">
                 <div className="rhu-user">
                   <div className="rhu-user-info">
-                    <span className="rhu-user-name">Dr. Sarah Smith</span>
+                    <span className="rhu-user-name">CHO Admin</span>
                     <span className="rhu-user-role">CHO Administrator</span>
                   </div>
                   <div className="rhu-avatar">SS</div>
@@ -394,6 +433,9 @@ export default function CHOBatchDistribution() {
                   <div>
                     <h2 className="rhu-dist-plan-title">Available Batches</h2>
                     <p className="rhu-dist-plan-sub">Click Distribute beside a batch to split it among all registered RHUs.</p>
+                    <p style={{ fontSize: "12px", color: "#6b7280", margin: "4px 0 0" }}>
+                      ★ marks the lot expiring soonest for each medicine — distribute that one first (FEFO).
+                    </p>
                   </div>
                 </div>
                 <div className="rhu-table-wrapper">
@@ -416,10 +458,10 @@ export default function CHOBatchDistribution() {
                         <tr><td colSpan={7}>No available accepted batches. Add and accept stock in Batch Inventory first.</td></tr>
                       ) : (
                         availableBatches.map(b => (
-                          <tr key={b.id}>
+                          <tr key={b.id} style={b._isFefoFirst ? { background: "#fffbeb" } : undefined}>
                             <td className="rhu-product-key"><strong>{b.batchId || "—"}</strong></td>
                             <td className="rhu-product-key">{b.productId || "—"}</td>
-                            <td><strong>{b.name}</strong></td>
+                            <td><strong>{b._isFefoFirst ? "★ " : ""}{b.name}</strong></td>
                             <td className="rhu-product-key">{b.lotNumber || "—"}</td>
                             <td><strong>{b.remaining ?? b.quantity} boxes</strong></td>
                             <td>{b.expiryDate}</td>
@@ -586,6 +628,20 @@ export default function CHOBatchDistribution() {
                 Lot {distributingBatch.lotNumber || "—"} — {distributingBatch.remaining ?? distributingBatch.quantity} boxes remaining.
                 Calculates share dynamically based on total RHU population.
               </p>
+              {(() => {
+                const sameNameBatches = batches.filter(b =>
+                  b.name === distributingBatch.name
+                  && b.id !== distributingBatch.id
+                  && (b.remaining ?? b.quantity) > 0
+                );
+                const better = sameNameBatches.find(b => getExpiryTime(b) < getExpiryTime(distributingBatch));
+                if (!better) return null;
+                return (
+                  <p className="rhu-dist-note" style={{ color: "#b45309", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 10px" }}>
+                    ⚠ Lot {better.lotNumber || "—"} of {better.name} expires sooner ({better.expiryDate || "no expiry set"}) — consider distributing that one first (FEFO).
+                  </p>
+                );
+              })()}
               <div className="rhu-form-field">
                 <label className="rhu-label">Boxes to Distribute</label>
                 <input className="rhu-input" type="number" min="1" placeholder="e.g., 100"

@@ -205,6 +205,7 @@ export default function MidwifeMessages() {
         </nav>
 
         <div className="midwife-sidebar-footer">
+          <NavLink to="/midwife/settings" className={({ isActive }) => "midwife-nav-item midwife-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
           <button className="midwife-nav-item midwife-nav-btn midwife-signout" onClick={handleLogout}>
             Sign Out
           </button>
