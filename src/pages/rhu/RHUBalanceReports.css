@@ -1,0 +1,7 @@
+/* RHUBalanceReports.css
+   This page reuses the shared design-system classes (rhu-layout, rhu-table,
+   rhu-dist-stat-card, cho-input, cho-btn-export-pdf, etc.) that already exist
+   in RHUDistribution.css. Importing it here keeps every class this page uses
+   available, while still giving this page its own dedicated stylesheet file
+   to match the project's one-CSS-per-page convention. */
+@import "./RHUDistribution.css";

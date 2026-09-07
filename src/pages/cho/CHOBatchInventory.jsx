@@ -8,6 +8,7 @@ import {
 import { db } from "../../firebase/config";
 import { runExpiryChecks } from "../../utils/expiryNotifier";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { FHSIS_ANTIGENS, FHSIS_ANTIGEN_ORDER } from "../../utils/fhsisImmunization";
 import "./CHOBatchInventory.css";
 
 const navItems = [
@@ -18,6 +19,7 @@ const navItems = [
   { label: "RHU Management",    to: "/cho/rhu-management"     },
   { label: "Population Report", to: "/cho/population-report"  },
   { label: "Batch Distribution",to: "/cho/batch-distribution" },
+  { label: "Balance Reports",   to: "/cho/balance-reports"    },
   { label: "Reports",           to: "/cho/reports"            },
   { label: "Messages",          to: "/cho/messages"           },
   { label: "Notifications",     to: "/cho/notifications"      },
@@ -58,6 +60,10 @@ export default function CHOBatchInventory() {
   const [quantity, setQuantity] = useState("");
   const [manufactureDate, setManufactureDate] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
+  const [isVaccine, setIsVaccine] = useState(false);
+  const [doseType, setDoseType] = useState("single"); // "single" | "multi"
+  const [dosesPerVial, setDosesPerVial] = useState("");
+  const [fhsisAntigen, setFhsisAntigen] = useState("other");
 
   function handleLogout() { logout(); navigate("/"); }
 
@@ -96,6 +102,7 @@ export default function CHOBatchInventory() {
   function openAddModal() {
     setProductIdInput(""); setLotNumber(""); setQuantity("");
     setManufactureDate(""); setExpiryDate("");
+    setIsVaccine(false); setDoseType("single"); setDosesPerVial(""); setFhsisAntigen("other");
     setShowAddModal(true);
   }
 
@@ -110,6 +117,10 @@ export default function CHOBatchInventory() {
     }
     if (!lotNumber.trim() || !quantity || !manufactureDate || !expiryDate) {
       alert("Please fill in Lot Number, Quantity, Manufacture Date, and Expiry Date.");
+      return;
+    }
+    if (isVaccine && doseType === "multi" && (!dosesPerVial || parseInt(dosesPerVial) <= 0)) {
+      alert("Please enter Doses per Vial for this multi-dose vaccine.");
       return;
     }
     setSaving(true);
@@ -128,8 +139,13 @@ export default function CHOBatchInventory() {
         quantity: qty,
         remaining: qty,
         manufactureDate: manufactureDate, 
+        expiryDate: expiryDate,
         addedDate: currentDateStr,        
         ownerType: "cho",
+        isVaccine,
+        doseType: isVaccine ? doseType : "",
+        fhsisAntigen: isVaccine ? fhsisAntigen : "",
+        dosesPerVial: isVaccine && doseType === "multi" ? parseInt(dosesPerVial) : (isVaccine ? 1 : 0),
         createdBy: user?.uid ?? "",
         createdAt: serverTimestamp(),
       });
@@ -152,18 +168,28 @@ export default function CHOBatchInventory() {
   const months = [...new Set(batches.map(b => b.month).filter(Boolean))].sort().reverse();
 
   // Filter batches by search keyword and dropdown month selection
-  const filteredBatches = batches.filter(b => {
-    const matchesSearch = 
-      (b.name || "").toLowerCase().includes(search.toLowerCase()) ||
-      (b.productId || "").toLowerCase().includes(search.toLowerCase()) ||
-      (b.batchId || "").toLowerCase().includes(search.toLowerCase()) ||
-      (b.lotNumber || "").toLowerCase().includes(search.toLowerCase());
+  const filteredBatches = batches
+    .filter(b => {
+      const matchesSearch = 
+        (b.name || "").toLowerCase().includes(search.toLowerCase()) ||
+        (b.productId || "").toLowerCase().includes(search.toLowerCase()) ||
+        (b.batchId || "").toLowerCase().includes(search.toLowerCase()) ||
+        (b.lotNumber || "").toLowerCase().includes(search.toLowerCase());
 
-    if (selectedMonth === "all") return matchesSearch;
+      if (selectedMonth === "all") return matchesSearch;
 
-    const matchesMonth = b.month === selectedMonth;
-    return matchesSearch && matchesMonth;
-  });
+      const matchesMonth = b.month === selectedMonth;
+      return matchesSearch && matchesMonth;
+    })
+    .slice()
+    .sort((a, b) => {
+      const remA = a.remaining ?? a.quantity ?? 0;
+      const remB = b.remaining ?? b.quantity ?? 0;
+      const aDepleted = remA <= 0;
+      const bDepleted = remB <= 0;
+      if (aDepleted !== bDepleted) return aDepleted ? 1 : -1; // depleted sinks to bottom
+      return 0; // preserve existing relative order otherwise
+    });
 
   const totalRemainingQuantity = filteredBatches.reduce((s, b) => s + ((b.remaining ?? b.quantity) || 0), 0);
   const totalInitialQuantity = filteredBatches.reduce((s, b) => s + (b.quantity || 0), 0);
@@ -190,14 +216,14 @@ export default function CHOBatchInventory() {
                 <NavLink key={item.to} to={item.to}
                   className={({ isActive }) => "cho-nav-item" + (isActive ? " active" : "")}>
                   <span>{item.label}</span>
-                  {item.label === "Notifications" && unreadCount > 0 && (
+                  {item.label === "Notifications" && Boolean(unreadCount) && (
                     <span className="nav-badge">{unreadCount}</span>
                   )}
                 </NavLink>
               ))}
             </nav>
             <div className="cho-sidebar-footer">
-              <NavLink to="/cho/settings" className={({ isActive }) => "cho-nav-item cho-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
+              <NavLink to="/cho/settings" className="cho-nav-item cho-nav-btn">Settings</NavLink>
               <button className="cho-nav-item cho-nav-btn cho-signout" onClick={handleLogout}>Sign out</button>
             </div>
           </aside>
@@ -299,10 +325,15 @@ export default function CHOBatchInventory() {
                               {b.subCategory
                                 ? <span className="cho-subcategory-pill">{b.subCategory}</span>
                                 : "—"}
+                              {b.isVaccine && (
+                                <span className="cho-subcategory-pill" style={{ marginLeft: "4px" }}>
+                                  {b.doseType === "multi" ? `Vaccine · ${b.dosesPerVial}/vial` : "Vaccine · single-dose"}
+                                </span>
+                              )}
                             </td>
                             <td className="cho-product-key">{b.lotNumber || "—"}</td>
-                            <td>{b.quantity} boxes</td>
-                            <td><strong>{remaining} boxes</strong></td>
+                            <td>{b.quantity} {b.isVaccine ? "vials" : "boxes"}</td>
+                            <td><strong>{remaining} {b.isVaccine ? "vials" : "boxes"}</strong></td>
                             <td>{b.manufactureDate || "—"}</td>
                             <td>{b.addedDate || "—"}</td>
                             <td>{b.expiryDate}</td>
@@ -435,6 +466,45 @@ export default function CHOBatchInventory() {
                 <input className="cho-input" type="date"
                   value={expiryDate} onChange={e => setExpiryDate(e.target.value)} />
               </div>
+
+              <h3 className="cho-form-section-title">Vaccine Classification</h3>
+              <div className="cho-form-field">
+                <label className="cho-label" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <input type="checkbox" checked={isVaccine}
+                    onChange={e => setIsVaccine(e.target.checked)} />
+                  This batch is a vaccine (tracked in vials, not boxes)
+                </label>
+              </div>
+              {isVaccine && (
+                <div className="cho-form-row">
+                  <div className="cho-form-field">
+                    <label className="cho-label">Dose Type <span className="cho-required">*</span></label>
+                    <select className="cho-input" value={doseType} onChange={e => setDoseType(e.target.value)}>
+                      <option value="single">Single-dose (1 vial = 1 dose)</option>
+                      <option value="multi">Multi-dose (vial holds several doses)</option>
+                    </select>
+                  </div>
+                  {doseType === "multi" && (
+                    <div className="cho-form-field">
+                      <label className="cho-label">Doses per Vial <span className="cho-required">*</span></label>
+                      <input className="cho-input" type="number" min="1" placeholder="e.g., 10 (measles)"
+                        value={dosesPerVial} onChange={e => setDosesPerVial(e.target.value)} />
+                    </div>
+                  )}
+                  <div className="cho-form-field">
+                    <label className="cho-label">FHSIS Antigen Category</label>
+                    <select className="cho-input" value={fhsisAntigen} onChange={e => setFhsisAntigen(e.target.value)}>
+                      {FHSIS_ANTIGEN_ORDER.map(key => (
+                        <option key={key} value={key}>{FHSIS_ANTIGENS[key].label}</option>
+                      ))}
+                      <option value="other">{FHSIS_ANTIGENS.other.label}</option>
+                    </select>
+                    <p className="cho-form-hint" style={{ marginTop: "4px" }}>
+                      Tags this vaccine for DOH-standard immunization reporting. Choose "Other" if it's not part of the standard EPI schedule.
+                    </p>
+                  </div>
+                </div>
+              )}
               <p className="cho-form-hint"><span className="cho-required">*</span> Required fields</p>
             </div>
             <div className="cho-modal-footer">

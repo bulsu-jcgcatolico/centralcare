@@ -6,13 +6,14 @@ import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
 
 const navItems = [
-  { label: "Dashboard",     to: "/rhu/dashboard"     },
-  { label: "Inventory",     to: "/rhu/inventory"     },
-  { label: "Barangay",      to: "/rhu/barangay"      },
-  { label: "Distribution",  to: "/rhu/distribution"  },
-  { label: "Reports",       to: "/rhu/reports"       },
-  { label: "Messages",      to: "/rhu/messages"      },
-  { label: "Notifications", to: "/rhu/notifications" },
+  { label: "Dashboard",       to: "/rhu/dashboard"         },
+  { label: "Inventory",       to: "/rhu/inventory"         },
+  { label: "Barangay",        to: "/rhu/barangay"          },
+  { label: "Distribution",    to: "/rhu/distribution"      },
+  { label: "Balance Reports", to: "/rhu/balance-reports"   },
+  { label: "Reports",         to: "/rhu/reports"           },
+  { label: "Messages",        to: "/rhu/messages"          },
+  { label: "Notifications",   to: "/rhu/notifications"     },
 ];
 
 export default function RHUNotification() {
@@ -23,6 +24,7 @@ export default function RHUNotification() {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+  const [justReadIds, setJustReadIds] = useState(new Set());
 
   function handleLogout() { logout(); navigate("/"); }
 
@@ -40,7 +42,16 @@ export default function RHUNotification() {
         where("toRhuId", "==", rhuNumber)
       );
       const snap = await getDocs(q);
-      setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setNotifications(list);
+
+      // Opening this page is itself the "read" action, same as Facebook/YouTube
+      // notification panels — the sidebar badge clears as soon as you look.
+      const unread = list.filter(n => !n.read);
+      if (unread.length > 0) {
+        setJustReadIds(new Set(unread.map(n => n.id)));
+        await Promise.all(unread.map(n => updateDoc(doc(db, "notifications", n.id), { read: true })));
+      }
     } catch (err) { console.error(err); }
     setLoading(false);
   }
@@ -51,6 +62,7 @@ export default function RHUNotification() {
         await updateDoc(doc(db, "notifications", n.id), { read: true });
       }
       setNotifications(notifications.map(n => ({ ...n, read: true })));
+      setJustReadIds(new Set());
     } catch (err) { alert("Error: " + err.message); }
   }
 
@@ -67,7 +79,7 @@ export default function RHUNotification() {
     (n.title || "").toLowerCase().includes(search.trim().toLowerCase()) ||
     (n.message || "").toLowerCase().includes(search.trim().toLowerCase())
   );
-  const unreadNum = notifications.filter(n => !n.read).length;
+  const unreadNum = justReadIds.size;
 
   const borderColor = (n) => {
     if (n.type === "low-stock") return n.level === "Critical" ? "#dc2626" : "#d97706";
@@ -93,7 +105,7 @@ export default function RHUNotification() {
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "rhu-nav-item" + (isActive ? " active" : "")}>
               <span>{item.label}</span>
-              {item.label === "Notifications" && unreadCount > 0 && (
+              {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
               )}
             </NavLink>
@@ -183,10 +195,12 @@ export default function RHUNotification() {
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {filtered.map(n => (
+              {filtered.map(n => {
+                const wasUnread = justReadIds.has(n.id);
+                return (
                 <div key={n.id} style={{
-                  background: n.read ? "#f9fafb" : "#eff6ff",
-                  border: `1px solid ${n.read ? "#e5e7eb" : "#bfdbfe"}`,
+                  background: !wasUnread ? "#f9fafb" : "#eff6ff",
+                  border: `1px solid ${!wasUnread ? "#e5e7eb" : "#bfdbfe"}`,
                   borderLeft: `4px solid ${borderColor(n)}`,
                   borderRadius: "10px", padding: "14px 16px",
                   display: "flex", alignItems: "flex-start",
@@ -195,7 +209,7 @@ export default function RHUNotification() {
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
                       <p style={{ fontWeight: "600", color: "#0f172a", margin: 0 }}>{n.title}</p>
-                      {!n.read && (
+                      {wasUnread && (
                         <span style={{ background: "#1a56db", color: "#fff", fontSize: "10px",
                           fontWeight: "700", padding: "2px 8px", borderRadius: "99px" }}>NEW</span>
                       )}
@@ -206,7 +220,8 @@ export default function RHUNotification() {
                     style={{ background: "none", border: "none", color: "#9ca3af",
                       cursor: "pointer", fontSize: "18px", flexShrink: 0 }}>x</button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </main>

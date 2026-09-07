@@ -3,16 +3,18 @@ import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { collection, addDoc, query, where, orderBy, limit, onSnapshot, serverTimestamp, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
+import { useUnreadCount } from "../../hooks/useUnreadCount";
 import "./RHUMessages.css";
 
 const navItems = [
-  { label: "Dashboard",     to: "/rhu/dashboard"     },
-  { label: "Inventory",     to: "/rhu/inventory"     },
-  { label: "Barangay",      to: "/rhu/barangay"      },
-  { label: "Distribution",  to: "/rhu/distribution"  },
-  { label: "Reports",       to: "/rhu/reports"       },
-  { label: "Messages",      to: "/rhu/messages"      },
-  { label: "Notifications", to: "/rhu/notifications" },
+  { label: "Dashboard",       to: "/rhu/dashboard"         },
+  { label: "Inventory",       to: "/rhu/inventory"         },
+  { label: "Barangay",        to: "/rhu/barangay"          },
+  { label: "Distribution",    to: "/rhu/distribution"      },
+  { label: "Balance Reports", to: "/rhu/balance-reports"   },
+  { label: "Reports",         to: "/rhu/reports"           },
+  { label: "Messages",        to: "/rhu/messages"          },
+  { label: "Notifications",   to: "/rhu/notifications"     },
 ];
 
 const RHU_REGISTRY_COLLECTION = "cho_rhu_registry";
@@ -36,6 +38,7 @@ function cleanSenderName(name) {
 export default function RHUMessages() {
   const { logout, userData, user } = useAuth();
   const navigate = useNavigate();
+  const unreadCount = useUnreadCount();
 
   const activeUser = userData || user;
   
@@ -299,6 +302,9 @@ export default function RHUMessages() {
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "rhu-nav-item" + (isActive ? " active" : "")}>
               <span>{item.label}</span>
+              {item.label === "Notifications" && Boolean(unreadCount) && (
+                <span className="nav-badge">{unreadCount}</span>
+              )}
             </NavLink>
           ))}
         </nav>

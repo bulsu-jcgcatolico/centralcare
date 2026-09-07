@@ -3,12 +3,15 @@ import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
   collection, addDoc, getDocs, getDoc, deleteDoc, doc,
-  serverTimestamp, query, where, updateDoc
+  serverTimestamp, query, where, updateDoc, Timestamp
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { checkAndNotifyLowStock } from "../../utils/lowStockNotifier";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
 import { useToast } from "../../context/ToastContext";
+import {
+  getPriorMonthKey, monthKeyLabel, getSubmittedOwnerIds,
+} from "../../utils/monthlyBalance";
 import "./RHUDistribution.css";
 
 const navItems = [
@@ -16,6 +19,7 @@ const navItems = [
   { label: "Inventory",     to: "/rhu/inventory"     },
   { label: "Barangay",      to: "/rhu/barangay"      },
   { label: "Distribution",  to: "/rhu/distribution"  },
+  { label: "Balance Reports", to: "/rhu/balance-reports" },
   { label: "Reports",       to: "/rhu/reports"       },
   { label: "Messages",      to: "/rhu/messages"      },
   { label: "Notifications", to: "/rhu/notifications" },
@@ -27,8 +31,6 @@ const RHU_REGISTRY_COLLECTION = "cho_rhu_registry";
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 // FEFO (First-Expired, First-Out) helpers — same logic as MidwifeDispense.jsx.
-// Items with no expiry are treated as expiring last, so an unknown date never
-// gets falsely recommended over a lot with a known, dated expiry.
 function getExpiryTime(item) {
   if (!item?.expiry) return Infinity;
   const t = new Date(item.expiry).getTime();
@@ -75,14 +77,24 @@ export default function RHUDistribution() {
   const [searchTerm, setSearchTerm]         = useState("");
   const [selectedMonth, setSelectedMonth]   = useState("all"); 
 
+  // Custom Distribution Date State (Defaults to current local YYYY-MM-DD)
+  const [distributeDate, setDistributeDate] = useState(() => new Date().toISOString().split("T")[0]);
+
   // New distribution modal — multi-medicine selection
   const [showNewModal, setShowNewModal]         = useState(false);
   const [selectedItems, setSelectedItems]       = useState({}); // { [inventoryId]: "boxes string" }
-  const [calculatedPlans, setCalculatedPlans]   = useState([]); // [{ inventoryId, item, totalBoxes, dist }]
+  const [pendingFefoItem, setPendingFefoItem] = useState(null); 
+  const [calculatedPlans, setCalculatedPlans]   = useState([]); 
 
   // Review modal
   const [showReviewModal, setShowReviewModal]   = useState(false);
   const [reviewData, setReviewData]             = useState(null);
+
+  // Barangays (midwives) that HAVE submitted their end-of-month "Present End
+  // Balance" report for the most recently completed month. Same rule as
+  // CHO -> RHU, applied one level down: RHU -> Midwife.
+  const [compliantBarangayNames, setCompliantBarangayNames] = useState(new Set());
+  const reportMonthKey = getPriorMonthKey();
 
   function handleLogout() { logout(); navigate("/"); }
 
@@ -91,8 +103,16 @@ export default function RHUDistribution() {
       loadDistributions();
       loadInventory();
       loadAssignedBarangays();
+      loadCompliance();
     }
   }, [userData]);
+
+  async function loadCompliance() {
+    try {
+      const names = await getSubmittedOwnerIds("midwife", reportMonthKey);
+      setCompliantBarangayNames(names);
+    } catch (err) { console.error("Error loading midwife balance compliance:", err); }
+  }
 
   async function loadInventory() {
     try {
@@ -199,17 +219,43 @@ export default function RHUDistribution() {
   function resetNewModal() {
     setSelectedItems({});
     setCalculatedPlans([]);
+    setPendingFefoItem(null);
+    setDistributeDate(new Date().toISOString().split("T")[0]);
   }
 
   function calculatePlans() {
     const entries = Object.entries(selectedItems);
     if (entries.length === 0) { showToast("Select at least one medicine to distribute.", "error"); return; }
 
-    const activeBarangays = barangays.filter(b => b.population > 0);
-    const populationSum = activeBarangays.reduce((s, b) => s + b.population, 0);
-
-    if (activeBarangays.length === 0 || populationSum <= 0) {
+    const populationBarangays = barangays.filter(b => b.population > 0);
+    if (populationBarangays.length === 0) {
       showToast("No assigned barangay has a valid population set yet. Update population numbers in the Barangay module first.", "error");
+      return;
+    }
+
+    // Validation rule: a Midwife/barangay must have submitted its "Present
+    // End Balance" report for the month that just ended before this RHU can
+    // send it a new replenishment.
+    const activeBarangays = populationBarangays.filter(b => compliantBarangayNames.has(String(b.name).trim().toLowerCase()));
+    const skippedBarangays = populationBarangays.filter(b => !compliantBarangayNames.has(String(b.name).trim().toLowerCase()));
+
+    if (activeBarangays.length === 0) {
+      showToast(
+        `No barangay is eligible for replenishment yet — none have submitted their ${monthKeyLabel(reportMonthKey)} end-balance report.`,
+        "error"
+      );
+      return;
+    }
+    if (skippedBarangays.length > 0) {
+      showToast(
+        `Skipping ${skippedBarangays.map(b => b.name).join(", ")} — missing ${monthKeyLabel(reportMonthKey)} end-balance report.`,
+        "error"
+      );
+    }
+
+    const populationSum = activeBarangays.reduce((s, b) => s + b.population, 0);
+    if (populationSum <= 0) {
+      showToast("Eligible barangays have no valid population set.", "error");
       return;
     }
 
@@ -253,6 +299,15 @@ export default function RHUDistribution() {
     if (calculatedPlans.length === 0) return;
     setSaving(true);
     try {
+      // Parse the custom distribution date
+      const selectedDateObj = new Date(distributeDate + "T00:00:00");
+      const formattedDate = selectedDateObj.toLocaleDateString("en-US", {
+        month: "2-digit",
+        day: "2-digit",
+        year: "numeric"
+      });
+      const customTimestamp = Timestamp.fromDate(selectedDateObj);
+
       for (const plan of calculatedPlans) {
         const docRef = await addDoc(collection(db, "rhu_distributions"), {
           fromType:             "rhu",
@@ -265,12 +320,16 @@ export default function RHUDistribution() {
           subCategory:          plan.item.subCategory ?? "",
           lotNumber:            plan.item.lotNumber ?? "",
           expiry:               plan.item.expiry ?? "",
+          isVaccine:            !!plan.item.isVaccine,
+          doseType:             plan.item.doseType ?? "",
+          dosesPerVial:         plan.item.dosesPerVial ?? 0,
+          fhsisAntigen:         plan.item.fhsisAntigen ?? "",
           totalBoxes:           plan.totalBoxes,
           barangayDistribution: plan.dist,
           status:               "Pending",
           createdBy:            user?.uid ?? "",
-          createdAt:            serverTimestamp(),
-          date:                 new Date().toLocaleDateString()
+          createdAt:            customTimestamp,
+          date:                 formattedDate
         });
 
         const newRemaining = (plan.item.remaining ?? plan.item.quantity) - plan.totalBoxes;
@@ -316,6 +375,10 @@ export default function RHUDistribution() {
 
       const b = updated.find(b => b.id === barangayId);
 
+      // Preserve distribution date timestamp for midwife inventory record
+      const distDateObj = dist.date ? new Date(dist.date) : new Date();
+      const recordTimestamp = isNaN(distDateObj.getTime()) ? serverTimestamp() : Timestamp.fromDate(distDateObj);
+
       await addDoc(collection(db, "inventory"), {
         productKey:     dist.productKey ?? "",
         name:           dist.medicineName,
@@ -332,7 +395,11 @@ export default function RHUDistribution() {
         fromRhuName:    userData?.rhuName ?? "",
         distributionId: dist.id,
         receivedStatus: "Accepted",
-        createdAt:      serverTimestamp(),
+        isVaccine:      !!dist.isVaccine,
+        doseType:       dist.doseType ?? "",
+        dosesPerVial:   dist.dosesPerVial ?? 0,
+        fhsisAntigen:   dist.fhsisAntigen ?? "",
+        createdAt:      recordTimestamp,
       });
 
       await addDoc(collection(db, "notifications"), {
@@ -363,6 +430,9 @@ export default function RHUDistribution() {
         status: "Completed"
       });
 
+      const distDateObj = dist.date ? new Date(dist.date) : new Date();
+      const recordTimestamp = isNaN(distDateObj.getTime()) ? serverTimestamp() : Timestamp.fromDate(distDateObj);
+
       for (const b of updated) {
         await addDoc(collection(db, "inventory"), {
           productKey:     dist.productKey ?? "",
@@ -380,7 +450,11 @@ export default function RHUDistribution() {
           fromRhuName:    userData?.rhuName ?? "",
           distributionId: dist.id,
           receivedStatus: "Accepted",
-          createdAt:      serverTimestamp(),
+          isVaccine:      !!dist.isVaccine,
+          doseType:       dist.doseType ?? "",
+          dosesPerVial:   dist.dosesPerVial ?? 0,
+          fhsisAntigen:   dist.fhsisAntigen ?? "",
+          createdAt:      recordTimestamp,
         });
 
         await addDoc(collection(db, "notifications"), {
@@ -438,6 +512,35 @@ export default function RHUDistribution() {
   const totalAssignedPopulation = barangays.reduce((sum, b) => sum + b.population, 0);
   const periodLabel = selectedMonth === "all" ? "All time" : selectedMonth;
 
+  const distributableInventory = inventory.filter(i => (i.remaining ?? i.quantity ?? 0) > 0);
+  const fefoGroups = {};
+  distributableInventory.forEach(item => {
+    const key = item.name || "Unnamed";
+    if (!fefoGroups[key]) fefoGroups[key] = [];
+    fefoGroups[key].push(item);
+  });
+  Object.keys(fefoGroups).forEach(name => { fefoGroups[name] = sortByFEFO(fefoGroups[name]); });
+
+  function handleMedicineCheck(item, checked) {
+    if (checked) {
+      const group = fefoGroups[item.name || "Unnamed"] || [];
+      const recommended = group[0];
+      const needsWarning = recommended
+        && recommended.id !== item.id
+        && (recommended.remaining ?? recommended.quantity ?? 0) > 0;
+      if (needsWarning) {
+        setPendingFefoItem({ item, recommended });
+        return;
+      }
+    }
+    toggleMedicine(item.id, checked);
+  }
+
+  function confirmFefoAndProceed() {
+    toggleMedicine(pendingFefoItem.item.id, true);
+    setPendingFefoItem(null);
+  }
+
   return (
     <div>
       {/* ════════════════════ NORMAL SCREEN VIEW ════════════════════ */}
@@ -483,10 +586,15 @@ export default function RHUDistribution() {
                 aria-label="Search" />
 
               <div className="rhu-topbar-right">
-                <button className="rhu-notif-btn" aria-label="Notifications">
+                <button className="rhu-notif-btn" aria-label="Notifications" onClick={() => navigate("/rhu/notifications")} style={{ position: "relative" }}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20">
                     <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                   </svg>
+                  {Boolean(unreadCount) && (
+                    <span className="nav-badge" style={{ position: "absolute", top: "-4px", right: "-4px" }}>
+                      {unreadCount}
+                    </span>
+                  )}
                 </button>
                 <div className="rhu-user">
                   <div className="rhu-user-info">
@@ -526,6 +634,9 @@ export default function RHUDistribution() {
                 <div className="rhu-page-header-actions">
                   <button className="rhu-btn-secondary" onClick={() => navigate("/rhu/barangay")}>
                     Manage Barangays
+                  </button>
+                  <button className="rhu-btn-secondary" onClick={() => navigate("/rhu/balance-reports")}>
+                    Review Midwife Balance Reports
                   </button>
                   <button className="rhu-btn-primary" onClick={() => setShowNewModal(true)}>
                     New Distribution
@@ -707,6 +818,33 @@ export default function RHUDistribution() {
         </div>
       </div>
 
+      {pendingFefoItem && (
+        <div className="rhu-modal-overlay" style={{ zIndex: 1100 }} onClick={() => setPendingFefoItem(null)}>
+          <div className="rhu-modal" style={{ maxWidth: "440px" }} onClick={e => e.stopPropagation()}>
+            <div className="rhu-modal-header">
+              <h2 className="rhu-modal-title">⚠ Not the recommended lot</h2>
+              <button className="rhu-modal-close" aria-label="Close" onClick={() => setPendingFefoItem(null)}>×</button>
+            </div>
+            <div className="rhu-modal-body">
+              <p className="rhu-dist-note">
+                Lot <strong>{pendingFefoItem.recommended.lotNumber || "—"}</strong> of {pendingFefoItem.item.name} {
+                  formatExpiry(pendingFefoItem.recommended.expiry) === formatExpiry(pendingFefoItem.item.expiry)
+                    ? "expires on the same date but is"
+                    : `expires sooner (${formatExpiry(pendingFefoItem.recommended.expiry)}) and is`
+                } the recommended lot to distribute first (FEFO).
+              </p>
+              <p className="rhu-dist-note" style={{ marginTop: "8px" }}>
+                You're about to select Lot <strong>{pendingFefoItem.item.lotNumber || "—"}</strong> instead. Continue anyway?
+              </p>
+            </div>
+            <div className="rhu-modal-footer">
+              <button className="rhu-btn-secondary" onClick={() => setPendingFefoItem(null)}>Cancel</button>
+              <button className="rhu-btn-primary" onClick={confirmFefoAndProceed}>Continue Anyway</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── New Distribution Modal (multi-medicine) ── */}
       {showNewModal && (
         <div className="rhu-modal-overlay" onClick={() => { setShowNewModal(false); resetNewModal(); }}>
@@ -717,6 +855,19 @@ export default function RHUDistribution() {
             </div>
             <div className="rhu-modal-body">
 
+              <div style={{ marginBottom: "16px" }}>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "4px" }}>
+                  Distribution Date
+                </label>
+                <input
+                  type="date"
+                  className="cho-input"
+                  value={distributeDate}
+                  onChange={e => setDistributeDate(e.target.value)}
+                  style={{ width: "100%", maxWidth: "220px" }}
+                />
+              </div>
+
               <p className="rhu-dist-note">Select one or more medicines and enter how many boxes of each to distribute.</p>
               <p style={{ fontSize: "12px", color: "#6b7280", margin: "-4px 0 10px" }}>
                 ★ marks the lot expiring soonest for each medicine — distribute that one first (FEFO).
@@ -724,28 +875,26 @@ export default function RHUDistribution() {
 
               <div className="rhu-med-select-list">
                 {(() => {
-                  const fefoGroups = {};
-                  inventory.forEach(item => {
-                    const key = item.name || "Unnamed";
-                    if (!fefoGroups[key]) fefoGroups[key] = [];
-                    fefoGroups[key].push(item);
-                  });
-                  Object.keys(fefoGroups).forEach(name => { fefoGroups[name] = sortByFEFO(fefoGroups[name]); });
                   const sortedInventory = Object.keys(fefoGroups)
                     .sort((a, b) => a.localeCompare(b))
                     .flatMap(name => fefoGroups[name]);
 
-                  return sortedInventory.map((item, i, arr) => {
+                  return sortedInventory.map((item) => {
                     const checked = item.id in selectedItems;
                     const avail = item.remaining ?? item.quantity;
-                    const isEarliestInGroup = fefoGroups[item.name || "Unnamed"][0]?.id === item.id;
+                    const group = fefoGroups[item.name || "Unnamed"] || [];
+                    const isEarliestInGroup = group[0]?.id === item.id;
                     return (
-                      <div className={`rhu-med-select-row ${checked ? "rhu-med-select-row--active" : ""}`} key={item.id}>
+                      <div
+                        className={`rhu-med-select-row ${checked ? "rhu-med-select-row--active" : ""}`}
+                        style={isEarliestInGroup ? { background: "#fffbeb" } : undefined}
+                        key={item.id}
+                      >
                         <label className="rhu-med-checkbox-label">
                           <input
                             type="checkbox"
                             checked={checked}
-                            onChange={e => toggleMedicine(item.id, e.target.checked)}
+                            onChange={e => handleMedicineCheck(item, e.target.checked)}
                           />
                           <span className="rhu-med-checkbox-text">
                             <strong>{isEarliestInGroup ? "★ " : ""}{item.name} — Lot {item.lotNumber || "—"}</strong>
@@ -770,7 +919,7 @@ export default function RHUDistribution() {
                     );
                   });
                 })()}
-                {inventory.length === 0 && (
+                {distributableInventory.length === 0 && (
                   <p className="rhu-dist-note">No accepted medicines in inventory available for distribution.</p>
                 )}
               </div>
@@ -796,6 +945,10 @@ export default function RHUDistribution() {
                   })}
                 </div>
               </div>
+
+              <p className="rhu-dist-note" style={{ color: compliantBarangayNames.size < barangays.filter(b => b.population > 0).length ? "#b45309" : "#166534" }}>
+                {compliantBarangayNames.size} of {barangays.filter(b => b.population > 0).length} population-registered barangays have submitted their {monthKeyLabel(reportMonthKey)} end-balance report and are eligible for this replenishment.
+              </p>
 
               <button className="rhu-btn-secondary rhu-calc-btn" onClick={calculatePlans}>
                 Calculate

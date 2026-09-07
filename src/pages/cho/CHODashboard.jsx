@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { buildForecastList, getUrgentForecasts, FIELD_MAPS } from "../../utils/stockForecast";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -18,6 +19,7 @@ const navItems = [
   { label: "RHU Management",    to: "/cho/rhu-management"     },
   { label: "Population Report", to: "/cho/population-report"  },
   { label: "Batch Distribution",to: "/cho/batch-distribution" },
+  { label: "Balance Reports",   to: "/cho/balance-reports"    },
   { label: "Reports",           to: "/cho/reports"            },
   { label: "Messages",          to: "/cho/messages"           },
   { label: "Notifications",     to: "/cho/notifications"      },
@@ -33,6 +35,7 @@ export default function CHODashboard() {
   const [inventory, setInventory] = useState([]);
   const [distributions, setDistributions] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [choBatches, setChoBatches] = useState([]);
   const [totalMalolosPopulation, setTotalMalolosPopulation] = useState(0);
   const [loading, setLoading] = useState(false);
 
@@ -43,15 +46,21 @@ export default function CHODashboard() {
   async function loadData() {
     setLoading(true);
     try {
-      const [invSnap, distSnap, notifSnap, barangaySnap] = await Promise.all([
+      const [invSnap, distSnap, notifSnap, barangaySnap, choBatchSnap] = await Promise.all([
         getDocs(collection(db, "inventory")),
         getDocs(query(collection(db, "distributions"), where("fromType", "==", "cho"))),
         getDocs(query(collection(db, "notifications"), where("fromType", "==", "cho"))),
-        getDocs(collection(db, "cho_barangays"))
+        getDocs(collection(db, "cho_barangays")),
+        getDocs(query(
+          collection(db, "cho_batches"),
+          where("ownerType", "==", "cho"),
+          where("status", "==", "Accepted")
+        ))
       ]);
       setInventory(invSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setDistributions(distSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setNotifications(notifSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setChoBatches(choBatchSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
       const totalPop = barangaySnap.docs.reduce((sum, doc) => {
         const data = doc.data();
@@ -70,6 +79,28 @@ export default function CHODashboard() {
     const days = (new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24);
     return days <= 30 && days >= 0;
   });
+
+  // Predictive stock-out forecast for CHO's OWN batch stock (cho_batches),
+  // not the system-wide `inventory` collection above (that's RHU/Midwife
+  // stock). "Consumption" here is what CHO distributes out to RHUs.
+  // Batches are aggregated by medicine name first since a medicine can have
+  // several lots — the forecast is one row per medicine, matching how
+  // `distributions` also logs by medicine name without lot granularity.
+  const choStockByMedicine = {};
+  choBatches.forEach(b => {
+    const key = b.name;
+    if (!choStockByMedicine[key]) {
+      choStockByMedicine[key] = { id: key, name: b.name, remaining: 0, expiry: b.expiryDate, isVaccine: !!b.isVaccine };
+    }
+    choStockByMedicine[key].remaining += Number(b.remaining ?? b.quantity ?? 0);
+    // Track the soonest-expiring lot for this medicine's waste-risk check.
+    if (b.expiryDate && (!choStockByMedicine[key].expiry || new Date(b.expiryDate) < new Date(choStockByMedicine[key].expiry))) {
+      choStockByMedicine[key].expiry = b.expiryDate;
+    }
+  });
+  const choStockList = Object.values(choStockByMedicine);
+  const forecastList = buildForecastList(choStockList, distributions, [], FIELD_MAPS.cho);
+  const urgentForecasts = getUrgentForecasts(forecastList, 5);
 
   const categoryMap = {};
   inventory.forEach(i => {
@@ -134,7 +165,7 @@ export default function CHODashboard() {
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "cho-nav-item" + (isActive ? " active" : "")}>
               <span>{item.label}</span>
-              {item.label === "Notifications" && unreadCount > 0 && (
+              {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
               )}
             </NavLink>
@@ -152,10 +183,15 @@ export default function CHODashboard() {
             placeholder="Search medical supplies, RHUs, or records..."
             value={search} onChange={e => setSearch(e.target.value)} />
           <div className="cho-topbar-right">
-            <button className="cho-notif-btn">
+            <button className="cho-notif-btn" onClick={() => navigate("/cho/notifications")} style={{ position: "relative" }}>
               <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
                 <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
               </svg>
+              {Boolean(unreadCount) && (
+                <span className="nav-badge" style={{ position: "absolute", top: "-4px", right: "-4px" }}>
+                  {unreadCount}
+                </span>
+              )}
             </button>
             <div className="cho-user">
               <div className="cho-user-info">
@@ -237,6 +273,44 @@ export default function CHODashboard() {
                       </div>
                     </div>
                     <span className="cho-notif-time">{n.date || "—"}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Predicted Stock-Outs */}
+          <section className="cho-section">
+            <div className="cho-section-hd">
+              <h2 className="cho-section-title">Predicted Stock-Outs</h2>
+              <NavLink to="/cho/batch-inventory" className="cho-view-all">View Inventory</NavLink>
+            </div>
+            {urgentForecasts.length === 0 ? (
+              <div className="cho-empty-small">
+                <p>No items are trending toward a stock-out based on the last 30 days of distribution activity.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {urgentForecasts.map(f => (
+                  <div key={f.itemId} style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "12px 14px", borderRadius: "8px",
+                    background: f.status === "critical" ? "#fef2f2" : "#fffbeb",
+                    border: `1px solid ${f.status === "critical" ? "#fecaca" : "#fde68a"}`,
+                  }}>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: 600, color: "#0f172a" }}>{f.name}{f.isVaccine ? " 💉" : ""}</p>
+                      <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#6b7280" }}>
+                        {f.remaining} boxes remaining · ~{f.dailyRate.toFixed(1)}/day
+                        {f.wasteRisk && <span style={{ color: "#b45309" }}> · will expire before running out</span>}
+                      </p>
+                    </div>
+                    <span style={{
+                      fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "99px",
+                      background: f.status === "critical" ? "#dc2626" : "#d97706", color: "#fff",
+                    }}>
+                      ~{Math.round(f.daysRemaining)} days left
+                    </span>
                   </div>
                 ))}
               </div>

@@ -8,13 +8,13 @@ import { useAuth } from "../../context/AuthContext";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
 import { useToast } from "../../context/ToastContext";
 import "./MidwifeAddPatient.css";
-
 const navItems = [
   { label: "Dashboard",     to: "/midwife/dashboard"     },
   { label: "Patients",      to: "/midwife/patients"      },
   { label: "Inventory",     to: "/midwife/inventory"     },
   { label: "Dispense",      to: "/midwife/dispense"      },
   { label: "Reports",       to: "/midwife/reports"       },
+  { label: "BHW & Campaigns", to: "/midwife/bhw"         },
   { label: "Messages",      to: "/midwife/messages"      },
   { label: "Notifications", to: "/midwife/notifications" },
 ];
@@ -263,7 +263,7 @@ export default function MidwifeAddPatient(props) {
                 className={function (navInfo) { return "midwife-nav-item" + (navInfo.isActive ? " active" : ""); }}
               >
                 <span>{item.label}</span>
-                {item.label === "Notifications" && unreadCount > 0 && (
+                {item.label === "Notifications" && Boolean(unreadCount) && (
                   <span className="nav-badge">{unreadCount}</span>
                 )}
               </NavLink>

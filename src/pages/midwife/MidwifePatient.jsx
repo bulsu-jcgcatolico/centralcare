@@ -11,13 +11,14 @@ import { useToast } from "../../context/ToastContext";
 import "./MidwifePatient.css";
 
 const navItems = [
-  { label: "Dashboard",     to: "/midwife/dashboard"      },
-  { label: "Patients",      to: "/midwife/patients"       },
-  { label: "Inventory",     to: "/midwife/inventory"      },
+  { label: "Dashboard",     to: "/midwife/dashboard"     },
+  { label: "Patients",      to: "/midwife/patients"      },
+  { label: "Inventory",     to: "/midwife/inventory"     },
   { label: "Dispense",      to: "/midwife/dispense"      },
-  { label: "Reports",       to: "/midwife/reports"        },
+  { label: "Reports",       to: "/midwife/reports"       },
+  { label: "BHW & Campaigns", to: "/midwife/bhw"         },
   { label: "Messages",      to: "/midwife/messages"      },
-  { label: "Notifications", to: "/midwife/notifications"  },
+  { label: "Notifications", to: "/midwife/notifications" },
 ];
 
 export default function MidwifePatients() {
@@ -219,7 +220,7 @@ export default function MidwifePatients() {
               className={({ isActive }) => "midwife-nav-item" + (isActive ? " active" : "")}
             >
               <span>{item.label}</span>
-              {item.label === "Notifications" && unreadCount > 0 && (
+              {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
               )}
             </NavLink>
@@ -244,10 +245,15 @@ export default function MidwifePatients() {
             onChange={(e) => setSearch(e.target.value)}
           />
           <div className="midwife-topbar-right">
-            <button className="midwife-notif-btn">
+            <button className="midwife-notif-btn" onClick={() => navigate("/midwife/notifications")} style={{ position: "relative" }}>
               <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
                 <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
               </svg>
+              {Boolean(unreadCount) && (
+                <span className="nav-badge" style={{ position: "absolute", top: "-4px", right: "-4px" }}>
+                  {unreadCount}
+                </span>
+              )}
             </button>
             <div className="midwife-user">
               <div className="midwife-user-info">

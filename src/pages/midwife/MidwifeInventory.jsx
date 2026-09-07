@@ -10,6 +10,11 @@ import { db } from "../../firebase/config";
 import { checkAndNotifyLowStock } from "../../utils/lowStockNotifier";
 import { runExpiryChecks } from "../../utils/expiryNotifier";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { FHSIS_ANTIGENS, FHSIS_ANTIGEN_ORDER } from "../../utils/fhsisImmunization";
+import {
+  getPriorMonthKey, monthKeyLabel, hasSubmittedBalance,
+  buildBalanceItemsFromInventory, submitBalanceReport,
+} from "../../utils/monthlyBalance";
 import "./MidwifeInventory.css";
 
 const navItems = [
@@ -18,6 +23,7 @@ const navItems = [
   { label: "Inventory",     to: "/midwife/inventory"     },
   { label: "Dispense",      to: "/midwife/dispense"      },
   { label: "Reports",       to: "/midwife/reports"       },
+  { label: "BHW & Campaigns", to: "/midwife/bhw"         },
   { label: "Messages",      to: "/midwife/messages"      },
   { label: "Notifications", to: "/midwife/notifications" },
 ];
@@ -58,6 +64,18 @@ export default function MidwifeInventory() {
   const [shipBoxes, setShipBoxes]                 = useState("");
   const [shipExpiry, setShipExpiry]               = useState("");
   const [shipSource, setShipSource]               = useState("");
+  const [shipIsVaccine, setShipIsVaccine]         = useState(false);
+  const [shipDoseType, setShipDoseType]           = useState("single");
+  const [shipDosesPerVial, setShipDosesPerVial]   = useState("");
+  const [shipFhsisAntigen, setShipFhsisAntigen]   = useState("other");
+
+  // "Present End Balance" monthly report — mandatory before this barangay's
+  // RHU will replenish it again.
+  const [showBalanceModal, setShowBalanceModal] = useState(false);
+  const [balanceAlreadySubmitted, setBalanceAlreadySubmitted] = useState(false);
+  const [checkingBalance, setCheckingBalance] = useState(true);
+  const [submittingBalance, setSubmittingBalance] = useState(false);
+  const reportMonthKey = getPriorMonthKey();
 
   // Confirm Receipt modal
   const [showReceiveModal, setShowReceiveModal] = useState(false);
@@ -69,6 +87,38 @@ export default function MidwifeInventory() {
   function handleLogout() { logout(); navigate("/"); }
 
   useEffect(() => { loadInventory(); }, [userData]);
+  useEffect(() => { checkBalanceStatus(); }, [userData]);
+
+  const ownerBarangayId = userData?.barangayName || userData?.barangay || "";
+
+  async function checkBalanceStatus() {
+    if (!ownerBarangayId) return;
+    setCheckingBalance(true);
+    try {
+      const submitted = await hasSubmittedBalance("midwife", ownerBarangayId, reportMonthKey);
+      setBalanceAlreadySubmitted(submitted);
+    } catch (err) { console.error("Error checking balance report status:", err); }
+    setCheckingBalance(false);
+  }
+
+  async function handleSubmitBalanceReport() {
+    setSubmittingBalance(true);
+    try {
+      const items = buildBalanceItemsFromInventory(activeInventory);
+      await submitBalanceReport({
+        ownerType: "midwife",
+        ownerId: ownerBarangayId,
+        ownerName: ownerBarangayId,
+        monthKey: reportMonthKey,
+        items,
+        submittedBy: userData?.username || "",
+      });
+      showToast(`${monthKeyLabel(reportMonthKey)} end balance report submitted. Your RHU can now review it before your next replenishment.`, "success");
+      setBalanceAlreadySubmitted(true);
+      setShowBalanceModal(false);
+    } catch (err) { showToast("Error: " + err.message, "error"); }
+    setSubmittingBalance(false);
+  }
 
   async function loadInventory() {
     setLoading(true);
@@ -144,6 +194,10 @@ export default function MidwifeInventory() {
           ownerType:     "midwife",
           receivedStatus: "Received", // Manual entries default to active/received
           barangayName:  userData?.barangayName || userData?.barangay || "",
+          isVaccine:     shipIsVaccine,
+          doseType:      shipIsVaccine ? shipDoseType : "",
+          dosesPerVial:  shipIsVaccine && shipDoseType === "multi" ? (parseInt(shipDosesPerVial) || 1) : (shipIsVaccine ? 1 : 0),
+          fhsisAntigen:  shipIsVaccine ? shipFhsisAntigen : "",
           createdAt:     serverTimestamp(),
         });
         showToast("Shipment logged successfully!", "success");
@@ -151,6 +205,7 @@ export default function MidwifeInventory() {
 
       setShipProductName(""); setShipLotNumber(""); setShipCategory("General Consumption");
       setShipSubCategory(""); setShipBoxes(""); setShipExpiry(""); setShipSource("");
+      setShipIsVaccine(false); setShipDoseType("single"); setShipDosesPerVial(""); setShipFhsisAntigen("other");
       setShowShipmentModal(false);
       loadInventory();
     } catch (err) { showToast("Error: " + err.message, "error"); }
@@ -204,9 +259,20 @@ export default function MidwifeInventory() {
 
   // For the actual table rows rendered
   const currentList = activeTab === "active" ? activeInventory : pendingInventory;
-  const filtered = currentList.filter(i =>
-    i.name?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = currentList
+    .filter(i => i.name?.toLowerCase().includes(search.toLowerCase()))
+    .slice()
+    .sort((a, b) => {
+      // Only reorder within Active Stock — pending shipments don't have a
+      // "depleted" concept, so leave that tab's order untouched.
+      if (activeTab !== "active") return 0;
+      const remA = a.remaining ?? a.quantity ?? 0;
+      const remB = b.remaining ?? b.quantity ?? 0;
+      const aDepleted = remA <= 0;
+      const bDepleted = remB <= 0;
+      if (aDepleted !== bDepleted) return aDepleted ? 1 : -1; // depleted sinks to bottom
+      return 0; // preserve existing relative order otherwise
+    });
 
   const lowStockCount   = activeInventory.filter(i => (i.remaining ?? 0) <= 50 && (i.remaining ?? 0) > 20).length;
   const criticalCount   = activeInventory.filter(i => (i.remaining ?? 0) <= 20).length;
@@ -239,14 +305,14 @@ export default function MidwifeInventory() {
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "midwife-nav-item" + (isActive ? " active" : "")}>
               <span>{item.label}</span>
-              {item.label === "Notifications" && unreadCount > 0 && (
+              {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
               )}
             </NavLink>
           ))}
         </nav>
         <div className="midwife-sidebar-footer">
-          <NavLink to="/midwife/settings" className={({ isActive }) => "midwife-nav-item midwife-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
+          <NavLink to="/midwife/settings" className="midwife-nav-item midwife-nav-btn">Settings</NavLink>
           <button className="midwife-nav-item midwife-nav-btn midwife-signout" onClick={handleLogout}>
             Sign Out
           </button>
@@ -382,11 +448,30 @@ export default function MidwifeInventory() {
               <button className="midwife-btn-secondary" onClick={() => setShowShipmentModal(true)}>
                 Log New Shipment
               </button>
+              <button
+                className="midwife-btn-secondary"
+                onClick={() => setShowBalanceModal(true)}
+                disabled={checkingBalance || balanceAlreadySubmitted}
+                title={balanceAlreadySubmitted ? `${monthKeyLabel(reportMonthKey)} report already submitted` : ""}
+              >
+                {balanceAlreadySubmitted ? `✓ ${monthKeyLabel(reportMonthKey)} Balance Submitted` : `Submit ${monthKeyLabel(reportMonthKey)} End Balance`}
+              </button>
               <button className="midwife-btn-secondary" onClick={() => showToast("CSV export isn't built yet — coming soon.", "info")}>
                 Export
               </button>
             </div>
           </div>
+
+          {!checkingBalance && !balanceAlreadySubmitted && (
+            <div className="midwife-empty-state" style={{ background: "#fff7ed", border: "1px solid #fed7aa", padding: "12px 16px", marginBottom: "1.25rem", textAlign: "left" }}>
+              <p style={{ margin: 0, color: "#9a3412", fontWeight: 600 }}>
+                Present End Balance report for {monthKeyLabel(reportMonthKey)} is missing.
+              </p>
+              <p style={{ margin: "4px 0 0", color: "#9a3412", fontSize: "0.9rem" }}>
+                Your RHU won't include this barangay in the next replenishment split until this month-end movement report is submitted.
+              </p>
+            </div>
+          )}
 
           {loading ? (
             <div className="midwife-empty-state"><p>Loading inventory...</p></div>
@@ -555,6 +640,41 @@ export default function MidwifeInventory() {
                     value={shipExpiry} onChange={e => setShipExpiry(e.target.value)} />
                 </div>
               </div>
+
+              <h3 className="midwife-form-section-title">Vaccine Classification</h3>
+              <div className="midwife-form-field">
+                <label className="midwife-label" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <input type="checkbox" checked={shipIsVaccine} onChange={e => setShipIsVaccine(e.target.checked)} />
+                  This item is a vaccine (tracked in vials, not boxes)
+                </label>
+              </div>
+              {shipIsVaccine && (
+                <div className="midwife-form-row">
+                  <div className="midwife-form-field">
+                    <label className="midwife-label">Dose Type</label>
+                    <select className="midwife-input" value={shipDoseType} onChange={e => setShipDoseType(e.target.value)}>
+                      <option value="single">Single-dose (1 vial = 1 dose)</option>
+                      <option value="multi">Multi-dose (vial holds several doses)</option>
+                    </select>
+                  </div>
+                  {shipDoseType === "multi" && (
+                    <div className="midwife-form-field">
+                      <label className="midwife-label">Doses per Vial</label>
+                      <input className="midwife-input" type="number" min="1" placeholder="e.g., 10"
+                        value={shipDosesPerVial} onChange={e => setShipDosesPerVial(e.target.value)} />
+                    </div>
+                  )}
+                  <div className="midwife-form-field">
+                    <label className="midwife-label">FHSIS Antigen Category</label>
+                    <select className="midwife-input" value={shipFhsisAntigen} onChange={e => setShipFhsisAntigen(e.target.value)}>
+                      {FHSIS_ANTIGEN_ORDER.map(key => (
+                        <option key={key} value={key}>{FHSIS_ANTIGENS[key].label}</option>
+                      ))}
+                      <option value="other">{FHSIS_ANTIGENS.other.label}</option>
+                    </select>
+                  </div>
+                </div>
+              )}
               <p className="midwife-form-hint"><span className="midwife-required">*</span> Required fields</p>
             </div>
             <div className="midwife-modal-footer">
@@ -595,6 +715,53 @@ export default function MidwifeInventory() {
               <button className="midwife-btn-secondary" onClick={() => setShowReceiveModal(false)}>Cancel</button>
               <button className="midwife-btn-primary" onClick={confirmReceipt} disabled={receiving}>
                 {receiving ? "Confirming..." : "Confirm Receipt"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBalanceModal && (
+        <div className="midwife-modal-overlay" onClick={() => setShowBalanceModal(false)}>
+          <div className="midwife-modal midwife-modal--wide" onClick={e => e.stopPropagation()}>
+            <div className="midwife-modal-header">
+              <h2 className="midwife-modal-title">Present End Balance — {monthKeyLabel(reportMonthKey)}</h2>
+              <button className="midwife-modal-close" aria-label="Close" onClick={() => setShowBalanceModal(false)}>×</button>
+            </div>
+            <div className="midwife-modal-body">
+              <p className="midwife-input-hint" style={{ marginBottom: "0.75rem" }}>
+                This snapshot of {activeInventory.length} active item(s) — opening stock, amount dispensed, and end balance —
+                goes to your RHU so they can review slow-moving stock before approving your next replenishment.
+              </p>
+              <div style={{ maxHeight: "360px", overflowY: "auto", overflowX: "hidden", border: "1px solid #e5e7eb", borderRadius: "8px" }}>
+                <table className="midwife-table" style={{ width: "100%", tableLayout: "fixed" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ width: "36%" }}>Item</th>
+                      <th style={{ width: "14%" }}>Opening</th>
+                      <th style={{ width: "16%" }}>Dispensed</th>
+                      <th style={{ width: "16%" }}>End Balance</th>
+                      <th style={{ width: "18%" }}>Movement</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {buildBalanceItemsFromInventory(activeInventory).map(it => (
+                      <tr key={it.itemId}>
+                        <td style={{ padding: "8px 10px", wordBreak: "break-word" }}>{it.name}{it.lotNumber ? ` (Lot ${it.lotNumber})` : ""}</td>
+                        <td style={{ padding: "8px 10px" }}>{it.openingBalance}</td>
+                        <td style={{ padding: "8px 10px" }}>{it.dispensed}</td>
+                        <td style={{ padding: "8px 10px" }}><strong>{it.endBalance}</strong></td>
+                        <td style={{ padding: "8px 10px", color: it.movementRate < 20 ? "#b91c1c" : "#166534" }}>{it.movementRate}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="midwife-modal-footer">
+              <button className="midwife-btn-secondary" onClick={() => setShowBalanceModal(false)}>Cancel</button>
+              <button className="midwife-btn-primary" onClick={handleSubmitBalanceReport} disabled={submittingBalance}>
+                {submittingBalance ? "Submitting..." : "Submit to RHU"}
               </button>
             </div>
           </div>

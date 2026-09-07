@@ -8,6 +8,9 @@ import { db } from "../../firebase/config";
 import { checkAndNotifyLowStock } from "../../utils/lowStockNotifier";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
 import { useToast } from "../../context/ToastContext";
+import { calculateDoseWastage } from "../../utils/vaccineWastage";
+import { getDoseOptionsForAntigen } from "../../utils/fhsisImmunization";
+import { getCurrentMonthKey } from "../../utils/monthlyBalance";
 import "./MidwifeDispense.css";
 
 const navItems = [
@@ -16,6 +19,7 @@ const navItems = [
   { label: "Inventory",     to: "/midwife/inventory"     },
   { label: "Dispense",      to: "/midwife/dispense"      },
   { label: "Reports",       to: "/midwife/reports"       },
+  { label: "BHW & Campaigns", to: "/midwife/bhw"         },
   { label: "Messages",      to: "/midwife/messages"      },
   { label: "Notifications", to: "/midwife/notifications" },
 ];
@@ -60,6 +64,14 @@ export default function MidwifeDispense() {
   const [diagnosis, setDiagnosis] = useState("");
   const [notes, setNotes] = useState("");
   const [dispensedBy, setDispensedBy] = useState("");
+  const [pendingFefoSelection, setPendingFefoSelection] = useState(null); // { rowId, selected, recommended }
+
+  // Vaccination Session mode — dispensing flow #2, dose/wastage aware.
+  const [dispenseMode, setDispenseMode] = useState("medicine"); // "medicine" | "vaccination"
+  const [vaccineItemId, setVaccineItemId] = useState("");
+  const [vialsUsed, setVialsUsed] = useState("");
+  const [dosesGiven, setDosesGiven] = useState("");
+  const [doseLabel, setDoseLabel] = useState(""); // e.g. "1st dose", "Booster"
 
   function handleLogout() { logout(); navigate("/"); }
 
@@ -103,6 +115,7 @@ export default function MidwifeDispense() {
     setDiagnosis("");
     setNotes("");
     setDispensedBy("");
+    setVaccineItemId(""); setVialsUsed(""); setDosesGiven(""); setDoseLabel("");
   }
 
   // Row management handlers
@@ -171,6 +184,7 @@ export default function MidwifeDispense() {
           patientId:        selectedPatient.id,
           patientName:      selectedPatient.name,
           patientRecordId:  selectedPatient.patientId ?? "",
+          patientType:      selectedPatient.type === "child" ? "child" : "adult",
           medicineName:     invItem.name,
           lotNumber:        invItem.lotNumber ?? "",
           boxesDispensed:   boxes,
@@ -179,11 +193,96 @@ export default function MidwifeDispense() {
           notes:            notes.trim(),
           dispensedBy:      dispensedBy.trim(),
           dispensedAt:      batchTimestamp,
-          date:             formattedDate
+          date:             formattedDate,
+          monthKey:         getCurrentMonthKey(),
         });
       }
 
       showToast(`Successfully dispensed medicines to ${selectedPatient.name}.`, "success");
+      resetForm();
+      loadData();
+    } catch (err) { showToast("Error: " + err.message, "error"); }
+    setSaving(false);
+  }
+
+  // Vaccine inventory available for vaccination sessions (isVaccine flag set,
+  // propagated automatically from CHO -> RHU -> Midwife on distribution).
+  const vaccineInventory = inventory.filter(i => i.isVaccine && (i.remaining ?? i.quantity ?? 0) > 0);
+  const selectedVaccine = vaccineInventory.find(i => i.id === vaccineItemId);
+  const vaccineWastagePreview = selectedVaccine && vialsUsed
+    ? calculateDoseWastage({
+        doseType: selectedVaccine.doseType,
+        dosesPerVial: selectedVaccine.dosesPerVial,
+        vialsUsed,
+        dosesGiven,
+      })
+    : null;
+
+  async function saveVaccinationSession() {
+    if (!selectedPatient) { showToast("Please search and select a patient first.", "error"); return; }
+    if (!vaccineItemId) { showToast("Please select a vaccine.", "error"); return; }
+
+    const vials = parseInt(vialsUsed);
+    const given = parseInt(dosesGiven);
+    if (!vials || vials <= 0) { showToast("Enter a valid number of vials used.", "error"); return; }
+    if (!given || given <= 0) { showToast("Enter a valid number of doses given.", "error"); return; }
+    if (!doseLabel) { showToast("Please select which dose this is.", "error"); return; }
+
+    const available = selectedVaccine.remaining ?? selectedVaccine.quantity ?? 0;
+    if (vials > available) {
+      showToast(`Only ${available} vials of ${selectedVaccine.name} remaining!`, "error");
+      return;
+    }
+
+    const wastage = calculateDoseWastage({
+      doseType: selectedVaccine.doseType,
+      dosesPerVial: selectedVaccine.dosesPerVial,
+      vialsUsed: vials,
+      dosesGiven: given,
+    });
+    if (given > wastage.totalDosesAvailable) {
+      showToast(`${vials} vial(s) of ${selectedVaccine.name} can only cover ${wastage.totalDosesAvailable} dose(s).`, "error");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const newRemaining = available - vials;
+      await updateDoc(doc(db, "inventory", selectedVaccine.id), { remaining: newRemaining });
+      await checkAndNotifyLowStock(
+        { id: selectedVaccine.id, name: selectedVaccine.name, remaining: newRemaining },
+        "midwife",
+        userData
+      );
+
+      const formattedDate = new Date().toLocaleDateString();
+      await addDoc(collection(db, "immunization_logs"), {
+        barangayName:   userData?.barangayName ?? "",
+        patientId:      selectedPatient.id,
+        patientName:    selectedPatient.name,
+        patientRecordId: selectedPatient.patientId ?? "",
+        patientType:    selectedPatient.type === "child" ? "child" : "adult",
+        vaccineName:    selectedVaccine.name,
+        lotNumber:      selectedVaccine.lotNumber ?? "",
+        doseType:       selectedVaccine.doseType || "single",
+        dosesPerVial:   selectedVaccine.doseType === "multi" ? (selectedVaccine.dosesPerVial || 1) : 1,
+        fhsisAntigen:   selectedVaccine.fhsisAntigen || "other",
+        doseLabel:      doseLabel.trim(),
+        vialsUsed:      vials,
+        dosesGiven:     given,
+        dosesWasted:    wastage.dosesWasted,
+        wastagePercent: wastage.wastagePercent,
+        dispensedBy:    dispensedBy.trim(),
+        notes:          notes.trim(),
+        dispensedAt:    serverTimestamp(),
+        date:           formattedDate,
+        monthKey:       getCurrentMonthKey(),
+      });
+
+      const wastedNote = wastage.dosesWasted > 0
+        ? ` (${wastage.dosesWasted} dose${wastage.dosesWasted !== 1 ? "s" : ""} wasted from opened vials)`
+        : "";
+      showToast(`Recorded ${given} dose(s) of ${selectedVaccine.name} for ${selectedPatient.name}.${wastedNote}`, wastage.dosesWasted > 0 ? "info" : "success");
       resetForm();
       loadData();
     } catch (err) { showToast("Error: " + err.message, "error"); }
@@ -273,18 +372,28 @@ export default function MidwifeDispense() {
   // For a given selected row, check whether a different lot of the SAME medicine
   // expires sooner and has enough stock to cover the requested quantity — if so,
   // the person should be nudged to dispense that one first instead.
-  function getFefoWarning(row) {
-    const current = inventory.find(i => i.id === row.itemId);
-    if (!current) return null;
-    const requested = parseInt(row.boxes) || 0;
-    const group = fefoGroups[current.name] || [];
-    const earlierBetterOption = group.find(item =>
-      item.id !== current.id
-      && getExpiryTime(item) < getExpiryTime(current)
-      && (item.remaining ?? item.quantity ?? 0) >= (requested || 1)
-    );
-    if (!earlierBetterOption) return null;
-    return `Lot ${earlierBetterOption.lotNumber || "—"} of this medicine expires sooner (${formatExpiry(earlierBetterOption.expiry)}) and has enough stock — consider dispensing that one first (FEFO).`;
+  // Intercept selecting a medicine: if it's not the FEFO-recommended lot and
+  // a better-stocked option exists, show a confirmation modal instead of
+  // committing the selection immediately.
+  function handleMedicineSelect(rowId, newItemId) {
+    if (!newItemId) { handleRowChange(rowId, "itemId", newItemId); return; }
+    const selected = inventory.find(i => i.id === newItemId);
+    if (!selected) { handleRowChange(rowId, "itemId", newItemId); return; }
+    const group = fefoGroups[selected.name] || [];
+    const recommended = group[0];
+    const needsWarning = recommended
+      && recommended.id !== selected.id
+      && (recommended.remaining ?? recommended.quantity ?? 0) > 0;
+    if (needsWarning) {
+      setPendingFefoSelection({ rowId, selected, recommended });
+      return;
+    }
+    handleRowChange(rowId, "itemId", newItemId);
+  }
+
+  function confirmFefoAndProceed() {
+    handleRowChange(pendingFefoSelection.rowId, "itemId", pendingFefoSelection.selected.id);
+    setPendingFefoSelection(null);
   }
 
   return (
@@ -306,7 +415,7 @@ export default function MidwifeDispense() {
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "midwife-nav-item" + (isActive ? " active" : "")}>
               <span>{item.label}</span>
-              {item.label === "Notifications" && unreadCount > 0 && (
+              {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
               )}
             </NavLink>
@@ -398,8 +507,32 @@ export default function MidwifeDispense() {
 
               <div className="midwife-section-header-block" style={{ marginTop: "1.75rem" }}>
                 <span className="midwife-step-badge">2</span>
-                <h2 className="midwife-section-title">Select Medicine(s)</h2>
+                <h2 className="midwife-section-title">
+                  {dispenseMode === "vaccination" ? "Record Vaccination" : "Select Medicine(s)"}
+                </h2>
               </div>
+
+              <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+                <button
+                  type="button"
+                  className={dispenseMode === "medicine" ? "midwife-btn-primary" : "midwife-btn-secondary"}
+                  onClick={() => setDispenseMode("medicine")}
+                  style={{ flex: 1 }}
+                >
+                  Medicine Dispensing
+                </button>
+                <button
+                  type="button"
+                  className={dispenseMode === "vaccination" ? "midwife-btn-primary" : "midwife-btn-secondary"}
+                  onClick={() => setDispenseMode("vaccination")}
+                  style={{ flex: 1 }}
+                >
+                  Vaccination Session
+                </button>
+              </div>
+
+              {dispenseMode === "medicine" ? (
+              <>
               <p style={{ fontSize: "12px", color: "#6b7280", margin: "-8px 0 12px" }}>
                 ★ marks the lot expiring soonest for each medicine — dispense that one first (FEFO).
               </p>
@@ -431,13 +564,14 @@ export default function MidwifeDispense() {
                         <select 
                           className="midwife-input" 
                           value={row.itemId} 
-                          onChange={e => handleRowChange(row.id, "itemId", e.target.value)}
+                          onChange={e => handleMedicineSelect(row.id, e.target.value)}
+                          style={currentItem && fefoGroups[currentItem.name]?.[0]?.id === currentItem.id ? { backgroundColor: "#fffbeb", borderColor: "#fde68a" } : undefined}
                         >
                           <option value="">-- Select Medicine --</option>
                           {sortedMedicineNames.map(name => (
                             <optgroup key={name} label={name}>
                               {fefoGroups[name].map((item, idx) => (
-                                <option key={item.id} value={item.id}>
+                                <option key={item.id} value={item.id} style={idx === 0 ? { backgroundColor: "#fffbeb" } : undefined}>
                                   {idx === 0 ? "★ " : ""}Lot {item.lotNumber || "—"} — expires {formatExpiry(item.expiry)} — {item.remaining ?? item.quantity ?? 0} boxes{idx === 0 ? " (dispense first — FEFO)" : ""}
                                 </option>
                               ))}
@@ -462,11 +596,6 @@ export default function MidwifeDispense() {
                             Remaining after: {availableStock - parseInt(row.boxes || 0)} boxes
                           </p>
                         )}
-                        {getFefoWarning(row) && (
-                          <p className="midwife-input-hint" style={{ color: "#b45309", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 10px", marginTop: "6px" }}>
-                            ⚠ {getFefoWarning(row)}
-                          </p>
-                        )}
                       </div>
                     </div>
                   );
@@ -484,6 +613,77 @@ export default function MidwifeDispense() {
                   Add Another Medicine
                 </button>
               </div>
+              </>
+              ) : (
+                <div className="dispense-medicine-rows-container">
+                  <div className="dispense-medicine-row-card">
+                    <div className="midwife-form-field">
+                      <label className="midwife-label">Vaccine <span className="midwife-required">*</span></label>
+                      <select className="midwife-input" value={vaccineItemId}
+                        onChange={e => { setVaccineItemId(e.target.value); setVialsUsed(""); setDosesGiven(""); setDoseLabel(""); }}>
+                        <option value="">-- Select Vaccine --</option>
+                        {vaccineInventory.map(item => (
+                          <option key={item.id} value={item.id}>
+                            {item.name} — Lot {item.lotNumber || "—"} — {item.doseType === "multi" ? `${item.dosesPerVial}/vial` : "single-dose"} — {item.remaining ?? item.quantity ?? 0} vials left
+                          </option>
+                        ))}
+                      </select>
+                      {vaccineInventory.length === 0 && (
+                        <p className="midwife-input-hint">No vaccines with available stock. Log or accept a vaccine shipment in Inventory first.</p>
+                      )}
+                    </div>
+
+                    {selectedVaccine && (
+                      <>
+                        <div className="midwife-form-row">
+                          <div className="midwife-form-field">
+                            <label className="midwife-label">Vials Used <span className="midwife-required">*</span></label>
+                            <input className="midwife-input" type="number" min="1"
+                              placeholder={`Max: ${selectedVaccine.remaining ?? selectedVaccine.quantity ?? 0} vials`}
+                              value={vialsUsed} onChange={e => setVialsUsed(e.target.value)} />
+                          </div>
+                          <div className="midwife-form-field">
+                            <label className="midwife-label">Doses Given (children/patients served) <span className="midwife-required">*</span></label>
+                            <input className="midwife-input" type="number" min="1"
+                              placeholder="e.g., 3"
+                              value={dosesGiven} onChange={e => setDosesGiven(e.target.value)} />
+                          </div>
+                        </div>
+                        <div className="midwife-form-field" style={{ marginBottom: 0 }}>
+                          <label className="midwife-label">
+                            Dose {selectedVaccine.fhsisAntigen && selectedVaccine.fhsisAntigen !== "other" ? <span className="midwife-required">*</span> : "(optional)"}
+                          </label>
+                          <select className="midwife-input" value={doseLabel} onChange={e => setDoseLabel(e.target.value)}>
+                            <option value="">-- Select Dose --</option>
+                            {getDoseOptionsForAntigen(selectedVaccine.fhsisAntigen || "other").map(opt => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </select>
+                          {(!selectedVaccine.fhsisAntigen || selectedVaccine.fhsisAntigen === "other") && (
+                            <p className="midwife-input-hint" style={{ marginTop: "4px" }}>
+                              This vaccine isn't tagged to a standard FHSIS antigen, so it won't appear in the DOH immunization report — it will still show in your regular Reports summary.
+                            </p>
+                          )}
+                        </div>
+
+                        {vaccineWastagePreview && vialsUsed && dosesGiven && (
+                          <p className="midwife-input-hint" style={{ marginTop: "8px" }}>
+                            {vaccineWastagePreview.totalDosesAvailable} dose(s) available from {vialsUsed} vial(s)
+                            {selectedVaccine.doseType === "multi" ? ` (${selectedVaccine.dosesPerVial} doses/vial)` : " (single-dose)"} —{" "}
+                            {vaccineWastagePreview.dosesWasted > 0 ? (
+                              <strong style={{ color: "#b91c1c" }}>
+                                {vaccineWastagePreview.dosesWasted} dose(s) will be recorded as wastage ({vaccineWastagePreview.wastagePercent}%).
+                              </strong>
+                            ) : (
+                              <strong style={{ color: "#166534" }}>No wastage — every dose accounted for.</strong>
+                            )}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="midwife-section-header-block" style={{ marginTop: "1.75rem" }}>
                 <span className="midwife-step-badge">3</span>
@@ -512,8 +712,12 @@ export default function MidwifeDispense() {
 
               <div className="dispense-submit-row">
                 <button className="midwife-btn-secondary" onClick={resetForm}>Clear</button>
-                <button className="midwife-btn-primary" onClick={saveDispense} disabled={saving}>
-                  {saving ? "Dispensing..." : "Confirm Dispense"}
+                <button
+                  className="midwife-btn-primary"
+                  onClick={dispenseMode === "vaccination" ? saveVaccinationSession : saveDispense}
+                  disabled={saving}
+                >
+                  {saving ? "Saving..." : dispenseMode === "vaccination" ? "Confirm Vaccination" : "Confirm Dispense"}
                 </button>
               </div>
             </section>
@@ -563,6 +767,49 @@ export default function MidwifeDispense() {
           </div>
         </main>
       </div>
+
+      {pendingFefoSelection && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "1rem" }}
+          onClick={() => setPendingFefoSelection(null)}
+        >
+          <div
+            style={{ background: "#fff", borderRadius: "12px", width: "100%", maxWidth: "440px", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1.25rem 1.5rem 1rem", borderBottom: "1px solid #e5e7eb" }}>
+              <h2 style={{ fontSize: "17px", fontWeight: 600, color: "#0f172a", margin: 0 }}>⚠ Not the recommended lot</h2>
+              <button
+                aria-label="Close"
+                onClick={() => setPendingFefoSelection(null)}
+                style={{ background: "none", border: "none", fontSize: "26px", color: "#9ca3af", cursor: "pointer", lineHeight: 1 }}
+              >×</button>
+            </div>
+            <div style={{ padding: "1.5rem" }}>
+              <p className="midwife-input-hint" style={{ margin: 0 }}>
+                Lot <strong>{pendingFefoSelection.recommended.lotNumber || "—"}</strong> of {pendingFefoSelection.selected.name} {
+                  formatExpiry(pendingFefoSelection.recommended.expiry) === formatExpiry(pendingFefoSelection.selected.expiry)
+                    ? "expires on the same date but is"
+                    : `expires sooner (${formatExpiry(pendingFefoSelection.recommended.expiry)}) and is`
+                } the recommended lot to dispense first (FEFO).
+              </p>
+              <p className="midwife-input-hint" style={{ marginTop: "8px" }}>
+                You're about to select Lot <strong>{pendingFefoSelection.selected.lotNumber || "—"}</strong> instead. Continue anyway?
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", padding: "1rem 1.5rem", borderTop: "1px solid #e5e7eb" }}>
+              <button className="midwife-btn-secondary" onClick={() => setPendingFefoSelection(null)}>Cancel</button>
+              <button
+                className="midwife-btn-primary"
+                onClick={confirmFefoAndProceed}
+                style={{ padding: "10px 20px", background: "#2563eb", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }}
+              >
+                Continue Anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

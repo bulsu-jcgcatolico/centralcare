@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
+import { useUnreadCount } from "../../hooks/useUnreadCount";
 import "./MidwifeSettings.css";
 
 const navItems = [
@@ -10,6 +11,7 @@ const navItems = [
   { label: "Inventory",     to: "/midwife/inventory"     },
   { label: "Dispense",      to: "/midwife/dispense"      },
   { label: "Reports",       to: "/midwife/reports"       },
+  { label: "BHW & Campaigns", to: "/midwife/bhw"         },
   { label: "Messages",      to: "/midwife/messages"      },
   { label: "Notifications", to: "/midwife/notifications" },
 ];
@@ -18,6 +20,7 @@ export default function MidwifeSettings() {
   const { logout, user, userData, changePassword } = useAuth();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const unreadCount = useUnreadCount();
 
   const currentBrgyName = userData?.barangayName || userData?.barangay || "Longos";
 
@@ -73,6 +76,9 @@ export default function MidwifeSettings() {
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "midwife-nav-item" + (isActive ? " active" : "")}>
               <span>{item.label}</span>
+              {item.label === "Notifications" && Boolean(unreadCount) && (
+                <span className="nav-badge">{unreadCount}</span>
+              )}
             </NavLink>
           ))}
         </nav>

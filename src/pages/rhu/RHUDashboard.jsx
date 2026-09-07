@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { buildForecastList, getUrgentForecasts, FIELD_MAPS } from "../../utils/stockForecast";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -11,13 +12,14 @@ import {
 import "./RHUDashboard.css";
 
 const navItems = [
-  { label: "Dashboard",     to: "/rhu/dashboard"     },
-  { label: "Inventory",     to: "/rhu/inventory"     },
-  { label: "Barangay",      to: "/rhu/barangay"      },
-  { label: "Distribution",  to: "/rhu/distribution"  },
-  { label: "Reports",       to: "/rhu/reports"       },
-  { label: "Messages",      to: "/rhu/messages"      },
-  { label: "Notifications", to: "/rhu/notifications" },
+  { label: "Dashboard",       to: "/rhu/dashboard"         },
+  { label: "Inventory",       to: "/rhu/inventory"         },
+  { label: "Barangay",        to: "/rhu/barangay"          },
+  { label: "Distribution",    to: "/rhu/distribution"      },
+  { label: "Balance Reports", to: "/rhu/balance-reports"   },
+  { label: "Reports",         to: "/rhu/reports"           },
+  { label: "Messages",        to: "/rhu/messages"          },
+  { label: "Notifications",   to: "/rhu/notifications"     },
 ];
 
 const PIE_COLORS = ["#1a56db", "#93c5fd", "#dbeafe", "#bfdbfe", "#eff6ff"];
@@ -30,6 +32,7 @@ export default function RHUDashboard() {
   const [inventory, setInventory] = useState([]);
   const [distributions, setDistributions] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [monthlyReports, setMonthlyReports] = useState([]);
   const [loading, setLoading] = useState(false);
 
   function handleLogout() { logout(); navigate("/"); }
@@ -49,12 +52,12 @@ export default function RHUDashboard() {
       // exactly the "No inventory data yet" symptom. Fetch by ownerType/fromType only,
       // then filter client-side with normalized (trimmed, lowercased) string comparison,
       // matching the same robust approach already used in RHUInventory.jsx.
-      const [invSnap, distSnap, notifSnap] = await Promise.all([
+      const [invSnap, distSnap, notifSnap, reportsSnap] = await Promise.all([
         getDocs(query(collection(db, "inventory"), where("ownerType", "==", "rhu"))),
         getDocs(query(collection(db, "rhu_distributions"))),
-        getDocs(query(collection(db, "notifications")))
+        getDocs(query(collection(db, "notifications"))),
+        getDocs(query(collection(db, "monthly_balance_reports"), where("ownerType", "==", "rhu")))
       ]);
-
       const matchesRhu = (idField, nameField) => {
         const itemRhuId = String(idField || "").trim().toLowerCase();
         const itemRhuName = String(nameField || "").trim().toLowerCase();
@@ -75,9 +78,14 @@ export default function RHUDashboard() {
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(item => matchesRhu(item.toRhuId, item.toRhuName));
 
+      const reportsList = reportsSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(r => matchesRhu(r.ownerId, r.ownerName));
+
       setInventory(invList);
       setDistributions(distList);
       setNotifications(notifList);
+      setMonthlyReports(reportsList);
     } catch (err) { console.error(err); }
     setLoading(false);
   }
@@ -88,6 +96,12 @@ export default function RHUDashboard() {
     const days = (new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24);
     return days <= 30 && days >= 0;
   });
+
+  // Predictive stock-out forecast — trailing moving-average consumption rate
+  // from actual distributions to barangays, falling back to the last
+  // submitted monthly balance report when there isn't enough recent history.
+  const forecastList = buildForecastList(inventory, distributions, monthlyReports, FIELD_MAPS.rhu);
+  const urgentForecasts = getUrgentForecasts(forecastList, 5);
 
   // Bar chart — inventory by category
   const categoryMap = {};
@@ -143,7 +157,7 @@ export default function RHUDashboard() {
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "rhu-nav-item" + (isActive ? " active" : "")}>
               <span>{item.label}</span>
-              {item.label === "Notifications" && unreadCount > 0 && (
+              {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
               )}
             </NavLink>
@@ -161,10 +175,15 @@ export default function RHUDashboard() {
             placeholder="Search patients, appointments, or medical records..."
             value={search} onChange={e => setSearch(e.target.value)} />
           <div className="rhu-topbar-right">
-            <button className="rhu-notif-btn">
+            <button className="rhu-notif-btn" onClick={() => navigate("/rhu/notifications")} style={{ position: "relative" }}>
               <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
                 <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
               </svg>
+              {Boolean(unreadCount) && (
+                <span className="nav-badge" style={{ position: "absolute", top: "-4px", right: "-4px" }}>
+                  {unreadCount}
+                </span>
+              )}
             </button>
             <div className="rhu-user">
               <div className="rhu-user-info">
@@ -239,6 +258,46 @@ export default function RHUDashboard() {
                         <p className="rhu-notif-msg">{n.message}</p>
                       </div>
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Predicted Stock-Outs */}
+          <section className="rhu-section">
+            <div className="rhu-section-hd">
+              <h2 className="rhu-section-title">Predicted Stock-Outs</h2>
+              <NavLink to="/rhu/inventory" className="rhu-view-all">View Inventory</NavLink>
+            </div>
+            {urgentForecasts.length === 0 ? (
+              <div className="rhu-empty-small">
+                <p>No items are trending toward a stock-out based on the last 30 days of distribution activity.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {urgentForecasts.map(f => (
+                  <div key={f.itemId} style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "12px 14px", borderRadius: "8px",
+                    background: f.status === "critical" ? "#fef2f2" : "#fffbeb",
+                    border: `1px solid ${f.status === "critical" ? "#fecaca" : "#fde68a"}`,
+                  }}>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: 600, color: "#0f172a" }}>
+                        {f.name}{f.lotNumber ? ` (Lot ${f.lotNumber})` : ""}
+                      </p>
+                      <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#6b7280" }}>
+                        {f.remaining} boxes remaining · ~{f.dailyRate.toFixed(1)}/day
+                        {f.wasteRisk && <span style={{ color: "#b45309" }}> · will expire before running out</span>}
+                      </p>
+                    </div>
+                    <span style={{
+                      fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "99px",
+                      background: f.status === "critical" ? "#dc2626" : "#d97706", color: "#fff",
+                    }}>
+                      ~{Math.round(f.daysRemaining)} days left
+                    </span>
                   </div>
                 ))}
               </div>

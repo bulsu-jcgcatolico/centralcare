@@ -9,6 +9,11 @@ import {
 import { db } from "../../firebase/config";
 import { runExpiryChecks } from "../../utils/expiryNotifier";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import {
+  getPriorMonthKey, monthKeyLabel, hasSubmittedBalance,
+  buildBalanceItemsFromInventory, submitBalanceReport, displayFacilityName,
+} from "../../utils/monthlyBalance";
+import { FHSIS_ANTIGENS, FHSIS_ANTIGEN_ORDER } from "../../utils/fhsisImmunization";
 import "./RHUInventory.css";
 
 const navItems = [
@@ -16,6 +21,7 @@ const navItems = [
   { label: "Inventory",     to: "/rhu/inventory"     },
   { label: "Barangay",      to: "/rhu/barangay"      },
   { label: "Distribution",  to: "/rhu/distribution"  },
+  { label: "Balance Reports", to: "/rhu/balance-reports" },
   { label: "Reports",       to: "/rhu/reports"       },
   { label: "Messages",      to: "/rhu/messages"      },
   { label: "Notifications", to: "/rhu/notifications" },
@@ -59,6 +65,18 @@ export default function RHUInventory() {
   const [tabletsPerBox, setTabletsPerBox] = useState("");
   const [source, setSource] = useState("");
   const [expiry, setExpiry] = useState("");
+  const [isVaccine, setIsVaccine] = useState(false);
+  const [doseType, setDoseType] = useState("single");
+  const [dosesPerVial, setDosesPerVial] = useState("");
+  const [fhsisAntigen, setFhsisAntigen] = useState("other");
+
+  // "Present End Balance" monthly report — mandatory before CHO will
+  // replenish this RHU again.
+  const [showBalanceModal, setShowBalanceModal] = useState(false);
+  const [balanceAlreadySubmitted, setBalanceAlreadySubmitted] = useState(false);
+  const [checkingBalance, setCheckingBalance] = useState(true);
+  const [submittingBalance, setSubmittingBalance] = useState(false);
+  const reportMonthKey = getPriorMonthKey();
 
   // Accept modal
   const [showAcceptModal, setShowAcceptModal] = useState(false);
@@ -74,6 +92,36 @@ export default function RHUInventory() {
   function handleLogout() { logout(); navigate("/"); }
 
   useEffect(() => { loadInventory(); }, [userData]);
+  useEffect(() => { checkBalanceStatus(); }, [userData]);
+
+  async function checkBalanceStatus() {
+    if (!userData?.rhuId) return;
+    setCheckingBalance(true);
+    try {
+      const submitted = await hasSubmittedBalance("rhu", userData.rhuId, reportMonthKey);
+      setBalanceAlreadySubmitted(submitted);
+    } catch (err) { console.error("Error checking balance report status:", err); }
+    setCheckingBalance(false);
+  }
+
+  async function handleSubmitBalanceReport() {
+    setSubmittingBalance(true);
+    try {
+      const items = buildBalanceItemsFromInventory(activeInventory);
+      await submitBalanceReport({
+        ownerType: "rhu",
+        ownerId: userData?.rhuId || "",
+        ownerName: displayFacilityName(userData?.rhuName) || "",
+        monthKey: reportMonthKey,
+        items,
+        submittedBy: userData?.username || user?.uid || "",
+      });
+      showToast(`${monthKeyLabel(reportMonthKey)} end balance report submitted. CHO can now review it before your next replenishment.`, "success");
+      setBalanceAlreadySubmitted(true);
+      setShowBalanceModal(false);
+    } catch (err) { showToast("Error: " + err.message, "error"); }
+    setSubmittingBalance(false);
+  }
 
   async function loadInventory() {
     setLoading(true);
@@ -124,10 +172,6 @@ export default function RHUInventory() {
       const trimmedName = productName.trim();
       const trimmedLot = lotNumber.trim();
 
-      // Only treat this as "the same batch" if name, lot number, AND expiry date all
-      // match exactly. Matching on name alone would merge genuinely different batches
-      // (different lot / expiry) into one row and silently overwrite that row's expiry
-      // and lot number — hiding which boxes are actually near expiry or from which lot.
       const existing = activeInventory.find(
         i => i.name.trim().toLowerCase() === trimmedName.toLowerCase()
           && (i.lotNumber || "").trim().toLowerCase() === trimmedLot.toLowerCase()
@@ -159,6 +203,10 @@ export default function RHUInventory() {
           receivedStatus: "Accepted",
           rhuId: userData?.rhuId || "",
           rhuName: userData?.rhuName || "",
+          isVaccine,
+          doseType: isVaccine ? doseType : "",
+          dosesPerVial: isVaccine && doseType === "multi" ? (parseInt(dosesPerVial) || 1) : (isVaccine ? 1 : 0),
+          fhsisAntigen: isVaccine ? fhsisAntigen : "",
           createdBy: user?.uid || "",
           createdAt: serverTimestamp(),
         });
@@ -167,6 +215,7 @@ export default function RHUInventory() {
 
       setProductName(""); setLotNumber(""); setCategory("General Consumption");
       setSubCategory(""); setQuantity(""); setTabletsPerBox(""); setSource(""); setExpiry("");
+      setIsVaccine(false); setDoseType("single"); setDosesPerVial(""); setFhsisAntigen("other");
       setShowAddModal(false);
       loadInventory();
     } catch (err) { showToast("Error: " + err.message, "error"); }
@@ -201,11 +250,33 @@ export default function RHUInventory() {
     }
     setProcessingAction(true);
     try {
-      await updateDoc(doc(db, "inventory", selectedItem.id), {
-        receivedStatus: "Accepted",
-        receivedBy: receivedBy.trim(),
-        receivedAt: dateReceived,
-      });
+      const trimmedName = (selectedItem.name || "").trim().toLowerCase();
+      const trimmedLot = (selectedItem.lotNumber || "").trim().toLowerCase();
+      const existingMatch = activeInventory.find(i =>
+        i.id !== selectedItem.id
+        && (i.name || "").trim().toLowerCase() === trimmedName
+        && (i.lotNumber || "").trim().toLowerCase() === trimmedLot
+        && i.expiry === selectedItem.expiry
+      );
+
+      if (existingMatch) {
+        const addedQty = selectedItem.quantity ?? 0;
+        const newQuantity = (existingMatch.quantity ?? 0) + addedQty;
+        const newRemaining = (existingMatch.remaining ?? 0) + addedQty;
+        await updateDoc(doc(db, "inventory", existingMatch.id), {
+          quantity: newQuantity,
+          remaining: newRemaining,
+        });
+        await deleteDoc(doc(db, "inventory", selectedItem.id));
+        showToast(`${selectedItem.name} (Lot ${selectedItem.lotNumber || "—"}) matches an existing batch — merged into it (new total: ${newRemaining} boxes).`, "success");
+      } else {
+        await updateDoc(doc(db, "inventory", selectedItem.id), {
+          receivedStatus: "Accepted",
+          receivedBy: receivedBy.trim(),
+          receivedAt: dateReceived,
+        });
+        showToast("Shipment accepted and added to active inventory!", "success");
+      }
 
       await addDoc(collection(db, "notifications"), {
         type: "shipment_accepted",
@@ -217,7 +288,6 @@ export default function RHUInventory() {
         createdAt: serverTimestamp()
       });
 
-      showToast("Shipment accepted and added to active inventory!", "success");
       setShowAcceptModal(false);
       loadInventory();
     } catch (err) { showToast("Error: " + err.message, "error"); }
@@ -260,9 +330,18 @@ export default function RHUInventory() {
     return status === "" || status === "pending";
   });
 
-  const displayList = (activeTab === "active" ? activeInventory : pendingInventory).filter(item =>
-    item.name?.toLowerCase().includes(search.toLowerCase())
-  );
+  const displayList = (activeTab === "active" ? activeInventory : pendingInventory)
+    .filter(item => item.name?.toLowerCase().includes(search.toLowerCase()))
+    .slice()
+    .sort((a, b) => {
+      if (activeTab !== "active") return 0;
+      const remA = a.remaining ?? a.quantity ?? 0;
+      const remB = b.remaining ?? b.quantity ?? 0;
+      const aDepleted = remA <= 0;
+      const bDepleted = remB <= 0;
+      if (aDepleted !== bDepleted) return aDepleted ? 1 : -1;
+      return 0;
+    });
 
   const lowStockCount = activeInventory.filter(i => (i.remaining ?? i.quantity) <= 50 && (i.remaining ?? i.quantity) > 20).length;
   const criticalCount = activeInventory.filter(i => (i.remaining ?? i.quantity) <= 20).length;
@@ -292,14 +371,14 @@ export default function RHUInventory() {
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "rhu-nav-item" + (isActive ? " active" : "")}>
               <span>{item.label}</span>
-              {item.label === "Notifications" && unreadCount > 0 && (
+              {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
               )}
             </NavLink>
           ))}
         </nav>
         <div className="rhu-sidebar-footer">
-          <NavLink to="/rhu/settings" className={({ isActive }) => "rhu-nav-item rhu-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
+          <NavLink to="/rhu/settings" className="rhu-nav-item rhu-nav-btn">Settings</NavLink>
           <button className="rhu-nav-item rhu-nav-btn rhu-signout" onClick={handleLogout}>Sign out</button>
         </div>
       </aside>
@@ -395,9 +474,28 @@ export default function RHUInventory() {
               />
             </div>
             <div className="rhu-inv-toolbar-right" style={{ display: "flex", gap: "10px" }}>
+              <button
+                className="rhu-btn-secondary"
+                onClick={() => setShowBalanceModal(true)}
+                disabled={checkingBalance || balanceAlreadySubmitted}
+                title={balanceAlreadySubmitted ? `${monthKeyLabel(reportMonthKey)} report already submitted` : ""}
+              >
+                {balanceAlreadySubmitted ? `✓ ${monthKeyLabel(reportMonthKey)} Balance Submitted` : `Submit ${monthKeyLabel(reportMonthKey)} End Balance`}
+              </button>
               <button className="rhu-btn-primary" onClick={() => setShowAddModal(true)}>+ Add New Item</button>
             </div>
           </div>
+
+          {!checkingBalance && !balanceAlreadySubmitted && (
+            <div className="rhu-empty-state" style={{ background: "#fff7ed", border: "1px solid #fed7aa", padding: "12px 16px", marginBottom: "1.25rem", textAlign: "left" }}>
+              <p style={{ margin: 0, color: "#9a3412", fontWeight: 600 }}>
+                Present End Balance report for {monthKeyLabel(reportMonthKey)} is missing.
+              </p>
+              <p style={{ margin: "4px 0 0", color: "#9a3412", fontSize: "0.9rem" }}>
+                CHO won't include {displayFacilityName(userData?.rhuName) || "your RHU"} in the next replenishment split until this month-end movement report is submitted.
+              </p>
+            </div>
+          )}
 
           {loading ? (
             <div className="rhu-empty-state"><p>Loading inventory...</p></div>
@@ -481,8 +579,18 @@ export default function RHUInventory() {
                           <td>
                             <div className="rhu-action-group">
                               {isPending && (
-                                <button className="rhu-btn-action rhu-btn-distribute" onClick={() => openAcceptModal(item)}>
-                                  Accept
+                                <>
+                                  <button className="rhu-btn-action rhu-btn-distribute" onClick={() => openAcceptModal(item)}>
+                                    Accept
+                                  </button>
+                                  <button className="rhu-btn-action rhu-btn-del" onClick={() => openDeclineModal(item)}>
+                                    Decline
+                                  </button>
+                                </>
+                              )}
+                              {!isPending && (
+                                <button className="rhu-btn-action rhu-btn-del" onClick={() => deleteItem(item.id)}>
+                                  Delete
                                 </button>
                               )}
                             </div>
@@ -561,6 +669,41 @@ export default function RHUInventory() {
                     value={expiry} onChange={e => setExpiry(e.target.value)} />
                 </div>
               </div>
+
+              <h3 className="rhu-form-section-title">Vaccine Classification</h3>
+              <div className="rhu-form-field">
+                <label className="rhu-label" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <input type="checkbox" checked={isVaccine} onChange={e => setIsVaccine(e.target.checked)} />
+                  This item is a vaccine (tracked in vials, not boxes)
+                </label>
+              </div>
+              {isVaccine && (
+                <div className="rhu-form-row">
+                  <div className="rhu-form-field">
+                    <label className="rhu-label">Dose Type</label>
+                    <select className="rhu-input" value={doseType} onChange={e => setDoseType(e.target.value)}>
+                      <option value="single">Single-dose (1 vial = 1 dose)</option>
+                      <option value="multi">Multi-dose (vial holds several doses)</option>
+                    </select>
+                  </div>
+                  {doseType === "multi" && (
+                    <div className="rhu-form-field">
+                      <label className="rhu-label">Doses per Vial</label>
+                      <input className="rhu-input" type="number" min="1" placeholder="e.g., 10"
+                        value={dosesPerVial} onChange={e => setDosesPerVial(e.target.value)} />
+                    </div>
+                  )}
+                  <div className="rhu-form-field">
+                    <label className="rhu-label">FHSIS Antigen Category</label>
+                    <select className="rhu-input" value={fhsisAntigen} onChange={e => setFhsisAntigen(e.target.value)}>
+                      {FHSIS_ANTIGEN_ORDER.map(key => (
+                        <option key={key} value={key}>{FHSIS_ANTIGENS[key].label}</option>
+                      ))}
+                      <option value="other">{FHSIS_ANTIGENS.other.label}</option>
+                    </select>
+                  </div>
+                </div>
+              )}
               <p className="rhu-form-hint"><span className="rhu-required">*</span> Required fields</p>
             </div>
             <div className="rhu-modal-footer">
@@ -600,6 +743,53 @@ export default function RHUInventory() {
               <button className="rhu-btn-secondary" onClick={() => setShowAcceptModal(false)}>Cancel</button>
               <button className="rhu-btn-primary" onClick={handleAccept} disabled={processingAction}>
                 {processingAction ? "Accepting..." : "Accept Shipment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBalanceModal && (
+        <div className="rhu-modal-overlay" onClick={() => setShowBalanceModal(false)}>
+          <div className="rhu-modal rhu-modal--lg" onClick={e => e.stopPropagation()}>
+            <div className="rhu-modal-header">
+              <h2 className="rhu-modal-title">Present End Balance — {monthKeyLabel(reportMonthKey)}</h2>
+              <button className="rhu-modal-close" aria-label="Close" onClick={() => setShowBalanceModal(false)}>×</button>
+            </div>
+            <div className="rhu-modal-body">
+              <p className="rhu-dist-note">
+                This snapshot of {activeInventory.length} active item(s) — opening stock, amount moved, and end balance —
+                goes to CHO so they can review slow-moving stock before approving your next replenishment.
+              </p>
+              <div style={{ maxHeight: "360px", overflowY: "auto", overflowX: "hidden", marginTop: "0.75rem", border: "1px solid #e5e7eb", borderRadius: "8px" }}>
+                <table className="rhu-table" style={{ width: "100%", tableLayout: "fixed" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ width: "36%" }}>Item</th>
+                      <th style={{ width: "14%" }}>Opening</th>
+                      <th style={{ width: "16%" }}>Dispensed</th>
+                      <th style={{ width: "16%" }}>End Balance</th>
+                      <th style={{ width: "18%" }}>Movement</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {buildBalanceItemsFromInventory(activeInventory).map(it => (
+                      <tr key={it.itemId}>
+                        <td style={{ padding: "8px 10px", wordBreak: "break-word" }}>{it.name}{it.lotNumber ? ` (Lot ${it.lotNumber})` : ""}</td>
+                        <td style={{ padding: "8px 10px" }}>{it.openingBalance}</td>
+                        <td style={{ padding: "8px 10px" }}>{it.dispensed}</td>
+                        <td style={{ padding: "8px 10px" }}><strong>{it.endBalance}</strong></td>
+                        <td style={{ padding: "8px 10px", color: it.movementRate < 20 ? "#b91c1c" : "#166534" }}>{it.movementRate}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="rhu-modal-footer">
+              <button className="rhu-btn-secondary" onClick={() => setShowBalanceModal(false)}>Cancel</button>
+              <button className="rhu-btn-primary" onClick={handleSubmitBalanceReport} disabled={submittingBalance}>
+                {submittingBalance ? "Submitting..." : "Submit to CHO"}
               </button>
             </div>
           </div>

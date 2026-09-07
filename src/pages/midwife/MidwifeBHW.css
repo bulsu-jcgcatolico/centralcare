@@ -1,0 +1,8 @@
+/* MidwifeBHW.css
+   This page reuses the shared design-system classes (midwife-layout,
+   midwife-table, midwife-section, midwife-modal, form fields, etc.) that
+   already exist in MidwifeInventory.css. Importing it here keeps every
+   class this page uses available, while still giving this page its own
+   dedicated stylesheet file to match the project's one-CSS-per-page
+   convention. */
+@import "./MidwifeInventory.css";

@@ -1,0 +1,7 @@
+/* CHOBalanceReports.css
+   This page reuses the CHO/RHU shared design-system classes (rhu-layout,
+   rhu-table, rhu-dist-stat-card, etc.) that already exist in
+   CHOBatchDistribution.css. Importing it here keeps every class this page
+   uses available, while still giving this page its own dedicated stylesheet
+   file to match the project's one-CSS-per-page convention. */
+@import "./CHOBatchDistribution.css";

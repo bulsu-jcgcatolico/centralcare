@@ -17,6 +17,7 @@ const navItems = [
   { label: "RHU Management",    to: "/cho/rhu-management"     },
   { label: "Population Report", to: "/cho/population-report"  },
   { label: "Batch Distribution",to: "/cho/batch-distribution" },
+  { label: "Balance Reports",   to: "/cho/balance-reports"    },
   { label: "Reports",           to: "/cho/reports"            },
   { label: "Messages",          to: "/cho/messages"           },
   { label: "Notifications",     to: "/cho/notifications"      },
@@ -174,7 +175,7 @@ export default function CHOBarangay() {
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "rhu-nav-item" + (isActive ? " active" : "")}>
               <span>{item.label}</span>
-              {item.label === "Notifications" && unreadCount > 0 && (
+              {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
               )}
             </NavLink>

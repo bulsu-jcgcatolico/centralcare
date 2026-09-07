@@ -6,13 +6,14 @@ import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
 
 const navItems = [
-  { label: "Dashboard",     to: "/rhu/dashboard"     },
-  { label: "Inventory",     to: "/rhu/inventory"     },
-  { label: "Barangay",      to: "/rhu/barangay"      },
-  { label: "Distribution",  to: "/rhu/distribution"  },
-  { label: "Reports",       to: "/rhu/reports"       },
-  { label: "Messages",      to: "/rhu/messages"      },
-  { label: "Notifications", to: "/rhu/notifications" },
+  { label: "Dashboard",       to: "/rhu/dashboard"         },
+  { label: "Inventory",       to: "/rhu/inventory"         },
+  { label: "Barangay",        to: "/rhu/barangay"          },
+  { label: "Distribution",    to: "/rhu/distribution"      },
+  { label: "Balance Reports", to: "/rhu/balance-reports"   },
+  { label: "Reports",         to: "/rhu/reports"           },
+  { label: "Messages",        to: "/rhu/messages"          },
+  { label: "Notifications",   to: "/rhu/notifications"     },
 ];
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -112,7 +113,7 @@ export default function RHUReports() {
                 <NavLink key={item.to} to={item.to}
                   className={({ isActive }) => "rhu-nav-item" + (isActive ? " active" : "")}>
                   <span>{item.label}</span>
-                  {item.label === "Notifications" && unreadCount > 0 && (
+                  {item.label === "Notifications" && Boolean(unreadCount) && (
                     <span className="nav-badge">{unreadCount}</span>
                   )}
                 </NavLink>

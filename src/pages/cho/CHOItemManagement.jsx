@@ -17,6 +17,7 @@ const navItems = [
   { label: "RHU Management",    to: "/cho/rhu-management"     },
   { label: "Population Report", to: "/cho/population-report"  },
   { label: "Batch Distribution",to: "/cho/batch-distribution" },
+  { label: "Balance Reports",   to: "/cho/balance-reports"    },
   { label: "Reports",           to: "/cho/reports"            },
   { label: "Messages",          to: "/cho/messages"           },
   { label: "Notifications",     to: "/cho/notifications"      },
@@ -64,7 +65,12 @@ export default function CHOItemManagement() {
     try {
       const snap = await getDocs(collection(db, PRODUCTS_COLLECTION));
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+      list.sort((a, b) => {
+        const numA = parseInt(String(a.productId || "").match(/\d+/)?.[0] ?? "", 10);
+        const numB = parseInt(String(b.productId || "").match(/\d+/)?.[0] ?? "", 10);
+        if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+        return String(a.productId || "").localeCompare(String(b.productId || ""));
+      });
       setProducts(list);
     } catch (err) { console.error(err); }
     setLoading(false);
@@ -202,14 +208,14 @@ export default function CHOItemManagement() {
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "cho-nav-item" + (isActive ? " active" : "")}>
               <span>{item.label}</span>
-              {item.label === "Notifications" && unreadCount > 0 && (
+              {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
               )}
             </NavLink>
           ))}
         </nav>
         <div className="cho-sidebar-footer">
-          <NavLink to="/cho/settings" className={({ isActive }) => "cho-nav-item cho-nav-btn" + (isActive ? " active" : "")}>Settings</NavLink>
+          <NavLink to="/cho/settings" className="cho-nav-item cho-nav-btn">Settings</NavLink>
           <button className="cho-nav-item cho-nav-btn cho-signout" onClick={handleLogout}>Sign out</button>
         </div>
       </aside>

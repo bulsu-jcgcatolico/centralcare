@@ -13,6 +13,7 @@ const navItems = [
   { label: "RHU Management",    to: "/cho/rhu-management"     },
   { label: "Population Report", to: "/cho/population-report"  },
   { label: "Batch Distribution",to: "/cho/batch-distribution" },
+  { label: "Balance Reports",   to: "/cho/balance-reports"    },
   { label: "Reports",           to: "/cho/reports"            },
   { label: "Messages",          to: "/cho/messages"           },
   { label: "Notifications",     to: "/cho/notifications"      },
@@ -25,6 +26,11 @@ export default function CHONotification() {
   const [notifications, setNotifications] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+  // IDs that were unread the moment this page opened — kept separately so
+  // the "NEW" pill still shows for this viewing session even though the
+  // underlying Firestore doc gets marked read right away (which is what
+  // clears the sidebar badge).
+  const [justReadIds, setJustReadIds] = useState(new Set());
 
   function handleLogout() { logout(); navigate("/"); }
 
@@ -40,7 +46,18 @@ export default function CHONotification() {
         where("fromType", "==", "cho")
       );
       const snap = await getDocs(q);
-      setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setNotifications(list);
+
+      // Opening this page is itself the "read" action — mirrors how a
+      // notification bell/panel behaves on Facebook, YouTube, etc.: the
+      // badge clears as soon as you look at the list, not only after a
+      // separate "mark all read" click.
+      const unread = list.filter(n => !n.read);
+      if (unread.length > 0) {
+        setJustReadIds(new Set(unread.map(n => n.id)));
+        await Promise.all(unread.map(n => updateDoc(doc(db, "notifications", n.id), { read: true })));
+      }
     } catch (err) { console.error(err); }
     setLoading(false);
   }
@@ -51,6 +68,7 @@ export default function CHONotification() {
         await updateDoc(doc(db, "notifications", n.id), { read: true });
       }
       setNotifications(notifications.map(n => ({ ...n, read: true })));
+      setJustReadIds(new Set());
     } catch (err) { alert("Error: " + err.message); }
   }
 
@@ -61,7 +79,7 @@ export default function CHONotification() {
     } catch (err) { alert("Error: " + err.message); }
   }
 
-  const unreadNum = notifications.filter(n => !n.read).length;
+  const unreadNum = justReadIds.size;
   const searchedNotifications = notifications.filter(n =>
     (n.title || "").toLowerCase().includes(search.trim().toLowerCase()) ||
     (n.message || "").toLowerCase().includes(search.trim().toLowerCase())
@@ -86,7 +104,7 @@ export default function CHONotification() {
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "cho-nav-item" + (isActive ? " active" : "")}>
               <span>{item.label}</span>
-              {item.label === "Notifications" && unreadCount > 0 && (
+              {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
               )}
             </NavLink>
@@ -160,10 +178,12 @@ export default function CHONotification() {
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {searchedNotifications.map(n => (
+              {searchedNotifications.map(n => {
+                const wasUnread = justReadIds.has(n.id);
+                return (
                 <div key={n.id} style={{
-                  background: n.read ? "#f9fafb" : (n.level === "Critical" ? "#fef2f2" : "#fffbeb"),
-                  border: `1px solid ${n.read ? "#e5e7eb" : n.level === "Critical" ? "#fecaca" : "#fde68a"}`,
+                  background: !wasUnread ? "#f9fafb" : (n.level === "Critical" ? "#fef2f2" : "#fffbeb"),
+                  border: `1px solid ${!wasUnread ? "#e5e7eb" : n.level === "Critical" ? "#fecaca" : "#fde68a"}`,
                   borderLeft: `4px solid ${n.level === "Critical" ? "#dc2626" : "#d97706"}`,
                   borderRadius: "10px", padding: "14px 16px",
                   display: "flex", alignItems: "flex-start",
@@ -172,7 +192,7 @@ export default function CHONotification() {
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
                       <p style={{ fontWeight: "600", color: "#0f172a", margin: 0 }}>{n.title}</p>
-                      {!n.read && (
+                      {wasUnread && (
                         <span style={{ background: n.level === "Critical" ? "#dc2626" : "#d97706",
                           color: "#fff", fontSize: "10px", fontWeight: "700",
                           padding: "2px 8px", borderRadius: "99px" }}>
@@ -186,7 +206,8 @@ export default function CHONotification() {
                     style={{ background: "none", border: "none", color: "#9ca3af",
                       cursor: "pointer", fontSize: "18px", flexShrink: 0 }}>x</button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </main>

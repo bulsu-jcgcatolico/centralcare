@@ -13,6 +13,7 @@ const navItems = [
   { label: "Inventory",     to: "/midwife/inventory"     },
   { label: "Dispense",      to: "/midwife/dispense"      },
   { label: "Reports",       to: "/midwife/reports"       },
+  { label: "BHW & Campaigns", to: "/midwife/bhw"         },
   { label: "Messages",      to: "/midwife/messages"      },
   { label: "Notifications", to: "/midwife/notifications" },
 ];
@@ -26,6 +27,7 @@ export default function MidwifeNotification() {
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [justReadIds, setJustReadIds] = useState(new Set());
 
   function handleLogout() { logout(); navigate("/"); }
 
@@ -39,7 +41,16 @@ export default function MidwifeNotification() {
         where("toBarangayName", "==", userData?.barangayName ?? "")
       );
       const snap = await getDocs(q);
-      setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setNotifications(list);
+
+      // Opening this page is itself the "read" action, same as Facebook/YouTube
+      // notification panels — the sidebar badge clears as soon as you look.
+      const unread = list.filter(n => !n.read);
+      if (unread.length > 0) {
+        setJustReadIds(new Set(unread.map(n => n.id)));
+        await Promise.all(unread.map(n => updateDoc(doc(db, "notifications", n.id), { read: true })));
+      }
     } catch (err) { console.error(err); }
     setLoading(false);
   }
@@ -50,6 +61,7 @@ export default function MidwifeNotification() {
         await updateDoc(doc(db, "notifications", n.id), { read: true });
       }
       setNotifications(notifications.map(n => ({ ...n, read: true })));
+      setJustReadIds(new Set());
     } catch (err) { showToast("Error: " + err.message, "error"); }
   }
 
@@ -69,7 +81,7 @@ export default function MidwifeNotification() {
           n.message?.toLowerCase().includes(search.toLowerCase())
     );
 
-  const unreadNum = notifications.filter(n => !n.read).length;
+  const unreadNum = justReadIds.size;
 
   const borderColor = (n) => {
     if (n.type === "low-stock") return n.level === "Critical" ? "#dc2626" : "#d97706";
@@ -77,13 +89,13 @@ export default function MidwifeNotification() {
   };
 
   const cardBg = (n) => {
-    if (n.read) return "#f9fafb";
+    if (!justReadIds.has(n.id)) return "#f9fafb";
     if (n.type === "low-stock") return n.level === "Critical" ? "#fef2f2" : "#fffbeb";
     return "#eff6ff";
   };
 
   const cardBorder = (n) => {
-    if (n.read) return "#e5e7eb";
+    if (!justReadIds.has(n.id)) return "#e5e7eb";
     if (n.type === "low-stock") return n.level === "Critical" ? "#fecaca" : "#fde68a";
     return "#bfdbfe";
   };
@@ -107,7 +119,7 @@ export default function MidwifeNotification() {
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "midwife-nav-item" + (isActive ? " active" : "")}>
               <span>{item.label}</span>
-              {item.label === "Notifications" && unreadCount > 0 && (
+              {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
               )}
             </NavLink>
@@ -223,7 +235,7 @@ export default function MidwifeNotification() {
                   <div className="midwife-notif-body">
                     <div className="midwife-notif-title-row">
                       <p className="midwife-notif-title">{n.title}</p>
-                      {!n.read && (
+                      {justReadIds.has(n.id) && (
                         <span
                           className="midwife-notif-badge"
                           style={{

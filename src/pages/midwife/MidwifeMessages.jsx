@@ -3,6 +3,7 @@ import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, getDocs } from "firebase/firestore";
 import { db } from "../../firebase/config";
+import { useUnreadCount } from "../../hooks/useUnreadCount";
 import "./MidwifeMessages.css";
 
 const RHU_REGISTRY_COLLECTION = "cho_rhu_registry";
@@ -14,6 +15,7 @@ const navItems = [
   { label: "Inventory",     to: "/midwife/inventory"     },
   { label: "Dispense",      to: "/midwife/dispense"      },
   { label: "Reports",       to: "/midwife/reports"       },
+  { label: "BHW & Campaigns", to: "/midwife/bhw"         },
   { label: "Messages",      to: "/midwife/messages"      },
   { label: "Notifications", to: "/midwife/notifications" },
 ];
@@ -36,6 +38,7 @@ function cleanName(name) {
 export default function MidwifeMessages() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
+  const unreadCount = useUnreadCount();
 
   const currentBrgyName = userData?.barangayName || "Longos";
 
@@ -200,6 +203,9 @@ export default function MidwifeMessages() {
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "midwife-nav-item" + (isActive ? " active" : "")}>
               <span>{item.label}</span>
+              {item.label === "Notifications" && Boolean(unreadCount) && (
+                <span className="nav-badge">{unreadCount}</span>
+              )}
             </NavLink>
           ))}
         </nav>

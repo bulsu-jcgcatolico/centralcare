@@ -8,6 +8,9 @@ import {
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
 import { useToast } from "../../context/ToastContext";
+import {
+  getPriorMonthKey, monthKeyLabel, getSubmittedOwnerIds, displayFacilityName,
+} from "../../utils/monthlyBalance";
 import "./CHOBatchDistribution.css";
 
 const navItems = [
@@ -18,6 +21,7 @@ const navItems = [
   { label: "RHU Management",    to: "/cho/rhu-management"     },
   { label: "Population Report", to: "/cho/population-report"  },
   { label: "Batch Distribution",to: "/cho/batch-distribution" },
+  { label: "Balance Reports",   to: "/cho/balance-reports"    },
   { label: "Reports",           to: "/cho/reports"            },
   { label: "Messages",          to: "/cho/messages"           },
   { label: "Notifications",     to: "/cho/notifications"      },
@@ -60,14 +64,28 @@ export default function CHOBatchDistribution() {
   const [showDistributeModal, setShowDistributeModal] = useState(false);
   const [distributingBatch, setDistributingBatch]     = useState(null);
   const [boxesToDistribute, setBoxesToDistribute]     = useState("");
+  const [pendingFefoBatch, setPendingFefoBatch]       = useState(null); // { batch, recommended } awaiting confirmation
   const [calculatedDist, setCalculatedDist]           = useState(null);
 
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewData, setReviewData]           = useState(null);
 
+  // RHUs that HAVE submitted their end-of-month "Present End Balance" report
+  // for the most recently completed month. Only these are eligible to
+  // receive a new replenishment — this is the client's validation rule.
+  const [compliantRhuIds, setCompliantRhuIds] = useState(new Set());
+  const reportMonthKey = getPriorMonthKey();
+
   function handleLogout() { logout(); navigate("/"); }
 
-  useEffect(() => { loadBatches(); loadRhus(); loadDistributions(); }, []);
+  useEffect(() => { loadBatches(); loadRhus(); loadDistributions(); loadCompliance(); }, []);
+
+  async function loadCompliance() {
+    try {
+      const ids = await getSubmittedOwnerIds("rhu", reportMonthKey);
+      setCompliantRhuIds(ids);
+    } catch (err) { console.error("Error loading RHU balance compliance:", err); }
+  }
 
   async function loadBatches() {
     setLoading(true);
@@ -94,18 +112,62 @@ export default function CHOBatchDistribution() {
   }
 
   function openDistributeModal(batch) {
+    const recommended = availableBatches.find(b => b.name === batch.name && b._isFefoFirst);
+    const needsWarning = recommended
+      && recommended.id !== batch.id
+      && (recommended.remaining ?? recommended.quantity ?? 0) > 0;
+    if (needsWarning) {
+      setPendingFefoBatch({ batch, recommended });
+      return;
+    }
+    actuallyOpenDistributeModal(batch);
+  }
+
+  function actuallyOpenDistributeModal(batch) {
     setDistributingBatch(batch);
     setBoxesToDistribute("");
     setCalculatedDist(null);
     setShowDistributeModal(true);
   }
 
-  function calculatePercentageSplit() {
-    const activeRhus = rhus.filter(r => (Number(r.totalPopulation) || 0) > 0);
-    const populationSum = activeRhus.reduce((s, r) => s + (Number(r.totalPopulation) || 0), 0);
+  function confirmFefoAndProceed() {
+    const batch = pendingFefoBatch.batch;
+    setPendingFefoBatch(null);
+    actuallyOpenDistributeModal(batch);
+  }
 
-    if (activeRhus.length === 0 || populationSum <= 0) {
+  function calculatePercentageSplit() {
+    const populationRhus = rhus.filter(r => (Number(r.totalPopulation) || 0) > 0);
+
+    if (populationRhus.length === 0) {
       showToast('No RHU has a Total Population set yet. Set it in RHU Management first.', "error");
+      return;
+    }
+
+    // Validation rule: an RHU must have submitted its "Present End Balance"
+    // report for the month that just ended before CHO can send it a new
+    // replenishment. This prevents blindly over-distributing to RHUs whose
+    // stock movement hasn't been reviewed.
+    const activeRhus = populationRhus.filter(r => compliantRhuIds.has(String(r.id).trim().toLowerCase()));
+    const skippedRhus = populationRhus.filter(r => !compliantRhuIds.has(String(r.id).trim().toLowerCase()));
+
+    if (activeRhus.length === 0) {
+      showToast(
+        `No RHU is eligible for replenishment yet — none have submitted their ${monthKeyLabel(reportMonthKey)} end-balance report.`,
+        "error"
+      );
+      return;
+    }
+    if (skippedRhus.length > 0) {
+      showToast(
+        `Skipping ${skippedRhus.map(r => displayFacilityName(r.rhuName)).join(", ")} — missing ${monthKeyLabel(reportMonthKey)} end-balance report. They won't receive this batch until submitted.`,
+        "error"
+      );
+    }
+
+    const populationSum = activeRhus.reduce((s, r) => s + (Number(r.totalPopulation) || 0), 0);
+    if (populationSum <= 0) {
+      showToast('Eligible RHUs have no Total Population set. Set it in RHU Management first.', "error");
       return;
     }
     const total = parseInt(boxesToDistribute, 10);
@@ -194,6 +256,9 @@ export default function CHOBatchDistribution() {
           rhuName: rhu.name,
           distributionId: docRef.id,
           receivedStatus: "Pending",
+          isVaccine: !!distributingBatch.isVaccine,
+          doseType: distributingBatch.doseType ?? "",
+          dosesPerVial: distributingBatch.dosesPerVial ?? 0,
           createdAt: serverTimestamp(),
         });
       }
@@ -347,7 +412,7 @@ export default function CHOBatchDistribution() {
                 <NavLink key={item.to} to={item.to}
                   className={({ isActive }) => "rhu-nav-item" + (isActive ? " active" : "")}>
                   <span>{item.label}</span>
-                  {item.label === "Notifications" && unreadCount > 0 && (
+                  {item.label === "Notifications" && Boolean(unreadCount) && (
                     <span className="nav-badge">{unreadCount}</span>
                   )}
                 </NavLink>
@@ -391,6 +456,9 @@ export default function CHOBatchDistribution() {
                       <option key={m} value={m}>{m}</option>
                     ))}
                   </select>
+                  <button className="rhu-btn-secondary" onClick={() => navigate("/cho/balance-reports")}>
+                    Review RHU Balance Reports
+                  </button>
                   <button className="rhu-btn-primary" onClick={() => window.print()}>
                     Print / Export PDF
                   </button>
@@ -616,52 +684,72 @@ export default function CHOBatchDistribution() {
         </div>
       </div>
 
+      {pendingFefoBatch && (
+        <div className="rhu-modal-overlay" style={{ zIndex: 1100 }} onClick={() => setPendingFefoBatch(null)}>
+          <div className="rhu-modal" style={{ maxWidth: "440px" }} onClick={e => e.stopPropagation()}>
+            <div className="rhu-modal-header">
+              <h2 className="rhu-modal-title">⚠ Not the recommended lot</h2>
+              <button className="rhu-modal-close" aria-label="Close" onClick={() => setPendingFefoBatch(null)}>×</button>
+            </div>
+            <div className="rhu-modal-body">
+              <p className="rhu-dist-note">
+                Lot <strong>{pendingFefoBatch.recommended.lotNumber || "—"}</strong> of {pendingFefoBatch.recommended.name} {
+                  pendingFefoBatch.recommended.expiryDate === pendingFefoBatch.batch.expiryDate
+                    ? "expires on the same date but is"
+                    : `expires sooner (${pendingFefoBatch.recommended.expiryDate || "no expiry set"}) and is`
+                } the recommended lot to distribute first (FEFO).
+              </p>
+              <p className="rhu-dist-note" style={{ marginTop: "8px" }}>
+                You're about to distribute Lot <strong>{pendingFefoBatch.batch.lotNumber || "—"}</strong> instead. Continue anyway?
+              </p>
+            </div>
+            <div className="rhu-modal-footer">
+              <button className="rhu-btn-secondary" onClick={() => setPendingFefoBatch(null)}>Cancel</button>
+              <button className="rhu-btn-primary" onClick={confirmFefoAndProceed}>Continue Anyway</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showDistributeModal && distributingBatch && (
         <div className="rhu-modal-overlay" onClick={() => setShowDistributeModal(false)}>
-          <div className="rhu-modal" onClick={e => e.stopPropagation()}>
+          <div className="rhu-modal" style={{ maxWidth: "680px" }} onClick={e => e.stopPropagation()}>
             <div className="rhu-modal-header">
               <h2 className="rhu-modal-title">Distribute {distributingBatch.name}</h2>
               <button className="rhu-modal-close" aria-label="Close" onClick={() => setShowDistributeModal(false)}>×</button>
             </div>
             <div className="rhu-modal-body">
               <p className="rhu-dist-note">
-                Lot {distributingBatch.lotNumber || "—"} — {distributingBatch.remaining ?? distributingBatch.quantity} boxes remaining.
+                Lot {distributingBatch.lotNumber || "—"} — {distributingBatch.remaining ?? distributingBatch.quantity} {distributingBatch.isVaccine ? "vials" : "boxes"} remaining.
                 Calculates share dynamically based on total RHU population.
               </p>
-              {(() => {
-                const sameNameBatches = batches.filter(b =>
-                  b.name === distributingBatch.name
-                  && b.id !== distributingBatch.id
-                  && (b.remaining ?? b.quantity) > 0
-                );
-                const better = sameNameBatches.find(b => getExpiryTime(b) < getExpiryTime(distributingBatch));
-                if (!better) return null;
-                return (
-                  <p className="rhu-dist-note" style={{ color: "#b45309", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 10px" }}>
-                    ⚠ Lot {better.lotNumber || "—"} of {better.name} expires sooner ({better.expiryDate || "no expiry set"}) — consider distributing that one first (FEFO).
-                  </p>
-                );
-              })()}
+              <p className="rhu-dist-note" style={{ color: compliantRhuIds.size < rhus.filter(r => (Number(r.totalPopulation) || 0) > 0).length ? "#b45309" : "#166534" }}>
+                {compliantRhuIds.size} of {rhus.filter(r => (Number(r.totalPopulation) || 0) > 0).length} population-registered RHUs have submitted their {monthKeyLabel(reportMonthKey)} end-balance report and are eligible for this replenishment.
+              </p>
               <div className="rhu-form-field">
                 <label className="rhu-label">Boxes to Distribute</label>
                 <input className="rhu-input" type="number" min="1" placeholder="e.g., 100"
                   value={boxesToDistribute} onChange={e => { setBoxesToDistribute(e.target.value); setCalculatedDist(null); }} />
               </div>
-              <button className="rhu-btn-secondary" onClick={calculatePercentageSplit}>Calculate Split</button>
+              <button className="rhu-btn-secondary" onClick={calculatePercentageSplit}>
+                Calculate Split
+              </button>
 
               {calculatedDist && (
                 <>
-                  <p className="rhu-dist-note" style={{ marginTop: "1rem" }}>Calculated Split Preview:</p>
-                  <table className="rhu-table">
+                  <p className="rhu-dist-note" style={{ marginTop: "1.25rem", fontWeight: 600 }}>
+                    Calculated Split Preview — {distributingBatch.name}, Lot {distributingBatch.lotNumber || "—"}
+                  </p>
+                  <table className="rhu-table" style={{ marginTop: "0.5rem" }}>
                     <thead>
-                      <tr><th>RHU</th><th>POP SHARE %</th><th>BOXES</th></tr>
+                      <tr><th>RHU</th><th>POPULATION SHARE</th><th>BOXES</th></tr>
                     </thead>
                     <tbody>
                       {calculatedDist.map(rhu => (
                         <tr key={rhu.id}>
-                          <td><strong>{rhu.name}</strong></td>
-                          <td>{rhu.sharePercent}%</td>
-                          <td><strong>{rhu.boxes} boxes</strong></td>
+                          <td style={{ padding: "10px 14px" }}><strong>{rhu.name}</strong></td>
+                          <td style={{ padding: "10px 14px" }}>{rhu.sharePercent}%</td>
+                          <td style={{ padding: "10px 14px" }}><strong>{rhu.boxes} boxes</strong></td>
                         </tr>
                       ))}
                     </tbody>

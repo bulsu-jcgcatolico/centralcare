@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { collection, getDocs, query, where, doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { buildForecastList, getUrgentForecasts, FIELD_MAPS } from "../../utils/stockForecast";
 import "./MidwifeDashboard.css";
 
 const navItems = [
@@ -12,6 +13,7 @@ const navItems = [
   { label: "Inventory",     to: "/midwife/inventory"     },
   { label: "Dispense",      to: "/midwife/dispense"      },
   { label: "Reports",       to: "/midwife/reports"       },
+  { label: "BHW & Campaigns", to: "/midwife/bhw"         },
   { label: "Messages",      to: "/midwife/messages"      },
   { label: "Notifications", to: "/midwife/notifications" },
 ];
@@ -25,6 +27,8 @@ export default function MidwifeDashboard() {
   const [inventory, setInventory] = useState([]);
   const [patients, setPatients] = useState([]);
   const [dispenseLogs, setDispenseLogs] = useState([]);
+  const [bhwAllocations, setBhwAllocations] = useState([]);
+  const [monthlyReports, setMonthlyReports] = useState([]);
   const [barangayPopulation, setBarangayPopulation] = useState(0);
   const [loading, setLoading] = useState(false);
 
@@ -44,7 +48,7 @@ export default function MidwifeDashboard() {
     try {
       const currentBarangay = userData?.barangayName ?? "";
 
-      const [invSnap, patSnap, dispSnap, barangaySnap] = await Promise.all([
+      const [invSnap, patSnap, dispSnap, barangaySnap, reportsSnap, bhwAllocSnap] = await Promise.all([
         getDocs(query(
           collection(db, "inventory"),
           where("ownerType", "==", "midwife"),
@@ -60,12 +64,25 @@ export default function MidwifeDashboard() {
         )),
         currentBarangay
           ? getDoc(doc(db, "cho_barangays", currentBarangay))
-          : Promise.resolve(null)
+          : Promise.resolve(null),
+        currentBarangay
+          ? getDocs(query(
+              collection(db, "monthly_balance_reports"),
+              where("ownerType", "==", "midwife"),
+              where("ownerId", "==", currentBarangay)
+            ))
+          : Promise.resolve({ docs: [] }),
+        getDocs(query(
+          collection(db, "bhw_allocations"),
+          where("barangayName", "==", currentBarangay)
+        ))
       ]);
 
       setInventory(invSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setPatients(patSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setDispenseLogs(dispSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setMonthlyReports(reportsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setBhwAllocations(bhwAllocSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
       if (barangaySnap && barangaySnap.exists()) {
         const bData = barangaySnap.data();
@@ -82,6 +99,22 @@ export default function MidwifeDashboard() {
   const lowStockItems = inventory.filter(i => (i.remaining ?? i.quantity ?? 0) <= 50);
   const availableMedicines = inventory.filter(i => (i.remaining ?? i.quantity ?? 0) > 0);
   const totalBoxesDispensed = dispenseLogs.reduce((s, l) => s + (l.boxesDispensed || 0), 0);
+
+  // Predictive stock-out forecast — trailing moving-average consumption rate
+  // from real patient dispensing, falling back to the last submitted monthly
+  // balance report when there isn't enough recent history yet.
+  //
+  // Stock handed to a BHW has already left the midwife's physical custody
+  // (see MidwifeBHW.jsx), so it counts as consumption for forecasting
+  // purposes even before the BHW reports back what was actually used —
+  // otherwise the forecast would think more stock remains than it does.
+  const bhwAllocationsAsLogs = bhwAllocations.map(a => ({
+    medicineName: a.itemName,
+    boxesDispensed: a.quantityAllocated,
+    dispensedAt: a.allocatedAt,
+  }));
+  const forecastList = buildForecastList(inventory, [...dispenseLogs, ...bhwAllocationsAsLogs], monthlyReports, FIELD_MAPS.midwife);
+  const urgentForecasts = getUrgentForecasts(forecastList, 5);
 
   const filteredMedicines = availableMedicines.filter(med =>
     med.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -112,7 +145,7 @@ export default function MidwifeDashboard() {
               className={({ isActive }) => "midwife-nav-item" + (isActive ? " active" : "")}
             >
               <span>{item.label}</span>
-              {item.label === "Notifications" && unreadCount > 0 && (
+              {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
               )}
             </NavLink>
@@ -138,10 +171,15 @@ export default function MidwifeDashboard() {
             onChange={e => setSearch(e.target.value)}
           />
           <div className="midwife-topbar-right">
-            <button className="midwife-notif-btn">
+            <button className="midwife-notif-btn" onClick={() => navigate("/midwife/notifications")} style={{ position: "relative" }}>
               <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
                 <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
               </svg>
+              {Boolean(unreadCount) && (
+                <span className="nav-badge" style={{ position: "absolute", top: "-4px", right: "-4px" }}>
+                  {unreadCount}
+                </span>
+              )}
             </button>
             <div className="midwife-user">
               <div className="midwife-user-info">
@@ -291,6 +329,46 @@ export default function MidwifeDashboard() {
               )}
             </section>
           </div>
+
+          {/* Predicted Stock-Outs */}
+          <section className="midwife-section">
+            <div className="midwife-section-hd">
+              <h2 className="midwife-section-title">Predicted Stock-Outs</h2>
+              <NavLink to="/midwife/inventory" className="midwife-view-all">View Inventory</NavLink>
+            </div>
+            {urgentForecasts.length === 0 ? (
+              <div className="midwife-empty-small">
+                <p>No items are trending toward a stock-out based on the last 30 days of dispensing activity.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {urgentForecasts.map(f => (
+                  <div key={f.itemId} style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "12px 14px", borderRadius: "8px",
+                    background: f.status === "critical" ? "#fef2f2" : "#fffbeb",
+                    border: `1px solid ${f.status === "critical" ? "#fecaca" : "#fde68a"}`,
+                  }}>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: 600, color: "#0f172a" }}>
+                        {f.name}{f.lotNumber ? ` (Lot ${f.lotNumber})` : ""}{f.isVaccine ? " 💉" : ""}
+                      </p>
+                      <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#6b7280" }}>
+                        {f.remaining} boxes remaining · ~{f.dailyRate.toFixed(1)}/day
+                        {f.wasteRisk && <span style={{ color: "#b45309" }}> · will expire before running out</span>}
+                      </p>
+                    </div>
+                    <span style={{
+                      fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "99px",
+                      background: f.status === "critical" ? "#dc2626" : "#d97706", color: "#fff",
+                    }}>
+                      ~{Math.round(f.daysRemaining)} days left
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </main>
       </div>
     </div>

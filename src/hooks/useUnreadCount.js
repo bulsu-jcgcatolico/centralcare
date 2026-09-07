@@ -26,10 +26,15 @@ export function useUnreadCount() {
         where("read", "==", false)
       );
     } else if (role === "rhu") {
-      // RHU sees CHO distributions + low stock
+      // RHU sees CHO distributions + low stock.
+      // CHOBatchDistribution.jsx writes toRhuId using the RHU registry's raw
+      // doc ID (a plain number, e.g. "9"), not userData.rhuId verbatim (e.g.
+      // "RHU 9") — extract just the number so both sides always agree. This
+      // matches the same fix already applied in RHUNotification.jsx.
+      const rhuNumber = String(userData.rhuId ?? "").match(/\d+/)?.[0] ?? "";
       q = query(
         collection(db, "notifications"),
-        where("toRhuId", "==", userData.rhuId ?? ""),
+        where("toRhuId", "==", rhuNumber),
         where("read", "==", false)
       );
     } else if (role === "midwife") {

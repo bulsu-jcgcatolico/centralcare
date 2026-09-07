@@ -15,13 +15,14 @@ import { useToast } from "../../context/ToastContext";
 import "./RHUBarangay.css";
 
 const navItems = [
-  { label: "Dashboard",     to: "/rhu/dashboard"     },
-  { label: "Inventory",     to: "/rhu/inventory"     },
-  { label: "Barangay",      to: "/rhu/barangay"      },
-  { label: "Distribution",  to: "/rhu/distribution"  },
-  { label: "Reports",       to: "/rhu/reports"       },
-  { label: "Messages",      to: "/rhu/messages"      },
-  { label: "Notifications", to: "/rhu/notifications" },
+  { label: "Dashboard",       to: "/rhu/dashboard"         },
+  { label: "Inventory",       to: "/rhu/inventory"         },
+  { label: "Barangay",        to: "/rhu/barangay"          },
+  { label: "Distribution",    to: "/rhu/distribution"      },
+  { label: "Balance Reports", to: "/rhu/balance-reports"   },
+  { label: "Reports",         to: "/rhu/reports"           },
+  { label: "Messages",        to: "/rhu/messages"          },
+  { label: "Notifications",   to: "/rhu/notifications"     },
 ];
 
 const BARANGAYS_COLLECTION = "cho_barangays";
@@ -197,7 +198,7 @@ export default function RHUBarangay() {
             <NavLink key={item.to} to={item.to}
               className={({ isActive }) => "rhu-nav-item" + (isActive ? " active" : "")}>
               <span>{item.label}</span>
-              {item.label === "Notifications" && unreadCount > 0 && (
+              {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
               )}
             </NavLink>
