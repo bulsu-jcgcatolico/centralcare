@@ -85,10 +85,6 @@ export default function RHUInventory() {
   const [dateReceived, setDateReceived] = useState("");
   const [processingAction, setProcessingAction] = useState(false);
 
-  // Decline modal
-  const [showDeclineModal, setShowDeclineModal] = useState(false);
-  const [declineReason, setDeclineReason] = useState("");
-
   function handleLogout() { logout(); navigate("/"); }
 
   useEffect(() => { loadInventory(); }, [userData]);
@@ -222,25 +218,11 @@ export default function RHUInventory() {
     setSaving(false);
   }
 
-  async function deleteItem(id) {
-    if (!confirm("Delete this item?")) return;
-    try {
-      await deleteDoc(doc(db, "inventory", id));
-      setInventory(prev => prev.filter(i => i.id !== id));
-    } catch (err) { showToast("Error: " + err.message, "error"); }
-  }
-
   function openAcceptModal(item) {
     setSelectedItem(item);
     setReceivedBy(userData?.username || "");
     setDateReceived(new Date().toISOString().split("T")[0]);
     setShowAcceptModal(true);
-  }
-
-  function openDeclineModal(item) {
-    setSelectedItem(item);
-    setDeclineReason("");
-    setShowDeclineModal(true);
   }
 
   async function handleAccept() {
@@ -289,32 +271,6 @@ export default function RHUInventory() {
       });
 
       setShowAcceptModal(false);
-      loadInventory();
-    } catch (err) { showToast("Error: " + err.message, "error"); }
-    setProcessingAction(false);
-  }
-
-  async function handleDecline() {
-    setProcessingAction(true);
-    try {
-      await updateDoc(doc(db, "inventory", selectedItem.id), {
-        receivedStatus: "Declined",
-        declineReason: declineReason.trim() || "No reason provided",
-        declinedAt: serverTimestamp()
-      });
-
-      await addDoc(collection(db, "notifications"), {
-        type: "shipment_declined",
-        title: "Supply Shipment Declined",
-        message: `${userData?.rhuName || "RHU"} declined shipment of ${selectedItem.name} (${selectedItem.quantity} boxes). Reason: ${declineReason.trim() || "None"}`,
-        fromRhuName: userData?.rhuName || "",
-        fromRhuId: userData?.rhuId || "",
-        read: false,
-        createdAt: serverTimestamp()
-      });
-
-      showToast("Shipment declined.", "info");
-      setShowDeclineModal(false);
       loadInventory();
     } catch (err) { showToast("Error: " + err.message, "error"); }
     setProcessingAction(false);
@@ -516,8 +472,8 @@ export default function RHUInventory() {
               </p>
             </div>
           ) : (
-            <section className="rhu-inv-section">
-              <div style={{ width: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            <section className="rhu-inv-section" style={{ flexShrink: 0 }}>
+              <div className="rhu-inv-scroll-box" style={{ width: "100%", maxHeight: "480px", overflowY: "auto", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                 <table className="rhu-inv-table">
                   <colgroup>
                     <col style={{ width: "11%" }} />
@@ -578,20 +534,12 @@ export default function RHUInventory() {
                           </td>
                           <td>
                             <div className="rhu-action-group">
-                              {isPending && (
-                                <>
-                                  <button className="rhu-btn-action rhu-btn-distribute" onClick={() => openAcceptModal(item)}>
-                                    Accept
-                                  </button>
-                                  <button className="rhu-btn-action rhu-btn-del" onClick={() => openDeclineModal(item)}>
-                                    Decline
-                                  </button>
-                                </>
-                              )}
-                              {!isPending && (
-                                <button className="rhu-btn-action rhu-btn-del" onClick={() => deleteItem(item.id)}>
-                                  Delete
+                              {isPending ? (
+                                <button className="rhu-btn-action rhu-btn-distribute" onClick={() => openAcceptModal(item)}>
+                                  Accept
                                 </button>
+                              ) : (
+                                <span style={{ color: "#9ca3af" }}>—</span>
                               )}
                             </div>
                           </td>
@@ -796,37 +744,26 @@ export default function RHUInventory() {
         </div>
       )}
 
-      {showDeclineModal && selectedItem && (
-        <div className="rhu-modal-overlay" onClick={() => setShowDeclineModal(false)}>
-          <div className="rhu-modal" onClick={e => e.stopPropagation()}>
-            <div className="rhu-modal-header">
-              <h2 className="rhu-modal-title">Decline Supply Shipment</h2>
-              <button className="rhu-modal-close" aria-label="Close" onClick={() => setShowDeclineModal(false)}>×</button>
-            </div>
-            <div className="rhu-modal-body">
-              <p className="rhu-dist-note">
-                Are you sure you want to decline <strong>{selectedItem.quantity} boxes</strong> of <strong>{selectedItem.name}</strong>?
-              </p>
-              <div className="rhu-form-field">
-                <label className="rhu-label">Reason for Declining</label>
-                <textarea 
-                  className="rhu-input" 
-                  rows="3" 
-                  placeholder="e.g., Damaged boxes, incorrect item, expired..."
-                  value={declineReason} 
-                  onChange={e => setDeclineReason(e.target.value)} 
-                />
-              </div>
-            </div>
-            <div className="rhu-modal-footer">
-              <button className="rhu-btn-secondary" onClick={() => setShowDeclineModal(false)}>Cancel</button>
-              <button className="rhu-btn-action rhu-btn-del" onClick={handleDecline} disabled={processingAction} style={{ padding: "10px 18px", borderRadius: "8px" }}>
-                {processingAction ? "Declining..." : "Decline Shipment"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <style>{`
+        .rhu-inv-scroll-box {
+          scrollbar-width: auto; /* Firefox: always show, not overlay */
+        }
+        .rhu-inv-scroll-box::-webkit-scrollbar {
+          width: 12px;
+          height: 12px;
+        }
+        .rhu-inv-scroll-box::-webkit-scrollbar-track {
+          background: #f3f4f6;
+        }
+        .rhu-inv-scroll-box::-webkit-scrollbar-thumb {
+          background: #9ca3af;
+          border-radius: 6px;
+          border: 2px solid #f3f4f6;
+        }
+        .rhu-inv-scroll-box::-webkit-scrollbar-thumb:hover {
+          background: #6b7280;
+        }
+      `}</style>
     </div>
   );
 }

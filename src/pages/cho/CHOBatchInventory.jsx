@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
-  collection, addDoc, getDocs, deleteDoc, doc,
+  collection, addDoc, getDocs, doc,
   serverTimestamp
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
@@ -154,14 +154,6 @@ export default function CHOBatchInventory() {
       loadBatches();
     } catch (err) { alert("Error: " + err.message); }
     setSaving(false);
-  }
-
-  async function deleteBatch(id) {
-    if (!confirm("Delete this batch record?")) return;
-    try {
-      await deleteDoc(doc(db, BATCHES_COLLECTION, id));
-      setBatches(batches.filter(b => b.id !== id));
-    } catch (err) { alert("Error: " + err.message); }
   }
 
   // Generate dynamic list of available months from batches

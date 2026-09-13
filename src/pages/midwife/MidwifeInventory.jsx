@@ -23,7 +23,7 @@ const navItems = [
   { label: "Inventory",     to: "/midwife/inventory"     },
   { label: "Dispense",      to: "/midwife/dispense"      },
   { label: "Reports",       to: "/midwife/reports"       },
-  { label: "BHW & Campaigns", to: "/midwife/bhw"         },
+  { label: "BHW & Campaigns", to: "/midwife/bhw"        },
   { label: "Messages",      to: "/midwife/messages"      },
   { label: "Notifications", to: "/midwife/notifications" },
 ];
@@ -210,14 +210,6 @@ export default function MidwifeInventory() {
       loadInventory();
     } catch (err) { showToast("Error: " + err.message, "error"); }
     setSaving(false);
-  }
-
-  async function deleteItem(id) {
-    if (!confirm("Delete this item? This cannot be undone.")) return;
-    try {
-      await deleteDoc(doc(db, "inventory", id));
-      setInventory(inventory.filter(i => i.id !== id));
-    } catch (err) { showToast("Error: " + err.message, "error"); }
   }
 
   function openReceiveModal(item) {
@@ -497,7 +489,8 @@ export default function MidwifeInventory() {
               )}
             </div>
           ) : (
-            <section className="midwife-inv-section">
+            <section className="midwife-inv-section" style={{ flexShrink: 0 }}>
+              <div className="midwife-inv-scroll-box" style={{ width: "100%", maxHeight: "480px", overflowY: "auto", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
               <table className="midwife-table">
                 <colgroup>
                   <col style={{ width: "10%" }} />
@@ -577,6 +570,7 @@ export default function MidwifeInventory() {
                   })}
                 </tbody>
               </table>
+              </div>
             </section>
           )}
         </main>
@@ -767,6 +761,27 @@ export default function MidwifeInventory() {
           </div>
         </div>
       )}
+
+      <style>{`
+        .midwife-inv-scroll-box {
+          scrollbar-width: auto;
+        }
+        .midwife-inv-scroll-box::-webkit-scrollbar {
+          width: 12px;
+          height: 12px;
+        }
+        .midwife-inv-scroll-box::-webkit-scrollbar-track {
+          background: #f3f4f6;
+        }
+        .midwife-inv-scroll-box::-webkit-scrollbar-thumb {
+          background: #9ca3af;
+          border-radius: 6px;
+          border: 2px solid #f3f4f6;
+        }
+        .midwife-inv-scroll-box::-webkit-scrollbar-thumb:hover {
+          background: #6b7280;
+        }
+      `}</style>
     </div>
   );
 }
