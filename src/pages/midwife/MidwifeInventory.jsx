@@ -129,12 +129,12 @@ export default function MidwifeInventory() {
       );
       
       const snap = await getDocs(baseQuery);
-      const userBarangay = String(userData?.barangayName || userData?.barangay || "").toLowerCase();
+      const userBarangay = String(userData?.barangayName || userData?.barangay || "").trim().toLowerCase();
 
       const list = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(item => {
-          const itemBarangay = String(item.barangayName || item.barangay || "").toLowerCase();
+          const itemBarangay = String(item.barangayName || item.barangay || "").trim().toLowerCase();
           return userBarangay && itemBarangay === userBarangay;
         });
 
@@ -143,7 +143,7 @@ export default function MidwifeInventory() {
       // Run expiry checks strictly on active/received items
       const activeItems = list.filter(i => {
         const status = String(i.receivedStatus || "").trim().toLowerCase();
-        return status === "received" || status === "accepted" || !i.receivedStatus;
+        return status === "received" || status === "accepted";
       });
       runExpiryChecks(activeItems, "midwife", { barangayName: userData?.barangayName });
     } catch (err) { 
@@ -239,14 +239,20 @@ export default function MidwifeInventory() {
   }
 
   // Strict Split: Active vs Pending
+  // An item is Active only once it's explicitly confirmed (Received/Accepted —
+  // e.g. a manual "Log New Shipment" entry, which sets this itself). Anything
+  // else — including a shipment from the RHU that never got a status written
+  // at all — is Pending until the midwife taps "Confirm Receipt". Previously
+  // a missing/blank receivedStatus matched BOTH filters below, which is what
+  // let unconfirmed RHU shipments silently land in Active Stock.
   const activeInventory = inventory.filter(i => {
     const status = String(i.receivedStatus || "").trim().toLowerCase();
-    return status === "received" || status === "accepted" || !i.receivedStatus;
+    return status === "received" || status === "accepted";
   });
 
   const pendingInventory = inventory.filter(i => {
     const status = String(i.receivedStatus || "").trim().toLowerCase();
-    return status === "pending" || status === ""; // depending on backend setup, treating blank/pending safely
+    return status !== "received" && status !== "accepted";
   });
 
   // For the actual table rows rendered
@@ -266,12 +272,9 @@ export default function MidwifeInventory() {
       return 0; // preserve existing relative order otherwise
     });
 
-  const lowStockCount   = activeInventory.filter(i => (i.remaining ?? 0) <= 50 && (i.remaining ?? 0) > 20).length;
+  const lowStockCount   = activeInventory.filter(i => (i.remaining ?? 0) <= 50).length; // includes Critical (<=20) — "low stock" is the whole reorder-alert band, not just the 21-50 slice
   const criticalCount   = activeInventory.filter(i => (i.remaining ?? 0) <= 20).length;
-  const pendingReceiptCount = inventory.filter(i => {
-    const status = String(i.receivedStatus || "").trim().toLowerCase();
-    return status === "pending" || status === "";
-  }).length;
+  const pendingReceiptCount = pendingInventory.length;
   const expiringCount   = activeInventory.filter(i => {
     if (!i.expiry) return false;
     const days = (new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24);
@@ -550,17 +553,19 @@ export default function MidwifeInventory() {
                           )}
                         </td>
                         <td>
-                          {isPending || item.receivedStatus === "Pending" ? (
-                            <span className="midwife-status-badge midwife-status--low">Pending</span>
-                          ) : (
-                            <span className="midwife-status-badge midwife-status--good">Received</span>
-                          )}
+                          {(() => {
+                            const st = String(item.receivedStatus || "").trim().toLowerCase();
+                            const received = st === "received" || st === "accepted";
+                            return received
+                              ? <span className="midwife-status-badge midwife-status--good">Received</span>
+                              : <span className="midwife-status-badge midwife-status--low">Pending</span>;
+                          })()}
                         </td>
                         <td>
                           <div style={{ display: "flex", gap: "6px" }}>
                             {isPending && (
                               <button className="midwife-btn-icon" onClick={() => openReceiveModal(item)}>
-                                Receive
+                                Accept
                               </button>
                             )}
                           </div>

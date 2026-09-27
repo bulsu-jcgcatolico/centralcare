@@ -394,7 +394,7 @@ export default function RHUDistribution() {
         fromRhuId:      userData?.rhuId  ?? "",
         fromRhuName:    userData?.rhuName ?? "",
         distributionId: dist.id,
-        receivedStatus: "Accepted",
+        receivedStatus: "Pending", // awaiting the midwife's own Confirm Receipt — RHU clicking Distribute isn't the same as the stock actually arriving
         isVaccine:      !!dist.isVaccine,
         doseType:       dist.doseType ?? "",
         dosesPerVial:   dist.dosesPerVial ?? 0,
@@ -404,8 +404,8 @@ export default function RHUDistribution() {
 
       await addDoc(collection(db, "notifications"), {
         type:           "distribution",
-        title:          "Supply Dispatched",
-        message:        `Your ${b.boxes} boxes of ${dist.medicineName} have been dispatched and added to your inventory by ${userData?.rhuName || "RHU"}.`,
+        title:          "Supply Dispatched — Confirm Receipt",
+        message:        `${b.boxes} boxes of ${dist.medicineName} have been dispatched by ${userData?.rhuName || "RHU"}. Please confirm receipt in your Inventory once it arrives.`,
         toBarangayName: b.name,
         fromRhuId:      userData?.rhuId  ?? "",
         fromRhuName:    userData?.rhuName ?? "",
@@ -449,7 +449,7 @@ export default function RHUDistribution() {
           fromRhuId:      userData?.rhuId  ?? "",
           fromRhuName:    userData?.rhuName ?? "",
           distributionId: dist.id,
-          receivedStatus: "Accepted",
+          receivedStatus: "Pending", // awaiting the midwife's own Confirm Receipt — RHU clicking Distribute isn't the same as the stock actually arriving
           isVaccine:      !!dist.isVaccine,
           doseType:       dist.doseType ?? "",
           dosesPerVial:   dist.dosesPerVial ?? 0,
@@ -459,8 +459,8 @@ export default function RHUDistribution() {
 
         await addDoc(collection(db, "notifications"), {
           type:           "distribution",
-          title:          "Supply Dispatched",
-          message:        `Your ${b.boxes} boxes of ${dist.medicineName} have been dispatched and added to your inventory by ${userData?.rhuName || "RHU"}.`,
+          title:          "Supply Dispatched — Confirm Receipt",
+          message:        `${b.boxes} boxes of ${dist.medicineName} have been dispatched by ${userData?.rhuName || "RHU"}. Please confirm receipt in your Inventory once it arrives.`,
           toBarangayName: b.name,
           fromRhuId:      userData?.rhuId  ?? "",
           fromRhuName:    userData?.rhuName ?? "",
@@ -1061,6 +1061,46 @@ export default function RHUDistribution() {
         @media print {
           .cho-screen-only { display: none !important; }
           .cho-print-only  { display: block !important; }
+        }
+
+        /* The clipping was actually the outer distribution card, not the
+           table wrapper inside it — an ancestor with overflow:hidden clips
+           its children no matter what overflow the child itself uses. */
+        .rhu-dist-plan {
+          max-height: none !important;
+          height: auto !important;
+          overflow: visible !important;
+        }
+
+        /* Let the distribution table expand to fit every row instead of
+           clipping the last one inside a fixed-height scrollbox. */
+        .rhu-table-wrapper {
+          max-height: none !important;
+          height: auto !important;
+          overflow-y: visible !important;
+          overflow-x: auto !important;
+        }
+
+        /* New Distribution modal: make the modal body the single scrolling
+           region, capped to a sane viewport height, so pressing Calculate
+           adds content below the checklist instead of squeezing the
+           checklist down to make room for it. */
+        .rhu-modal--lg {
+          max-height: 90vh !important;
+          height: auto !important;
+          display: flex !important;
+          flex-direction: column !important;
+        }
+        .rhu-modal--lg .rhu-modal-body {
+          flex: 1 1 auto !important;
+          min-height: 0 !important;
+          max-height: none !important;
+          overflow-y: auto !important;
+        }
+        .rhu-modal--lg .rhu-med-select-list {
+          flex: none !important;
+          max-height: 220px !important;
+          overflow-y: auto !important;
         }
       `}</style>
     </div>
