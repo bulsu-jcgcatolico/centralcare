@@ -298,11 +298,16 @@ export default function MidwifeAddPatient(props) {
           <div className="midwife-topbar-right">
             <div className="midwife-user">
               <div className="midwife-user-info">
-                <span className="midwife-user-name">{(userData && userData.username) || "Maria Santos"}</span>
+                <span className="midwife-user-name">Barangay {(userData && userData.barangayName) || "Longos"}</span>
                 <span className="midwife-user-role">Registered Midwife</span>
               </div>
               <div className="midwife-avatar">
-                {((userData && userData.username) ? userData.username.substring(0, 2) : "MS").toUpperCase()}
+                {`Barangay ${(userData && userData.barangayName) || "Longos"}`
+                  .split(" ")
+                  .map(n => n[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()}
               </div>
             </div>
           </div>

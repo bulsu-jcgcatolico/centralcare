@@ -223,11 +223,16 @@ export default function MidwifeMessages() {
           <div className="midwife-topbar-right" style={{ marginLeft: "auto" }}>
             <div className="midwife-user">
               <div className="midwife-user-info">
-                <span className="midwife-user-name">Midwife ({currentBrgyName})</span>
-                <span className="midwife-user-role">Barangay Health Station</span>
+                <span className="midwife-user-name">Barangay {currentBrgyName}</span>
+                <span className="midwife-user-role">Registered Midwife</span>
               </div>
               <div className="midwife-avatar">
-                {currentBrgyName.substring(0, 2).toUpperCase()}
+                {`Barangay ${currentBrgyName}`
+                  .split(" ")
+                  .map(n => n[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()}
               </div>
             </div>
           </div>

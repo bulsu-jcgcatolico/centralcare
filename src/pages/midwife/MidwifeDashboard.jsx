@@ -183,11 +183,16 @@ export default function MidwifeDashboard() {
             </button>
             <div className="midwife-user">
               <div className="midwife-user-info">
-                <span className="midwife-user-name">{userData?.username || "Maria Santos"}</span>
+                <span className="midwife-user-name">Barangay {userData?.barangayName || "Longos"}</span>
                 <span className="midwife-user-role">Registered Midwife</span>
               </div>
               <div className="midwife-avatar">
-                {userData?.username ? userData.username.split(" ").map(n => n[0]).join("") : "MS"}
+                {`Barangay ${userData?.barangayName || "Longos"}`
+                  .split(" ")
+                  .map(n => n[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()}
               </div>
             </div>
           </div>
@@ -371,6 +376,21 @@ export default function MidwifeDashboard() {
           </section>
         </main>
       </div>
+
+      <style>{`
+        .midwife-hero {
+          min-height: 160px !important;
+          padding: 40px 32px !important;
+          display: flex !important;
+          align-items: center !important;
+        }
+        .midwife-hero-title {
+          color: #ffffff !important;
+        }
+        .midwife-hero-sub {
+          color: #e5edff !important;
+        }
+      `}</style>
     </div>
   );
 }

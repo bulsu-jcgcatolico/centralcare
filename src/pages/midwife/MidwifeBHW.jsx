@@ -288,10 +288,17 @@ export default function MidwifeBHW() {
           <div className="midwife-topbar-right" style={{ marginLeft: "auto" }}>
             <div className="midwife-user">
               <div className="midwife-user-info">
-                <span className="midwife-user-name">{userData?.username || "Midwife"}</span>
+                <span className="midwife-user-name">Barangay {userData?.barangayName || "Longos"}</span>
                 <span className="midwife-user-role">Registered Midwife</span>
               </div>
-              <div className="midwife-avatar">MS</div>
+              <div className="midwife-avatar">
+                {`Barangay ${userData?.barangayName || "Longos"}`
+                  .split(" ")
+                  .map(n => n[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </div>
             </div>
           </div>
         </header>

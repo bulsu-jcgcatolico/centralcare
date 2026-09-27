@@ -257,11 +257,16 @@ export default function MidwifePatients() {
             </button>
             <div className="midwife-user">
               <div className="midwife-user-info">
-                <span className="midwife-user-name">{userData?.username || "Maria Santos"}</span>
+                <span className="midwife-user-name">Barangay {userData?.barangayName || "Longos"}</span>
                 <span className="midwife-user-role">Registered Midwife</span>
               </div>
               <div className="midwife-avatar">
-                {userData?.username ? userData.username.split(" ").map(n => n[0]).join("") : "MS"}
+                {`Barangay ${userData?.barangayName || "Longos"}`
+                  .split(" ")
+                  .map(n => n[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()}
               </div>
             </div>
           </div>
