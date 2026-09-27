@@ -490,7 +490,7 @@ export default function MidwifeInventory() {
             </div>
           ) : (
             <section className="midwife-inv-section" style={{ flexShrink: 0 }}>
-              <div className="midwife-inv-scroll-box" style={{ width: "100%", maxHeight: "480px", overflowY: "auto", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+              <div className="midwife-inv-scroll-box" style={{ width: "100%", overflowY: "visible", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
               <table className="midwife-table">
                 <colgroup>
                   <col style={{ width: "10%" }} />

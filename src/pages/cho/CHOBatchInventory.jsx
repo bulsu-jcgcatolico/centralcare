@@ -402,6 +402,15 @@ export default function CHOBatchInventory() {
           .cho-screen-only { display: none !important; }
           .cho-print-only  { display: block !important; }
         }
+
+        /* Let the batch table expand to fit every row and scroll with the
+           page, instead of being boxed into its own internal scrollbar. */
+        .cho-table-wrapper {
+          max-height: none !important;
+          height: auto !important;
+          overflow-y: visible !important;
+          overflow-x: auto !important;
+        }
       `}</style>
 
       {/* ── Add Batch Modal ── */}

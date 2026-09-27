@@ -403,6 +403,18 @@ export default function RHUBarangay() {
           </div>
         </div>
       )}
+
+      {/* Let the table grow to fit every assigned barangay instead of clipping
+          rows inside a fixed-height scroll box (was hiding the last row when
+          a unit had more barangays than the box could show at once). */}
+      <style>{`
+        .bgy-table-card {
+          max-height: none !important;
+          height: auto !important;
+          overflow-y: visible !important;
+          overflow-x: auto !important;
+        }
+      `}</style>
     </div>
   );
 }

@@ -382,6 +382,17 @@ export default function CHOItemManagement() {
           </div>
         </div>
       )}
+
+      {/* Let the catalog table expand to fit every row and scroll with the
+          page, instead of being boxed into its own internal scrollbar. */}
+      <style>{`
+        .cho-table-wrapper {
+          max-height: none !important;
+          height: auto !important;
+          overflow-y: visible !important;
+          overflow-x: auto !important;
+        }
+      `}</style>
     </div>
   );
 }

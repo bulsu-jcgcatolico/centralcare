@@ -473,7 +473,7 @@ export default function RHUInventory() {
             </div>
           ) : (
             <section className="rhu-inv-section" style={{ flexShrink: 0 }}>
-              <div className="rhu-inv-scroll-box" style={{ width: "100%", maxHeight: "480px", overflowY: "auto", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+              <div className="rhu-inv-scroll-box" style={{ width: "100%", overflowY: "visible", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                 <table className="rhu-inv-table">
                   <colgroup>
                     <col style={{ width: "11%" }} />

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
 import { buildForecastList, getUrgentForecasts, FIELD_MAPS } from "../../utils/stockForecast";
@@ -24,6 +24,11 @@ const navItems = [
 
 const PIE_COLORS = ["#1a56db", "#93c5fd", "#dbeafe", "#bfdbfe", "#eff6ff"];
 
+// Same collections/matching logic as RHUBarangay.jsx, so this dashboard stat
+// and the Assigned Barangays page always agree on the same number.
+const BARANGAYS_COLLECTION = "cho_barangays";
+const RHU_REGISTRY_COLLECTION = "cho_rhu_registry";
+
 export default function RHUDashboard() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
@@ -33,11 +38,67 @@ export default function RHUDashboard() {
   const [distributions, setDistributions] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [monthlyReports, setMonthlyReports] = useState([]);
+  const [assignedBarangayCount, setAssignedBarangayCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
   function handleLogout() { logout(); navigate("/"); }
 
   useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadAssignedBarangayCount(); }, [userData]);
+
+  // Mirrors RHUBarangay.jsx's loadAssignedBarangays() so "Total Barangays"
+  // here always matches the count on the Assigned Barangays page instead of
+  // being a hardcoded placeholder.
+  async function loadAssignedBarangayCount() {
+    try {
+      const userRhuId = String(userData?.rhuId || "").trim().toLowerCase();
+      const userRhuName = String(userData?.rhuName || "").trim().toLowerCase();
+
+      let assignedKeys = [];
+
+      if (userData?.rhuId) {
+        const regRef = doc(db, RHU_REGISTRY_COLLECTION, String(userData.rhuId));
+        const regSnap = await getDoc(regRef);
+        if (regSnap.exists()) {
+          assignedKeys = regSnap.data().assignedBarangays || [];
+        }
+      }
+
+      if (assignedKeys.length === 0) {
+        const regSnap = await getDocs(collection(db, RHU_REGISTRY_COLLECTION));
+        regSnap.docs.forEach(d => {
+          const data = d.data();
+          const dRhuId = String(data.rhuId || "").trim().toLowerCase();
+          const dRhuName = String(data.rhuName || d.id || "").trim().toLowerCase();
+          if ((userRhuId && dRhuId === userRhuId) || (userRhuName && dRhuName === userRhuName)) {
+            if (Array.isArray(data.assignedBarangays)) {
+              assignedKeys = [...assignedKeys, ...data.assignedBarangays];
+            }
+          }
+        });
+      }
+
+      const allSnap = await getDocs(collection(db, BARANGAYS_COLLECTION));
+      const allBarangays = allSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const normalizedKeys = assignedKeys.map(k => String(k).trim().toLowerCase());
+
+      const assigned = allBarangays.filter(b => {
+        const bName = String(b.barangayName || b.name || "").trim().toLowerCase();
+        const bId = String(b.id).trim().toLowerCase();
+        const bRhuId = String(b.rhuId || b.assignedRhuId || "").trim().toLowerCase();
+        const bRhuName = String(b.assignedRhu || b.rhuName || "").trim().toLowerCase();
+
+        const inRegistry = normalizedKeys.includes(bName) || normalizedKeys.includes(bId);
+        const directMatch = (userRhuId && bRhuId === userRhuId) || (userRhuName && bRhuName === userRhuName);
+
+        return inRegistry || directMatch;
+      });
+
+      setAssignedBarangayCount(assigned.length);
+    } catch (err) {
+      console.error("Error loading assigned barangay count:", err);
+    }
+  }
 
   async function loadData() {
     setLoading(true);
@@ -227,7 +288,7 @@ export default function RHUDashboard() {
             </div>
             <div className="rhu-stat-card">
               <p className="rhu-stat-label">TOTAL BARANGAYS</p>
-              <div className="rhu-stat-row"><span className="rhu-stat-value">9</span></div>
+              <div className="rhu-stat-row"><span className="rhu-stat-value">{assignedBarangayCount}</span></div>
               <p className="rhu-stat-sub">Active barangay health posts</p>
             </div>
             <div className="rhu-stat-card">
