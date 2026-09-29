@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -85,6 +85,16 @@ export default function RHUDistribution() {
   const [selectedItems, setSelectedItems]       = useState({}); // { [inventoryId]: "boxes string" }
   const [pendingFefoItem, setPendingFefoItem] = useState(null); 
   const [calculatedPlans, setCalculatedPlans]   = useState([]); 
+  const resultsRef = useRef(null);
+
+  useEffect(() => {
+    if (calculatedPlans.length > 0 && resultsRef.current) {
+      // Calculate's own results land below Step 4's text in the right column —
+      // scroll them into view automatically instead of leaving the person to
+      // notice a plan appeared only by scrolling further themselves.
+      resultsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [calculatedPlans]);
 
   // Review modal
   const [showReviewModal, setShowReviewModal]   = useState(false);
@@ -185,9 +195,10 @@ export default function RHUDistribution() {
 
       const allBarangaysSnap = await getDocs(collection(db, BARANGAYS_COLLECTION));
       const allBarangays = allBarangaysSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      
+      const normalizedAssignedNames = assignedNames.map(n => String(n).trim().toLowerCase());
+
       const assigned = allBarangays
-        .filter(b => assignedNames.includes(b.barangayName))
+        .filter(b => normalizedAssignedNames.includes(String(b.barangayName).trim().toLowerCase()))
         .map(b => ({
           id: b.id,
           name: b.barangayName,
@@ -854,24 +865,38 @@ export default function RHUDistribution() {
               <button className="rhu-modal-close" aria-label="Close" onClick={() => { setShowNewModal(false); resetNewModal(); }}>×</button>
             </div>
             <div className="rhu-modal-body">
+              <div className="rhu-dist-grid">
+              <div className="rhu-dist-col-left">
 
-              <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "4px" }}>
-                  Distribution Date
+              <div className="rhu-dist-step" style={{ marginBottom: "20px" }}>
+                <label className="rhu-dist-step-label">
+                  <span className="rhu-dist-step-num">1</span>
+                  Pick a date for this delivery
                 </label>
                 <input
                   type="date"
-                  className="cho-input"
+                  className="cho-input rhu-dist-date-input"
                   value={distributeDate}
                   onChange={e => setDistributeDate(e.target.value)}
-                  style={{ width: "100%", maxWidth: "220px" }}
                 />
               </div>
 
-              <p className="rhu-dist-note">Select one or more medicines and enter how many boxes of each to distribute.</p>
-              <p style={{ fontSize: "12px", color: "#6b7280", margin: "-4px 0 10px" }}>
-                ★ marks the lot expiring soonest for each medicine — distribute that one first (FEFO).
-              </p>
+              </div>
+              <div className="rhu-dist-col-right">
+
+              <div className="rhu-dist-step" style={{ marginBottom: "12px" }}>
+                <label className="rhu-dist-step-label">
+                  <span className="rhu-dist-step-num">2</span>
+                  Choose which medicines to send
+                </label>
+                <p className="rhu-dist-step-help">
+                  Check the box next to each medicine you want to send, then type how many boxes.
+                </p>
+                <p className="rhu-dist-step-help rhu-dist-step-help--tip">
+                  <strong>Tip:</strong> Rows with a star (★) and a light yellow background are the batch expiring soonest —
+                  send that one out first so nothing goes to waste (this is called "FEFO").
+                </p>
+              </div>
 
               <div className="rhu-med-select-list">
                 {(() => {
@@ -924,10 +949,22 @@ export default function RHUDistribution() {
                 )}
               </div>
 
+              </div>
+              </div>
+
+              <div className="rhu-dist-grid" style={{ marginTop: "20px" }}>
+              <div className="rhu-dist-col-left">
+
               {/* Read-only summary of configured barangays */}
+              <div className="rhu-dist-step" style={{ marginBottom: "8px" }}>
+                <label className="rhu-dist-step-label">
+                  <span className="rhu-dist-step-num">3</span>
+                  Who's receiving this delivery
+                </label>
+              </div>
               <div className="rhu-barangay-summary">
                 <div className="rhu-barangay-summary-header">
-                  <span>Distributing across {barangays.length} barangay{barangays.length !== 1 ? "s" : ""}</span>
+                  <span>Sending to {barangays.length} barangay{barangays.length !== 1 ? "s" : ""}</span>
                   <button type="button" className="rhu-link-btn" onClick={() => navigate("/rhu/barangay")}>
                     Edit barangays
                   </button>
@@ -950,13 +987,23 @@ export default function RHUDistribution() {
                 {compliantBarangayNames.size} of {barangays.filter(b => b.population > 0).length} population-registered barangays have submitted their {monthKeyLabel(reportMonthKey)} end-balance report and are eligible for this replenishment.
               </p>
 
-              <button className="rhu-btn-secondary rhu-calc-btn" onClick={calculatePlans}>
-                Calculate
-              </button>
+              </div>
+              <div className="rhu-dist-col-right">
+
+              <div className="rhu-dist-step" style={{ marginBottom: "8px" }}>
+                <label className="rhu-dist-step-label">
+                  <span className="rhu-dist-step-num">4</span>
+                  See the plan, then save it
+                </label>
+                <p className="rhu-dist-step-help">
+                  Tap "Calculate Distribution" below — it's pinned at the bottom so you don't need to scroll for it.
+                </p>
+              </div>
 
               {calculatedPlans.length > 0 && (
+                <div ref={resultsRef}>
                 <>
-                  <p className="rhu-dist-note">Auto-distributed by barangay population %:</p>
+                  <p className="rhu-dist-note" style={{ fontWeight: 600 }}>Here's the plan — boxes are split by each barangay's population:</p>
                   {calculatedPlans.map(plan => (
                     <div className="rhu-plan-preview" key={plan.inventoryId}>
                       <p className="rhu-plan-preview-title">{plan.item.name} — {plan.totalBoxes} boxes</p>
@@ -991,13 +1038,21 @@ export default function RHUDistribution() {
                     <strong>{grandTotalBoxes} boxes across {calculatedPlans.length} medicine{calculatedPlans.length > 1 ? "s" : ""}</strong>
                   </div>
                 </>
+                </div>
               )}
+
+              </div>
+              </div>
             </div>
             <div className="rhu-modal-footer">
               <button className="rhu-btn-secondary" onClick={() => { setShowNewModal(false); resetNewModal(); }}>Cancel</button>
-              {calculatedPlans.length > 0 && (
+              {calculatedPlans.length > 0 ? (
                 <button className="rhu-btn-primary" onClick={saveDistributionPlan} disabled={saving}>
                   {saving ? "Saving..." : "Save & Notify All Barangays"}
+                </button>
+              ) : (
+                <button className="rhu-btn-primary rhu-calc-btn" onClick={calculatePlans}>
+                  Calculate Distribution
                 </button>
               )}
             </div>
@@ -1072,6 +1127,118 @@ export default function RHUDistribution() {
           overflow: visible !important;
         }
 
+        /* New Distribution modal — larger, higher-contrast, and easier to
+           follow step by step for users less comfortable with software. */
+        .rhu-dist-grid {
+          display: grid;
+          grid-template-columns: 260px 1fr;
+          gap: 28px;
+          align-items: start;
+        }
+        @media (max-width: 720px) {
+          .rhu-dist-grid { grid-template-columns: 1fr; }
+        }
+        .rhu-dist-col-left {
+          min-width: 0;
+        }
+        .rhu-dist-col-right {
+          min-width: 0;
+        }
+        .rhu-dist-step-label {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 16px;
+          font-weight: 700;
+          color: #111827;
+          margin-bottom: 6px;
+        }
+        .rhu-dist-step-num {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 26px;
+          height: 26px;
+          flex-shrink: 0;
+          border-radius: 50%;
+          background: #2563eb;
+          color: #ffffff;
+          font-size: 14px;
+          font-weight: 700;
+        }
+        .rhu-dist-step-help {
+          font-size: 14.5px;
+          color: #374151;
+          margin: 0 0 4px;
+          line-height: 1.5;
+        }
+        .rhu-dist-step-help--tip {
+          background: #fffbeb;
+          border: 1px solid #fde68a;
+          border-radius: 8px;
+          padding: 8px 12px;
+          color: #78350f;
+        }
+        .rhu-dist-date-input {
+          width: 100% !important;
+          max-width: 280px !important;
+          font-size: 16px !important;
+          padding: 10px 12px !important;
+        }
+
+        .rhu-med-select-list {
+          font-size: 15px !important;
+        }
+        .rhu-med-checkbox-label input[type="checkbox"] {
+          width: 22px !important;
+          height: 22px !important;
+          accent-color: #2563eb;
+          cursor: pointer;
+        }
+        .rhu-med-select-row {
+          padding: 14px !important;
+          border-radius: 8px;
+          border: 2px solid transparent;
+        }
+        .rhu-med-checkbox-text strong {
+          font-size: 15.5px;
+        }
+        .rhu-med-checkbox-sub {
+          font-size: 13.5px !important;
+          color: #4b5563 !important;
+        }
+        /* A checked row gets an unmistakable blue outline — kept visually
+           distinct from the yellow "expires soonest" tint so the two signals
+           (recommended vs. actually selected) never get confused. */
+        .rhu-med-select-row--active {
+          border-color: #2563eb !important;
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+        .rhu-med-boxes-input {
+          font-size: 16px !important;
+          padding: 8px 10px !important;
+          min-width: 90px;
+        }
+
+        .rhu-barangay-chip {
+          font-size: 13.5px !important;
+          padding: 6px 12px !important;
+        }
+
+        .rhu-modal-footer .rhu-btn-primary,
+        .rhu-modal-footer .rhu-btn-secondary {
+          font-size: 15px !important;
+          padding: 12px 22px !important;
+        }
+
+        /* Let the New Distribution modal breathe a little more */
+        .rhu-modal--lg {
+          width: min(880px, 94vw) !important;
+        }
+        .rhu-modal--lg .rhu-modal-body {
+          padding: 24px !important;
+        }
+
         /* Let the distribution table expand to fit every row instead of
            clipping the last one inside a fixed-height scrollbox. */
         .rhu-table-wrapper {
@@ -1099,7 +1266,7 @@ export default function RHUDistribution() {
         }
         .rhu-modal--lg .rhu-med-select-list {
           flex: none !important;
-          max-height: 220px !important;
+          max-height: 300px !important;
           overflow-y: auto !important;
         }
       `}</style>

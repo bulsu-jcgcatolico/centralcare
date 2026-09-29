@@ -50,6 +50,7 @@ export default function RHUBalanceReports() {
       if (assignedNames.length === 0) { setBarangays([]); return; }
 
       const snap = await getDocs(collection(db, "cho_barangays"));
+      const normalizedAssignedNames = assignedNames.map(n => String(n).trim().toLowerCase());
       const all = snap.docs
         .map(d => {
           const data = d.data();
@@ -59,7 +60,7 @@ export default function RHUBalanceReports() {
             population: Number(data.totalPopulation ?? data.population ?? data.populationPercent ?? 0),
           };
         })
-        .filter(b => assignedNames.includes(b.name));
+        .filter(b => normalizedAssignedNames.includes(String(b.name).trim().toLowerCase()));
       setBarangays(all);
     } catch (err) { console.error("Error loading barangays:", err); }
   }
@@ -74,10 +75,22 @@ export default function RHUBalanceReports() {
   }
 
   const populationBarangays = barangays.filter(b => (Number(b.population) || 0) > 0);
-  const submittedNames = new Set(reports.map(r => String(r.ownerId).trim().toLowerCase()));
+
+  // getAllSubmittedReports() fetches every midwife report city-wide for the
+  // month (it's shared with CHO's own review page, which legitimately needs
+  // that). This RHU should only ever see reports from barangays actually
+  // assigned to it — otherwise another RHU's barangay (e.g. Longos under
+  // RHU 10) leaks into this RHU's own Balance Reports view.
+  const assignedNameSet = new Set(barangays.map(b => String(b.name).trim().toLowerCase()));
+  const scopedReports = reports.filter(r =>
+    assignedNameSet.has(String(r.ownerId).trim().toLowerCase()) ||
+    assignedNameSet.has(String(r.ownerName).trim().toLowerCase())
+  );
+
+  const submittedNames = new Set(scopedReports.map(r => String(r.ownerId).trim().toLowerCase()));
   const missingBarangays = populationBarangays.filter(b => !submittedNames.has(String(b.name).trim().toLowerCase()));
 
-  const displayedReports = reports.filter(r =>
+  const displayedReports = scopedReports.filter(r =>
     !search.trim() || (r.ownerName || "").toLowerCase().includes(search.trim().toLowerCase())
   );
 
@@ -152,7 +165,7 @@ export default function RHUBalanceReports() {
               </div>
               <div>
                 <p className="rhu-dist-stat-label">Barangays Submitted</p>
-                <p className="rhu-dist-stat-value">{reports.length}</p>
+                <p className="rhu-dist-stat-value">{scopedReports.length}</p>
               </div>
             </div>
             <div className="rhu-dist-stat-card">
@@ -244,14 +257,14 @@ export default function RHUBalanceReports() {
           <p style={{ fontSize: "12px", color: "#333", margin: "0 0 16px" }}>{monthKeyLabel(monthKey)}</p>
 
           <p style={{ fontSize: "12px", margin: "0 0 4px" }}>
-            <strong>Submitted:</strong> {reports.length} · <strong>Missing:</strong> {missingBarangays.length}
+            <strong>Submitted:</strong> {scopedReports.length} · <strong>Missing:</strong> {missingBarangays.length}
             {missingBarangays.length > 0 && ` (${missingBarangays.map(b => b.name).join(", ")})`}
           </p>
 
-          {reports.length === 0 ? (
+          {scopedReports.length === 0 ? (
             <p style={{ fontSize: "13px" }}>No reports submitted for {monthKeyLabel(monthKey)}.</p>
           ) : (
-            reports.map(r => (
+            scopedReports.map(r => (
               <div key={r.id} style={{ marginTop: "16px", pageBreakInside: "avoid" }}>
                 <h3 style={{ fontSize: "14px", margin: "0 0 4px" }}>
                   {r.ownerName || r.ownerId}
