@@ -866,9 +866,10 @@ export default function RHUDistribution() {
             </div>
             <div className="rhu-modal-body">
               <div className="rhu-dist-grid">
+
               <div className="rhu-dist-col-left">
 
-              <div className="rhu-dist-step" style={{ marginBottom: "20px" }}>
+              <div className="rhu-dist-step" style={{ marginBottom: "16px" }}>
                 <label className="rhu-dist-step-label">
                   <span className="rhu-dist-step-num">1</span>
                   Pick a date for this delivery
@@ -881,10 +882,43 @@ export default function RHUDistribution() {
                 />
               </div>
 
+              {/* Read-only summary of configured barangays */}
+              <div className="rhu-dist-step" style={{ marginBottom: "8px" }}>
+                <label className="rhu-dist-step-label">
+                  <span className="rhu-dist-step-num">3</span>
+                  Who's receiving this delivery
+                </label>
               </div>
+              <div className="rhu-barangay-summary">
+                <div className="rhu-barangay-summary-header">
+                  <span>Sending to {barangays.length} barangay{barangays.length !== 1 ? "s" : ""}</span>
+                  <button type="button" className="rhu-link-btn" onClick={() => navigate("/rhu/barangay")}>
+                    Edit barangays
+                  </button>
+                </div>
+                <div className="rhu-barangay-summary-chips">
+                  {barangays.map(b => {
+                    const pct = totalAssignedPopulation > 0
+                      ? ((b.population / totalAssignedPopulation) * 100).toFixed(1)
+                      : "0.0";
+                    return (
+                      <span className="rhu-barangay-chip" key={b.id}>
+                        {b.name} · {pct}%
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <p className="rhu-dist-note" style={{ color: compliantBarangayNames.size < barangays.filter(b => b.population > 0).length ? "#b45309" : "#166534" }}>
+                {compliantBarangayNames.size} of {barangays.filter(b => b.population > 0).length} population-registered barangays have submitted their {monthKeyLabel(reportMonthKey)} end-balance report and are eligible for this replenishment.
+              </p>
+
+              </div>
+
               <div className="rhu-dist-col-right">
 
-              <div className="rhu-dist-step" style={{ marginBottom: "12px" }}>
+              <div className="rhu-dist-step" style={{ marginBottom: "10px" }}>
                 <label className="rhu-dist-step-label">
                   <span className="rhu-dist-step-num">2</span>
                   Choose which medicines to send
@@ -949,48 +983,7 @@ export default function RHUDistribution() {
                 )}
               </div>
 
-              </div>
-              </div>
-
-              <div className="rhu-dist-grid" style={{ marginTop: "20px" }}>
-              <div className="rhu-dist-col-left">
-
-              {/* Read-only summary of configured barangays */}
-              <div className="rhu-dist-step" style={{ marginBottom: "8px" }}>
-                <label className="rhu-dist-step-label">
-                  <span className="rhu-dist-step-num">3</span>
-                  Who's receiving this delivery
-                </label>
-              </div>
-              <div className="rhu-barangay-summary">
-                <div className="rhu-barangay-summary-header">
-                  <span>Sending to {barangays.length} barangay{barangays.length !== 1 ? "s" : ""}</span>
-                  <button type="button" className="rhu-link-btn" onClick={() => navigate("/rhu/barangay")}>
-                    Edit barangays
-                  </button>
-                </div>
-                <div className="rhu-barangay-summary-chips">
-                  {barangays.map(b => {
-                    const pct = totalAssignedPopulation > 0
-                      ? ((b.population / totalAssignedPopulation) * 100).toFixed(1)
-                      : "0.0";
-                    return (
-                      <span className="rhu-barangay-chip" key={b.id}>
-                        {b.name} · {pct}%
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <p className="rhu-dist-note" style={{ color: compliantBarangayNames.size < barangays.filter(b => b.population > 0).length ? "#b45309" : "#166534" }}>
-                {compliantBarangayNames.size} of {barangays.filter(b => b.population > 0).length} population-registered barangays have submitted their {monthKeyLabel(reportMonthKey)} end-balance report and are eligible for this replenishment.
-              </p>
-
-              </div>
-              <div className="rhu-dist-col-right">
-
-              <div className="rhu-dist-step" style={{ marginBottom: "8px" }}>
+              <div className="rhu-dist-step" style={{ margin: "16px 0 8px" }}>
                 <label className="rhu-dist-step-label">
                   <span className="rhu-dist-step-num">4</span>
                   See the plan, then save it
@@ -1042,6 +1035,7 @@ export default function RHUDistribution() {
               )}
 
               </div>
+
               </div>
             </div>
             <div className="rhu-modal-footer">
@@ -1131,18 +1125,24 @@ export default function RHUDistribution() {
            follow step by step for users less comfortable with software. */
         .rhu-dist-grid {
           display: grid;
-          grid-template-columns: 260px 1fr;
-          gap: 28px;
-          align-items: start;
+          grid-template-columns: 300px 1fr;
+          gap: 32px;
+          align-items: stretch;
+          flex: 1 1 auto;
+          min-height: 0;
         }
-        @media (max-width: 720px) {
-          .rhu-dist-grid { grid-template-columns: 1fr; }
-        }
-        .rhu-dist-col-left {
-          min-width: 0;
-        }
+        .rhu-dist-col-left,
         .rhu-dist-col-right {
           min-width: 0;
+          overflow-y: auto;
+          padding-right: 4px;
+        }
+        @media (max-width: 760px) {
+          .rhu-dist-grid { grid-template-columns: 1fr; }
+          .rhu-dist-col-left, .rhu-dist-col-right {
+            overflow-y: visible !important;
+            height: auto !important;
+          }
         }
         .rhu-dist-step-label {
           display: flex;
@@ -1232,9 +1232,6 @@ export default function RHUDistribution() {
         }
 
         /* Let the New Distribution modal breathe a little more */
-        .rhu-modal--lg {
-          width: min(880px, 94vw) !important;
-        }
         .rhu-modal--lg .rhu-modal-body {
           padding: 24px !important;
         }
@@ -1248,13 +1245,15 @@ export default function RHUDistribution() {
           overflow-x: auto !important;
         }
 
-        /* New Distribution modal: make the modal body the single scrolling
-           region, capped to a sane viewport height, so pressing Calculate
-           adds content below the checklist instead of squeezing the
-           checklist down to make room for it. */
+        /* New Distribution modal: the body no longer scrolls as one whole
+           unit — it's a flex container sized to the available space, and
+           .rhu-dist-grid (below) fills it, with each column scrolling on
+           its own. Widened further so medicine names stop wrapping onto
+           3 lines and eating vertical space. */
         .rhu-modal--lg {
           max-height: 90vh !important;
           height: auto !important;
+          width: min(1040px, 96vw) !important;
           display: flex !important;
           flex-direction: column !important;
         }
@@ -1262,7 +1261,9 @@ export default function RHUDistribution() {
           flex: 1 1 auto !important;
           min-height: 0 !important;
           max-height: none !important;
-          overflow-y: auto !important;
+          overflow-y: hidden !important;
+          display: flex !important;
+          flex-direction: column !important;
         }
         .rhu-modal--lg .rhu-med-select-list {
           flex: none !important;
