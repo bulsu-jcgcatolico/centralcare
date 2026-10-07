@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { collection, addDoc, query, where, orderBy, limit, onSnapshot, serverTimestamp, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import "./RHUMessages.css";
 
 const navItems = [
@@ -39,6 +40,7 @@ export default function RHUMessages() {
   const { logout, userData, user } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
 
   const activeUser = userData || user;
   
@@ -304,6 +306,9 @@ export default function RHUMessages() {
               <span>{item.label}</span>
               {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
+              )}
+              {item.label === "Messages" && Boolean(unreadMessages) && (
+                <span className="nav-badge">{unreadMessages}</span>
               )}
             </NavLink>
           ))}

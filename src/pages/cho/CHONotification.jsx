@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { collection, getDocs, query, where, updateDoc, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 
 const navItems = [
   { label: "Dashboard",         to: "/cho/dashboard"          },
@@ -23,6 +24,7 @@ export default function CHONotification() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
   const [notifications, setNotifications] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
@@ -106,6 +108,9 @@ export default function CHONotification() {
               <span>{item.label}</span>
               {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
+              )}
+              {item.label === "Messages" && Boolean(unreadMessages) && (
+                <span className="nav-badge">{unreadMessages}</span>
               )}
             </NavLink>
           ))}

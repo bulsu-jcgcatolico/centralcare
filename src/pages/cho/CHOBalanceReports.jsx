@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import {
   getPriorMonthKey, monthKeyLabel, recentMonthKeys,
   getAllSubmittedReports, displayFacilityName,
@@ -30,6 +31,7 @@ export default function CHOBalanceReports() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
 
   const [monthKey, setMonthKey] = useState(getPriorMonthKey());
   const [rhus, setRhus] = useState([]);
@@ -54,12 +56,19 @@ export default function CHOBalanceReports() {
     setLoading(true);
     try {
       const data = await getAllSubmittedReports("rhu", monthKey);
-      setReports(data);
+      const numOf = (r) => Number(String(r.ownerId ?? r.ownerName ?? "").match(/\d+/)?.[0] ?? 0);
+      setReports([...data].sort((a, b) => numOf(a) - numOf(b)));
     } catch (err) { console.error("Error loading balance reports:", err); }
     setLoading(false);
   }
 
-  const populationRhus = rhus.filter(r => (Number(r.totalPopulation) || 0) > 0);
+  // Firestore returns docs in an unspecified order (here, effectively by
+  // document ID as a string), which sorts "RHU 10" right after "RHU 1"
+  // instead of after "RHU 9". Sort numerically by the RHU number instead.
+  const rhuNumber = (r) => Number(String(r.id ?? r.rhuName ?? "").match(/\d+/)?.[0] ?? 0);
+  const populationRhus = rhus
+    .filter(r => (Number(r.totalPopulation) || 0) > 0)
+    .sort((a, b) => rhuNumber(a) - rhuNumber(b));
   const submittedIds = new Set(reports.map(r => String(r.ownerId).trim().toLowerCase()));
   const missingRhus = populationRhus.filter(r => !submittedIds.has(String(r.id).trim().toLowerCase()));
 
@@ -90,6 +99,9 @@ export default function CHOBalanceReports() {
               <span>{item.label}</span>
               {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
+              )}
+              {item.label === "Messages" && Boolean(unreadMessages) && (
+                <span className="nav-badge">{unreadMessages}</span>
               )}
             </NavLink>
           ))}

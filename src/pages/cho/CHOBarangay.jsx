@@ -7,6 +7,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import "./CHOBarangay.css";
 
 const navItems = [
@@ -38,6 +39,7 @@ export default function CHOBarangay() {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
   const { showToast } = useToast();
 
   const [search, setSearch] = useState("");
@@ -177,6 +179,9 @@ export default function CHOBarangay() {
               <span>{item.label}</span>
               {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
+              )}
+              {item.label === "Messages" && Boolean(unreadMessages) && (
+                <span className="nav-badge">{unreadMessages}</span>
               )}
             </NavLink>
           ))}

@@ -4,7 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
-import { buildForecastList, getUrgentForecasts, FIELD_MAPS } from "../../utils/stockForecast";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -31,6 +31,7 @@ export default function CHODashboard() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
   const [search, setSearch] = useState("");
   const [inventory, setInventory] = useState([]);
   const [distributions, setDistributions] = useState([]);
@@ -74,33 +75,39 @@ export default function CHODashboard() {
 
   const lowStockItems   = inventory.filter(i => (i.remaining ?? i.quantity) <= 50);
   const criticalItems   = inventory.filter(i => (i.remaining ?? i.quantity) <= 20);
-  const expiringItems   = inventory.filter(i => {
-    if (!i.expiry) return false;
-    const days = (new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24);
+  // "Expiring Soon" is a CHO-level stat, so it should reflect CHO's own
+  // batch stock (cho_batches / expiryDate) — not the RHU/Midwife-owned
+  // `inventory` collection, which doesn't represent what's sitting in the
+  // CHO warehouse. This was checking the wrong collection/field entirely,
+  // which is why it always read 0 regardless of real expiring stock.
+  const expiringItems   = choBatches.filter(b => {
+    if (!b.expiryDate) return false;
+    const remaining = b.remaining ?? b.quantity ?? 0;
+    if (remaining <= 0) return false;
+    const days = (new Date(b.expiryDate) - new Date()) / (1000 * 60 * 60 * 24);
     return days <= 30 && days >= 0;
   });
 
-  // Predictive stock-out forecast for CHO's OWN batch stock (cho_batches),
-  // not the system-wide `inventory` collection above (that's RHU/Midwife
-  // stock). "Consumption" here is what CHO distributes out to RHUs.
-  // Batches are aggregated by medicine name first since a medicine can have
-  // several lots — the forecast is one row per medicine, matching how
-  // `distributions` also logs by medicine name without lot granularity.
-  const choStockByMedicine = {};
-  choBatches.forEach(b => {
-    const key = b.name;
-    if (!choStockByMedicine[key]) {
-      choStockByMedicine[key] = { id: key, name: b.name, remaining: 0, expiry: b.expiryDate, isVaccine: !!b.isVaccine };
-    }
-    choStockByMedicine[key].remaining += Number(b.remaining ?? b.quantity ?? 0);
-    // Track the soonest-expiring lot for this medicine's waste-risk check.
-    if (b.expiryDate && (!choStockByMedicine[key].expiry || new Date(b.expiryDate) < new Date(choStockByMedicine[key].expiry))) {
-      choStockByMedicine[key].expiry = b.expiryDate;
-    }
-  });
-  const choStockList = Object.values(choStockByMedicine);
-  const forecastList = buildForecastList(choStockList, distributions, [], FIELD_MAPS.cho);
-  const urgentForecasts = getUrgentForecasts(forecastList, 5);
+  // Items Expiring Soon — same batches counted in the EXPIRING SOON stat
+  // card above, shown soonest-first with a lotNumber and a critical/warning
+  // split (critical = expiring within a week, matching how low-stock
+  // severity is split elsewhere in the app).
+  const expiringSoonList = expiringItems
+    .map(b => {
+      const daysRemaining = (new Date(b.expiryDate) - new Date()) / (1000 * 60 * 60 * 24);
+      return {
+        id: b.id,
+        name: b.name,
+        lotNumber: b.lotNumber,
+        expiryDate: b.expiryDate,
+        remaining: b.remaining ?? b.quantity ?? 0,
+        isVaccine: !!b.isVaccine,
+        daysRemaining,
+        status: daysRemaining <= 7 ? "critical" : "warning",
+      };
+    })
+    .sort((a, b) => a.daysRemaining - b.daysRemaining)
+    .slice(0, 5);
 
   const categoryMap = {};
   inventory.forEach(i => {
@@ -167,6 +174,9 @@ export default function CHODashboard() {
               <span>{item.label}</span>
               {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
+              )}
+              {item.label === "Messages" && Boolean(unreadMessages) && (
+                <span className="nav-badge">{unreadMessages}</span>
               )}
             </NavLink>
           ))}
@@ -279,20 +289,20 @@ export default function CHODashboard() {
             )}
           </section>
 
-          {/* Predicted Stock-Outs */}
+          {/* Items Expiring Soon */}
           <section className="cho-section">
             <div className="cho-section-hd">
-              <h2 className="cho-section-title">Predicted Stock-Outs</h2>
+              <h2 className="cho-section-title">Items Expiring Soon</h2>
               <NavLink to="/cho/batch-inventory" className="cho-view-all">View Inventory</NavLink>
             </div>
-            {urgentForecasts.length === 0 ? (
+            {expiringSoonList.length === 0 ? (
               <div className="cho-empty-small">
-                <p>No items are trending toward a stock-out based on the last 30 days of distribution activity.</p>
+                <p>No batches are expiring within the next 30 days.</p>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {urgentForecasts.map(f => (
-                  <div key={f.itemId} style={{
+                {expiringSoonList.map(f => (
+                  <div key={f.id} style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",
                     padding: "12px 14px", borderRadius: "8px",
                     background: f.status === "critical" ? "#fef2f2" : "#fffbeb",
@@ -301,8 +311,7 @@ export default function CHODashboard() {
                     <div>
                       <p style={{ margin: 0, fontWeight: 600, color: "#0f172a" }}>{f.name}{f.isVaccine ? " 💉" : ""}</p>
                       <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#6b7280" }}>
-                        {f.remaining} boxes remaining · ~{f.dailyRate.toFixed(1)}/day
-                        {f.wasteRisk && <span style={{ color: "#b45309" }}> · will expire before running out</span>}
+                        {f.remaining} boxes remaining · Lot {f.lotNumber || "—"} · expires {f.expiryDate}
                       </p>
                     </div>
                     <span style={{

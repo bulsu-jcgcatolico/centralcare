@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="base" x1="0.15" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#46aaf7"/>
+      <stop offset="0.55" stop-color="#2a82ec"/>
+      <stop offset="1" stop-color="#1c5fd6"/>
+    </linearGradient>
+    <mask id="cm" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <path d="M399.9,159.6 L422.6,140.6 A216,216 0 1 0 422.6,371.4 L399.9,352.4 A150,150 0 1 1 399.9,159.6 Z" fill="#fff" stroke="#fff" stroke-width="24" stroke-linejoin="round"/>
+    </mask>
+  </defs>
+  <g mask="url(#cm)">
+    <rect width="512" height="512" fill="url(#base)"/>
+    <ellipse cx="170" cy="430" rx="300" ry="190" fill="#1d62d6" opacity="0.85"/>
+    <ellipse cx="215" cy="500" rx="260" ry="95" fill="#1249b4"/>
+    <ellipse cx="150" cy="60" rx="230" ry="80" fill="#6cc2fc" opacity="0.55"/>
+  </g>
+  <circle cx="285" cy="256" r="138" fill="#ffffff"/>
+  <rect x="265" y="194" width="40" height="124" rx="10" fill="#2b8ae6"/>
+  <rect x="223" y="236" width="124" height="40" rx="10" fill="#2b8ae6"/>
+</svg>

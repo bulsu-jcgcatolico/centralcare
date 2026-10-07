@@ -10,6 +10,7 @@ import { db } from "../../firebase/config";
 import { checkAndNotifyLowStock } from "../../utils/lowStockNotifier";
 import { runExpiryChecks } from "../../utils/expiryNotifier";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import { FHSIS_ANTIGENS, FHSIS_ANTIGEN_ORDER } from "../../utils/fhsisImmunization";
 import {
   getPriorMonthKey, monthKeyLabel, hasSubmittedBalance,
@@ -47,6 +48,7 @@ export default function MidwifeInventory() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
   const { showToast } = useToast();
 
   const [inventory, setInventory]   = useState([]);
@@ -302,6 +304,9 @@ export default function MidwifeInventory() {
               <span>{item.label}</span>
               {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
+              )}
+              {item.label === "Messages" && Boolean(unreadMessages) && (
+                <span className="nav-badge">{unreadMessages}</span>
               )}
             </NavLink>
           ))}

@@ -7,6 +7,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import { calculateDoseWastage } from "../../utils/vaccineWastage";
 import { getDoseOptionsForAntigen } from "../../utils/fhsisImmunization";
 import { getCurrentMonthKey } from "../../utils/monthlyBalance";
@@ -28,6 +29,7 @@ export default function MidwifeBHW() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
   const { showToast } = useToast();
 
   const barangayName = userData?.barangayName ?? "";
@@ -273,6 +275,9 @@ export default function MidwifeBHW() {
               <span>{item.label}</span>
               {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
+              )}
+              {item.label === "Messages" && Boolean(unreadMessages) && (
+                <span className="nav-badge">{unreadMessages}</span>
               )}
             </NavLink>
           ))}

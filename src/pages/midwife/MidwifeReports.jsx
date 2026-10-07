@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { collection, getDocs, query, where, doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import { summarizeWastageByVaccine } from "../../utils/vaccineWastage";
 import { getCurrentMonthKey, monthKeyLabel, getBalanceReport } from "../../utils/monthlyBalance";
 import { FHSIS_ANTIGENS, FHSIS_ANTIGEN_ORDER, buildImmunizationCoverageReport, buildCoverageReport } from "../../utils/fhsisImmunization";
@@ -54,6 +55,7 @@ export default function MidwifeReports() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
   const [selectedMonth, setSelectedMonth] = useState("all");
   const [search, setSearch] = useState("");
   const [inventory, setInventory] = useState([]);
@@ -292,6 +294,9 @@ export default function MidwifeReports() {
                   <span>{item.label}</span>
                   {item.label === "Notifications" && Boolean(unreadCount) && (
                     <span className="nav-badge">{unreadCount}</span>
+                  )}
+                  {item.label === "Messages" && Boolean(unreadMessages) && (
+                    <span className="nav-badge">{unreadMessages}</span>
                   )}
                 </NavLink>
               ))}

@@ -4,7 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
-import { buildForecastList, getUrgentForecasts, FIELD_MAPS } from "../../utils/stockForecast";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -33,6 +33,7 @@ export default function RHUDashboard() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
   const [search, setSearch] = useState("");
   const [inventory, setInventory] = useState([]);
   const [distributions, setDistributions] = useState([]);
@@ -158,11 +159,26 @@ export default function RHUDashboard() {
     return days <= 30 && days >= 0;
   });
 
-  // Predictive stock-out forecast — trailing moving-average consumption rate
-  // from actual distributions to barangays, falling back to the last
-  // submitted monthly balance report when there isn't enough recent history.
-  const forecastList = buildForecastList(inventory, distributions, monthlyReports, FIELD_MAPS.rhu);
-  const urgentForecasts = getUrgentForecasts(forecastList, 5);
+  // Items Expiring Soon — same batches counted in the EXPIRING SOON stat
+  // card above, shown soonest-first. Replaces the old consumption-forecast
+  // widget with a simpler, directly-verifiable date-based list (matching
+  // the same change made on the CHO dashboard).
+  const expiringSoonList = expiringItems
+    .map(i => {
+      const daysRemaining = (new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24);
+      return {
+        id: i.id,
+        name: i.name,
+        lotNumber: i.lotNumber,
+        expiry: i.expiry,
+        remaining: i.remaining ?? i.quantity ?? 0,
+        isVaccine: !!i.isVaccine,
+        daysRemaining,
+        status: daysRemaining <= 7 ? "critical" : "warning",
+      };
+    })
+    .sort((a, b) => a.daysRemaining - b.daysRemaining)
+    .slice(0, 5);
 
   // Bar chart — inventory by category
   const categoryMap = {};
@@ -220,6 +236,9 @@ export default function RHUDashboard() {
               <span>{item.label}</span>
               {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
+              )}
+              {item.label === "Messages" && Boolean(unreadMessages) && (
+                <span className="nav-badge">{unreadMessages}</span>
               )}
             </NavLink>
           ))}
@@ -325,20 +344,20 @@ export default function RHUDashboard() {
             )}
           </section>
 
-          {/* Predicted Stock-Outs */}
+          {/* Items Expiring Soon */}
           <section className="rhu-section">
             <div className="rhu-section-hd">
-              <h2 className="rhu-section-title">Predicted Stock-Outs</h2>
+              <h2 className="rhu-section-title">Items Expiring Soon</h2>
               <NavLink to="/rhu/inventory" className="rhu-view-all">View Inventory</NavLink>
             </div>
-            {urgentForecasts.length === 0 ? (
+            {expiringSoonList.length === 0 ? (
               <div className="rhu-empty-small">
-                <p>No items are trending toward a stock-out based on the last 30 days of distribution activity.</p>
+                <p>No items are expiring within the next 30 days.</p>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {urgentForecasts.map(f => (
-                  <div key={f.itemId} style={{
+                {expiringSoonList.map(f => (
+                  <div key={f.id} style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",
                     padding: "12px 14px", borderRadius: "8px",
                     background: f.status === "critical" ? "#fef2f2" : "#fffbeb",
@@ -349,8 +368,7 @@ export default function RHUDashboard() {
                         {f.name}{f.lotNumber ? ` (Lot ${f.lotNumber})` : ""}
                       </p>
                       <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#6b7280" }}>
-                        {f.remaining} boxes remaining · ~{f.dailyRate.toFixed(1)}/day
-                        {f.wasteRisk && <span style={{ color: "#b45309" }}> · will expire before running out</span>}
+                        {f.remaining} boxes remaining · expires {f.expiry}
                       </p>
                     </div>
                     <span style={{

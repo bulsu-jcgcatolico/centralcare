@@ -8,6 +8,7 @@ import {
 import { db } from "../../firebase/config";
 import { runExpiryChecks } from "../../utils/expiryNotifier";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import { FHSIS_ANTIGENS, FHSIS_ANTIGEN_ORDER } from "../../utils/fhsisImmunization";
 import "./CHOBatchInventory.css";
 
@@ -45,6 +46,7 @@ export default function CHOBatchInventory() {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
 
   const [search, setSearch] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("all");
@@ -185,6 +187,15 @@ export default function CHOBatchInventory() {
 
   const totalRemainingQuantity = filteredBatches.reduce((s, b) => s + ((b.remaining ?? b.quantity) || 0), 0);
   const totalInitialQuantity = filteredBatches.reduce((s, b) => s + (b.quantity || 0), 0);
+  // Same "due within 30 days" rule already used on the RHU and Midwife
+  // Inventory pages — only counts batches that still have stock left.
+  const expiringCount = filteredBatches.filter(b => {
+    if (!b.expiryDate) return false;
+    const remaining = b.remaining ?? b.quantity ?? 0;
+    if (remaining <= 0) return false;
+    const days = (new Date(b.expiryDate) - new Date()) / (1000 * 60 * 60 * 24);
+    return days <= 30 && days >= 0;
+  }).length;
   const periodLabel = selectedMonth === "all" ? "All time" : selectedMonth;
 
   return (
@@ -210,6 +221,9 @@ export default function CHOBatchInventory() {
                   <span>{item.label}</span>
                   {item.label === "Notifications" && Boolean(unreadCount) && (
                     <span className="nav-badge">{unreadCount}</span>
+                  )}
+                  {item.label === "Messages" && Boolean(unreadMessages) && (
+                    <span className="nav-badge">{unreadMessages}</span>
                   )}
                 </NavLink>
               ))}
@@ -254,7 +268,7 @@ export default function CHOBatchInventory() {
                 </div>
               </div>
 
-              <div className="cho-stats-grid cho-stats-grid--3">
+              <div className="cho-stats-grid cho-stats-grid--3" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
                 <div className="cho-stat-card">
                   <p className="cho-stat-label">TOTAL BATCHES</p>
                   <div className="cho-stat-row"><span className="cho-stat-value">{filteredBatches.length}</span></div>
@@ -269,6 +283,13 @@ export default function CHOBatchInventory() {
                   <p className="cho-stat-label">INITIAL QUANTITY</p>
                   <div className="cho-stat-row"><span className="cho-stat-value">{totalInitialQuantity}</span></div>
                   <p className="cho-stat-sub">{periodLabel}</p>
+                </div>
+                <div className="cho-stat-card" style={{ borderColor: expiringCount > 0 ? "#fecaca" : undefined }}>
+                  <p className="cho-stat-label" style={{ color: expiringCount > 0 ? "#dc2626" : undefined }}>EXPIRING SOON</p>
+                  <div className="cho-stat-row">
+                    <span className="cho-stat-value" style={{ color: expiringCount > 0 ? "#dc2626" : undefined }}>{expiringCount}</span>
+                  </div>
+                  <p className="cho-stat-sub">Within 30 days</p>
                 </div>
               </div>
 

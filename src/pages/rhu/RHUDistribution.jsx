@@ -8,6 +8,7 @@ import {
 import { db } from "../../firebase/config";
 import { checkAndNotifyLowStock } from "../../utils/lowStockNotifier";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import { useToast } from "../../context/ToastContext";
 import {
   getPriorMonthKey, monthKeyLabel, getSubmittedOwnerIds,
@@ -64,6 +65,7 @@ export default function RHUDistribution() {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
 
   const [distributions, setDistributions]   = useState([]);
   const [inventory, setInventory]           = useState([]);
@@ -577,6 +579,9 @@ export default function RHUDistribution() {
                   <span>{item.label}</span>
                   {item.label === "Notifications" && Boolean(unreadCount) && (
                     <span className="nav-badge">{unreadCount}</span>
+                  )}
+                  {item.label === "Messages" && Boolean(unreadMessages) && (
+                    <span className="nav-badge">{unreadMessages}</span>
                   )}
                 </NavLink>
               ))}

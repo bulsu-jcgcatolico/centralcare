@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import { useToast } from "../../context/ToastContext";
 import "./RHUBarangay.css";
 
@@ -57,6 +58,7 @@ export default function RHUBarangay() {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
 
   const [barangays, setBarangays] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -200,6 +202,9 @@ export default function RHUBarangay() {
               <span>{item.label}</span>
               {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
+              )}
+              {item.label === "Messages" && Boolean(unreadMessages) && (
+                <span className="nav-badge">{unreadMessages}</span>
               )}
             </NavLink>
           ))}

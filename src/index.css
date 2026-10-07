@@ -111,6 +111,117 @@ code {
   gap: 10px;
 }
 
+/* Same font, size, weight and spacing for every sidebar item, including the
+   Settings and Sign out buttons (they were inheriting the 18px root font).
+   Each role keeps its own nav size so nothing else in the sidebar changes. */
+
+/* RHU: nav links are 13.5px */
+.rhu-nav-item,
+.rhu-nav-btn,
+.rhu-signout {
+  font-family: var(--sans) !important;
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  line-height: 145% !important;
+  letter-spacing: 0.18px !important;
+  gap: 10px !important;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+/* Midwife: nav links are 14px with 10px 14px padding.
+   .midwife-nav-btn had padding: 0, which pushed Settings / Sign out to the left. */
+.midwife-nav-item,
+.midwife-nav-btn,
+.midwife-signout {
+  font-family: var(--sans) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 145% !important;
+  letter-spacing: 0.18px !important;
+  gap: 12px !important;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.midwife-nav-item.midwife-nav-btn {
+  padding: 10px 14px !important;
+  min-height: 42px;
+  width: 100%;
+}
+
+/* CHO + RHU: one identical sidebar frame on every page.
+   Some CHO pages use the .cho-* sidebar (CHODashboard.css, content-box, so it
+   rendered about 235px wide) and others use the .rhu-* sidebar
+   (CHOBatchDistribution.css, 220px border-box). Because every stylesheet is
+   bundled globally, those rules also leak into the RHU pages. This locks the
+   size, padding and spacing so it can't change from page to page. */
+.cho-sidebar,
+.rhu-sidebar {
+  width: 210px !important;
+  min-width: 210px !important;
+  max-width: 210px !important;
+  flex: 0 0 210px !important;
+  box-sizing: border-box !important;
+  padding: 1.25rem 0.75rem !important;
+  gap: 0.5rem !important;
+}
+
+.cho-nav,
+.rhu-nav {
+  gap: 2px !important;
+}
+
+.cho-sidebar-footer,
+.rhu-sidebar-footer {
+  gap: 2px !important;
+  padding-top: 0.75rem !important;
+}
+
+.cho-nav-item,
+.rhu-nav-item {
+  padding: 9px 12px !important;
+  border-radius: 8px;
+}
+
+/* Sign out is red on every CHO page, like RHU and Midwife */
+.cho-sidebar .cho-signout {
+  color: #ef4444 !important;
+}
+.cho-sidebar .cho-signout:hover {
+  background: #fef2f2 !important;
+  color: #dc2626 !important;
+}
+
+/* CHO: Settings / Sign out use the same type as the nav links */
+.cho-nav-item,
+.cho-nav-btn,
+.cho-signout {
+  font-family: var(--sans) !important;
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  line-height: 145% !important;
+  letter-spacing: 0.18px !important;
+  gap: 10px !important;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.rhu-nav-item.active,
+.midwife-nav-item.active,
+.cho-nav-item.active {
+  font-weight: 600 !important;
+}
+
+/* If any footer icon is an inline <svg>, keep it the same size as the others */
+[class*="-nav-item"] svg,
+[class*="-nav-btn"] svg,
+[class*="-signout"] svg {
+  width: 18px !important;
+  height: 18px !important;
+  flex-shrink: 0;
+}
+
 [class*="-nav-item"]::before {
   content: "";
   flex-shrink: 0;
@@ -154,3 +265,21 @@ a[class*="-nav-item"][href$="/dispense"]::before { -webkit-mask-image: url("data
 a[class*="-nav-item"][href$="/bhw"]::before { -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='m3%2011%2018-5v12L3%2014v-3z'/%3E%3Cpath%20d='M11.6%2016.8a3%203%200%201%201-5.8-1.6'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='m3%2011%2018-5v12L3%2014v-3z'/%3E%3Cpath%20d='M11.6%2016.8a3%203%200%201%201-5.8-1.6'/%3E%3C/svg%3E"); }
 a[class*="-nav-item"][href$="/settings"]::before { -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Ccircle%20cx='12'%20cy='12'%20r='3'/%3E%3Cpath%20d='M19.4%2015a1.65%201.65%200%200%200%20.33%201.82l.06.06a2%202%200%200%201%200%202.83%202%202%200%200%201-2.83%200l-.06-.06a1.65%201.65%200%200%200-1.82-.33%201.65%201.65%200%200%200-1%201.51V21a2%202%200%200%201-2%202%202%202%200%200%201-2-2v-.09A1.65%201.65%200%200%200%209%2019.4a1.65%201.65%200%200%200-1.82.33l-.06.06a2%202%200%200%201-2.83%200%202%202%200%200%201%200-2.83l.06-.06a1.65%201.65%200%200%200%20.33-1.82%201.65%201.65%200%200%200-1.51-1H3a2%202%200%200%201-2-2%202%202%200%200%201%202-2h.09A1.65%201.65%200%200%200%204.6%209a1.65%201.65%200%200%200-.33-1.82l-.06-.06a2%202%200%200%201%200-2.83%202%202%200%200%201%202.83%200l.06.06a1.65%201.65%200%200%200%201.82.33H9a1.65%201.65%200%200%200%201-1.51V3a2%202%200%200%201%202-2%202%202%200%200%201%202%202v.09a1.65%201.65%200%200%200%201%201.51%201.65%201.65%200%200%200%201.82-.33l.06-.06a2%202%200%200%201%202.83%200%202%202%200%200%201%200%202.83l-.06.06a1.65%201.65%200%200%200-.33%201.82V9a1.65%201.65%200%200%200%201.51%201H21a2%202%200%200%201%202%202%202%202%200%200%201-2%202h-.09a1.65%201.65%200%200%200-1.51%201z'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Ccircle%20cx='12'%20cy='12'%20r='3'/%3E%3Cpath%20d='M19.4%2015a1.65%201.65%200%200%200%20.33%201.82l.06.06a2%202%200%200%201%200%202.83%202%202%200%200%201-2.83%200l-.06-.06a1.65%201.65%200%200%200-1.82-.33%201.65%201.65%200%200%200-1%201.51V21a2%202%200%200%201-2%202%202%202%200%200%201-2-2v-.09A1.65%201.65%200%200%200%209%2019.4a1.65%201.65%200%200%200-1.82.33l-.06.06a2%202%200%200%201-2.83%200%202%202%200%200%201%200-2.83l.06-.06a1.65%201.65%200%200%200%20.33-1.82%201.65%201.65%200%200%200-1.51-1H3a2%202%200%200%201-2-2%202%202%200%200%201%202-2h.09A1.65%201.65%200%200%200%204.6%209a1.65%201.65%200%200%200-.33-1.82l-.06-.06a2%202%200%200%201%200-2.83%202%202%200%200%201%202.83%200l.06.06a1.65%201.65%200%200%200%201.82.33H9a1.65%201.65%200%200%200%201-1.51V3a2%202%200%200%201%202-2%202%202%200%200%201%202%202v.09a1.65%201.65%200%200%200%201%201.51%201.65%201.65%200%200%200%201.82-.33l.06-.06a2%202%200%200%201%202.83%200%202%202%200%200%201%200%202.83l-.06.06a1.65%201.65%200%200%200-.33%201.82V9a1.65%201.65%200%200%200%201.51%201H21a2%202%200%200%201%202%202%202%202%200%200%201-2%202h-.09a1.65%201.65%200%200%200-1.51%201z'/%3E%3C/svg%3E"); }
 .cho-signout::before, .rhu-signout::before, .midwife-signout::before { -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M9%2021H5a2%202%200%200%201-2-2V5a2%202%200%200%201%202-2h4'/%3E%3Cpolyline%20points='16%2017%2021%2012%2016%207'/%3E%3Cline%20x1='21'%20y1='12'%20x2='9'%20y2='12'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M9%2021H5a2%202%200%200%201-2-2V5a2%202%200%200%201%202-2h4'/%3E%3Cpolyline%20points='16%2017%2021%2012%2016%207'/%3E%3Cline%20x1='21'%20y1='12'%20x2='9'%20y2='12'/%3E%3C/svg%3E"); }
+/* ── Sidebar logo badge (CHO, RHU & Midwife) ───────────────────────────────────
+   Replaces the blue square + plus with the CentralCare logo on every sidebar,
+   without touching each page's JSX. Logo file: src/assets/logo.svg */
+.cho-brand-icon,
+.rhu-brand-icon,
+.midwife-brand-icon {
+  background: url("./assets/logo.svg") center / contain no-repeat !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  width: 38px !important;
+  height: 38px !important;
+}
+
+.cho-brand-icon > *,
+.rhu-brand-icon > *,
+.midwife-brand-icon > * {
+  display: none !important;
+}

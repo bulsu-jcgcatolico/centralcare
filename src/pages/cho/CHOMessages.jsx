@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { collection, query, where, orderBy, limit, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import "./CHOMessages.css";
 
 const navItems = [
@@ -40,6 +41,7 @@ export default function CHOMessages() {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
 
   const choId = "cho_admin";
   const choName = user?.displayName || user?.name || "CHO Administrator";
@@ -217,6 +219,9 @@ export default function CHOMessages() {
               <span>{item.label}</span>
               {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
+              )}
+              {item.label === "Messages" && Boolean(unreadMessages) && (
+                <span className="nav-badge">{unreadMessages}</span>
               )}
             </NavLink>
           ))}

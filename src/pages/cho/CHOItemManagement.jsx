@@ -6,6 +6,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import { useToast } from "../../context/ToastContext";
 import "./CHOItemManagement.css";
 
@@ -41,6 +42,7 @@ export default function CHOItemManagement() {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
 
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState([]);
@@ -210,6 +212,9 @@ export default function CHOItemManagement() {
               <span>{item.label}</span>
               {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
+              )}
+              {item.label === "Messages" && Boolean(unreadMessages) && (
+                <span className="nav-badge">{unreadMessages}</span>
               )}
             </NavLink>
           ))}

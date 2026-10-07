@@ -6,6 +6,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import { useToast } from "../../context/ToastContext";
 import "./CHORHUManagement.css";
 
@@ -43,6 +44,7 @@ export default function CHORHUManagement() {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
 
   const [rhus, setRhus] = useState([]);
   const [search, setSearch] = useState("");
@@ -207,6 +209,9 @@ export default function CHORHUManagement() {
               <span>{item.label}</span>
               {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
+              )}
+              {item.label === "Messages" && Boolean(unreadMessages) && (
+                <span className="nav-badge">{unreadMessages}</span>
               )}
             </NavLink>
           ))}

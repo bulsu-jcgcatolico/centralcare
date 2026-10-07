@@ -4,7 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { collection, getDocs, query, where, doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
-import { buildForecastList, getUrgentForecasts, FIELD_MAPS } from "../../utils/stockForecast";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import "./MidwifeDashboard.css";
 
 const navItems = [
@@ -22,6 +22,7 @@ export default function MidwifeDashboard() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
   
   const [search, setSearch] = useState("");
   const [inventory, setInventory] = useState([]);
@@ -100,21 +101,32 @@ export default function MidwifeDashboard() {
   const availableMedicines = inventory.filter(i => (i.remaining ?? i.quantity ?? 0) > 0);
   const totalBoxesDispensed = dispenseLogs.reduce((s, l) => s + (l.boxesDispensed || 0), 0);
 
-  // Predictive stock-out forecast — trailing moving-average consumption rate
-  // from real patient dispensing, falling back to the last submitted monthly
-  // balance report when there isn't enough recent history yet.
-  //
-  // Stock handed to a BHW has already left the midwife's physical custody
-  // (see MidwifeBHW.jsx), so it counts as consumption for forecasting
-  // purposes even before the BHW reports back what was actually used —
-  // otherwise the forecast would think more stock remains than it does.
-  const bhwAllocationsAsLogs = bhwAllocations.map(a => ({
-    medicineName: a.itemName,
-    boxesDispensed: a.quantityAllocated,
-    dispensedAt: a.allocatedAt,
-  }));
-  const forecastList = buildForecastList(inventory, [...dispenseLogs, ...bhwAllocationsAsLogs], monthlyReports, FIELD_MAPS.midwife);
-  const urgentForecasts = getUrgentForecasts(forecastList, 5);
+  // Items Expiring Soon — same date-based rule used on the CHO and RHU
+  // dashboards, replacing the old consumption-forecast widget with a
+  // simpler, directly-verifiable list.
+  const expiringItems = inventory.filter(i => {
+    if (!i.expiry) return false;
+    const remaining = i.remaining ?? i.quantity ?? 0;
+    if (remaining <= 0) return false;
+    const days = (new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24);
+    return days <= 30 && days >= 0;
+  });
+  const expiringSoonList = expiringItems
+    .map(i => {
+      const daysRemaining = (new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24);
+      return {
+        id: i.id,
+        name: i.name,
+        lotNumber: i.lotNumber,
+        expiry: i.expiry,
+        remaining: i.remaining ?? i.quantity ?? 0,
+        isVaccine: !!i.isVaccine,
+        daysRemaining,
+        status: daysRemaining <= 7 ? "critical" : "warning",
+      };
+    })
+    .sort((a, b) => a.daysRemaining - b.daysRemaining)
+    .slice(0, 5);
 
   const filteredMedicines = availableMedicines.filter(med =>
     med.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -147,6 +159,9 @@ export default function MidwifeDashboard() {
               <span>{item.label}</span>
               {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
+              )}
+              {item.label === "Messages" && Boolean(unreadMessages) && (
+                <span className="nav-badge">{unreadMessages}</span>
               )}
             </NavLink>
           ))}
@@ -217,7 +232,7 @@ export default function MidwifeDashboard() {
           </div>
 
           {/* Stat Cards */}
-          <div className="midwife-stats-grid">
+          <div className="midwife-stats-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
             <div className="midwife-stat-card">
               <div className="midwife-stat-icon-wrap blue">
                 <svg viewBox="0 0 24 24" fill="#1a56db" width="24" height="24">
@@ -264,6 +279,19 @@ export default function MidwifeDashboard() {
               <p className="midwife-stat-label">Boxes Dispensed</p>
               <p className="midwife-stat-value">{totalBoxesDispensed}</p>
               <span className="midwife-stat-trend up">All time</span>
+            </div>
+
+            <div className="midwife-stat-card">
+              <div className="midwife-stat-icon-wrap" style={{ background: "#fee2e2" }}>
+                <svg viewBox="0 0 24 24" fill="#dc2626" width="24" height="24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/>
+                </svg>
+              </div>
+              <p className="midwife-stat-label">Expiring Soon</p>
+              <p className="midwife-stat-value">{expiringItems.length}</p>
+              <span className="midwife-stat-trend warning">
+                {expiringItems.length > 0 ? "Within 30 days" : "None expiring soon"}
+              </span>
             </div>
           </div>
 
@@ -335,20 +363,20 @@ export default function MidwifeDashboard() {
             </section>
           </div>
 
-          {/* Predicted Stock-Outs */}
+          {/* Items Expiring Soon */}
           <section className="midwife-section">
             <div className="midwife-section-hd">
-              <h2 className="midwife-section-title">Predicted Stock-Outs</h2>
+              <h2 className="midwife-section-title">Items Expiring Soon</h2>
               <NavLink to="/midwife/inventory" className="midwife-view-all">View Inventory</NavLink>
             </div>
-            {urgentForecasts.length === 0 ? (
+            {expiringSoonList.length === 0 ? (
               <div className="midwife-empty-small">
-                <p>No items are trending toward a stock-out based on the last 30 days of dispensing activity.</p>
+                <p>No items are expiring within the next 30 days.</p>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {urgentForecasts.map(f => (
-                  <div key={f.itemId} style={{
+                {expiringSoonList.map(f => (
+                  <div key={f.id} style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",
                     padding: "12px 14px", borderRadius: "8px",
                     background: f.status === "critical" ? "#fef2f2" : "#fffbeb",
@@ -359,8 +387,7 @@ export default function MidwifeDashboard() {
                         {f.name}{f.lotNumber ? ` (Lot ${f.lotNumber})` : ""}{f.isVaccine ? " 💉" : ""}
                       </p>
                       <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#6b7280" }}>
-                        {f.remaining} boxes remaining · ~{f.dailyRate.toFixed(1)}/day
-                        {f.wasteRisk && <span style={{ color: "#b45309" }}> · will expire before running out</span>}
+                        {f.remaining} boxes remaining · expires {f.expiry}
                       </p>
                     </div>
                     <span style={{

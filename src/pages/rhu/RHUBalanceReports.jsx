@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import {
   getPriorMonthKey, monthKeyLabel, recentMonthKeys,
   getAllSubmittedReports, displayFacilityName,
@@ -27,6 +28,7 @@ export default function RHUBalanceReports() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
 
   const [monthKey, setMonthKey] = useState(getPriorMonthKey());
   const [barangays, setBarangays] = useState([]);
@@ -117,6 +119,9 @@ export default function RHUBalanceReports() {
               <span>{item.label}</span>
               {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
+              )}
+              {item.label === "Messages" && Boolean(unreadMessages) && (
+                <span className="nav-badge">{unreadMessages}</span>
               )}
             </NavLink>
           ))}

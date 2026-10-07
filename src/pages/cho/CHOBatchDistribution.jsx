@@ -7,6 +7,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import { useToast } from "../../context/ToastContext";
 import {
   getPriorMonthKey, monthKeyLabel, getSubmittedOwnerIds, displayFacilityName,
@@ -50,6 +51,7 @@ export default function CHOBatchDistribution() {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
 
   const [batches, setBatches]           = useState([]);
   const [rhus, setRhus]                 = useState([]);
@@ -414,6 +416,9 @@ export default function CHOBatchDistribution() {
                   <span>{item.label}</span>
                   {item.label === "Notifications" && Boolean(unreadCount) && (
                     <span className="nav-badge">{unreadCount}</span>
+                  )}
+                  {item.label === "Messages" && Boolean(unreadMessages) && (
+                    <span className="nav-badge">{unreadMessages}</span>
                   )}
                 </NavLink>
               ))}

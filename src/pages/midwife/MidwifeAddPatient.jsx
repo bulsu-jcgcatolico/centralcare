@@ -6,6 +6,7 @@ import { db } from "../../firebase/config";
 import { useNavigate, useParams, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import { useToast } from "../../context/ToastContext";
 import "./MidwifeAddPatient.css";
 const navItems = [
@@ -55,6 +56,7 @@ export default function MidwifeAddPatient(props) {
   const params = useParams();
   const patientId = params.id;
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
 
   const [type, setType] = useState(typeProp);
   const [pageLoading, setPageLoading] = useState(isEdit ? true : false);
@@ -265,6 +267,9 @@ export default function MidwifeAddPatient(props) {
                 <span>{item.label}</span>
                 {item.label === "Notifications" && Boolean(unreadCount) && (
                   <span className="nav-badge">{unreadCount}</span>
+                )}
+                {item.label === "Messages" && Boolean(unreadMessages) && (
+                  <span className="nav-badge">{unreadMessages}</span>
                 )}
               </NavLink>
             );

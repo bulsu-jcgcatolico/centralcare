@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import logo from "../../assets/logo.svg";
 import "./Login.css";
 
 export default function Login() {
@@ -41,10 +42,11 @@ export default function Login() {
 
           {/* Logo */}
           <div className="login-logo">
-            <div className="login-logo-icon">
-              <svg viewBox="0 0 24 24" fill="white" width="26" height="26">
-                <path d="M19 3H5C3.9 3 3 3.9 3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c.55 0 1 .45 1 1v3h3c.55 0 1 .45 1 1s-.45 1-1 1h-3v3c0 .55-.45 1-1 1s-1-.45-1-1v-3H8c-.55 0-1-.45-1-1s.45-1 1-1h3V7c0-.55.45-1 1-1z"/>
-              </svg>
+            <div
+              className="login-logo-icon"
+              style={{ background: "transparent", boxShadow: "none", width: "auto", height: "auto" }}
+            >
+              <img src={logo} alt="CentralCare" width="76" height="76" style={{ display: "block" }} />
             </div>
           </div>
 
@@ -147,7 +149,7 @@ export default function Login() {
           </div>
 
           <div className="login-copyright">
-            <p>© 2024 CentralCare Health System. All rights reserved.</p>
+            <p>© 2026 CentralCare Health System. All rights reserved.</p>
           </div>
 
         </div>

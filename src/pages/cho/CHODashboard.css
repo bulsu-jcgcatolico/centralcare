@@ -118,12 +118,12 @@
 }
 
 .cho-signout {
-  color: #ef4444 !important;
+  color: #374151 !important;
 }
 
 .cho-signout:hover {
-  background: #fef2f2 !important;
-  color: #dc2626 !important;
+  background: #f1f5f9 !important;
+  color: #1a56db !important;
 }
 
 /* ── Main ─────────────────────────────────────────────────────────────────────── */

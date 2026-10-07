@@ -7,6 +7,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import { useToast } from "../../context/ToastContext";
 import "./MidwifePatient.css";
 
@@ -26,6 +27,7 @@ export default function MidwifePatients() {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const unreadCount = useUnreadCount();
+  const unreadMessages = useUnreadMessageCount();
 
   const [search, setSearch]       = useState("");
   const [activeTab, setActiveTab] = useState("child");
@@ -116,7 +118,6 @@ export default function MidwifePatients() {
     activeTab === "child" ? childPatients : adultPatients
   ));
 
-  const activeCases = patients.filter(p => p.status === "active").length;
 
   // Print / Export Handler function
   function exportPatients() {
@@ -223,6 +224,9 @@ export default function MidwifePatients() {
               {item.label === "Notifications" && Boolean(unreadCount) && (
                 <span className="nav-badge">{unreadCount}</span>
               )}
+              {item.label === "Messages" && Boolean(unreadMessages) && (
+                <span className="nav-badge">{unreadMessages}</span>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -305,8 +309,8 @@ export default function MidwifePatients() {
                 </svg>
               </div>
               <div>
-                <p className="midwife-stat-label-box">Active Cases</p>
-                <p className="midwife-stat-value-box">{activeCases}</p>
+                <p className="midwife-stat-label-box">Total Registered Patients</p>
+                <p className="midwife-stat-value-box">{patients.length}</p>
               </div>
             </div>
 
