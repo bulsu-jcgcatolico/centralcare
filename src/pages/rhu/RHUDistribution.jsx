@@ -60,6 +60,46 @@ function getMonthYear(dateStr, seconds) {
   return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+// Today as YYYY-MM-DD in LOCAL time. (toISOString() is UTC, which is still
+// "yesterday" in the Philippines between midnight and 8 AM.)
+function todayLocalISO() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function toMillis(ts) {
+  if (!ts) return 0;
+  if (typeof ts.toMillis === "function") return ts.toMillis();
+  if (typeof ts.seconds === "number") return ts.seconds * 1000;
+  const t = new Date(ts).getTime();
+  return isNaN(t) ? 0 : t;
+}
+
+// The calendar day a distribution is dated for (local midnight).
+function getDistributionDay(d) {
+  let t = toMillis(d.createdAt);
+  if (!t && d.date) {
+    const p = new Date(d.date).getTime();
+    t = isNaN(p) ? 0 : p;
+  }
+  if (!t) return 0;
+  const day = new Date(t);
+  day.setHours(0, 0, 0, 0);
+  return day.getTime();
+}
+
+// When the record was actually entered. New records carry savedAt; older ones
+// fall back to createdAt.
+function getEntryTime(d) {
+  return toMillis(d.savedAt) || toMillis(d.createdAt);
+}
+
+// Newest delivery date first; on the same day, most recently entered first.
+function sortNewestFirst(a, b) {
+  return getDistributionDay(b) - getDistributionDay(a) || getEntryTime(b) - getEntryTime(a);
+}
+
 export default function RHUDistribution() {
   const { logout, user, userData } = useAuth();
   const { showToast } = useToast();
@@ -80,7 +120,7 @@ export default function RHUDistribution() {
   const [selectedMonth, setSelectedMonth]   = useState("all"); 
 
   // Custom Distribution Date State (Defaults to current local YYYY-MM-DD)
-  const [distributeDate, setDistributeDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [distributeDate, setDistributeDate] = useState(todayLocalISO);
 
   // New distribution modal — multi-medicine selection
   const [showNewModal, setShowNewModal]         = useState(false);
@@ -233,7 +273,12 @@ export default function RHUDistribution() {
     setSelectedItems({});
     setCalculatedPlans([]);
     setPendingFefoItem(null);
-    setDistributeDate(new Date().toISOString().split("T")[0]);
+    setDistributeDate(todayLocalISO());
+  }
+
+  function closeNewModal() {
+    setShowNewModal(false);
+    resetNewModal();
   }
 
   function calculatePlans() {
@@ -342,6 +387,7 @@ export default function RHUDistribution() {
           status:               "Pending",
           createdBy:            user?.uid ?? "",
           createdAt:            customTimestamp,
+          savedAt:              serverTimestamp(), // real entry time — createdAt only holds the delivery DATE
           date:                 formattedDate
         });
 
@@ -517,9 +563,7 @@ export default function RHUDistribution() {
 
   const pendingCount      = filteredDistributions.filter(d => d.status === "Pending" || d.status === "Partial").length;
   const totalDistributed  = filteredDistributions.reduce((s, d) => s + (d.totalBoxes || 0), 0);
-  const tableRows         = filteredDistributions.slice().sort((a, b) =>
-    (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)
-  );
+  const tableRows         = filteredDistributions.slice().sort(sortNewestFirst);
   const grandTotalBoxes   = calculatedPlans.reduce((s, p) => s + p.totalBoxes, 0);
 
   const totalAssignedPopulation = barangays.reduce((sum, b) => sum + b.population, 0);
@@ -533,6 +577,47 @@ export default function RHUDistribution() {
     fefoGroups[key].push(item);
   });
   Object.keys(fefoGroups).forEach(name => { fefoGroups[name] = sortByFEFO(fefoGroups[name]); });
+
+  // ── New Distribution modal: values shown in the UI ──
+  const populationBarangays = barangays.filter(b => b.population > 0);
+  const isBarangayEligible  = b => compliantBarangayNames.has(String(b.name).trim().toLowerCase());
+  const eligibleBarangays   = populationBarangays.filter(isBarangayEligible);
+  const eligiblePopulation  = eligibleBarangays.reduce((s, b) => s + b.population, 0);
+  const reportLabel         = monthKeyLabel(reportMonthKey);
+
+  const recipients = barangays.map(b => {
+    const hasPop   = b.population > 0;
+    const eligible = hasPop && isBarangayEligible(b);
+    const share    = eligible && eligiblePopulation > 0
+      ? ((b.population / eligiblePopulation) * 100).toFixed(1)
+      : null;
+    return { ...b, hasPop, eligible, share };
+  });
+
+  let eligibility = null;
+  if (barangays.length > 0) {
+    if (populationBarangays.length === 0) {
+      eligibility = { tone: "warn", text: "No assigned barangay has a population set yet. Add population numbers in the Barangay module first." };
+    } else if (eligibleBarangays.length === 0) {
+      eligibility = {
+        tone: "danger",
+        text: `No barangay is eligible yet — none have submitted their ${reportLabel} end-balance report.`,
+        action: { label: "Review balance reports", to: "/rhu/balance-reports" },
+      };
+    } else if (eligibleBarangays.length < populationBarangays.length) {
+      const skipped = populationBarangays.length - eligibleBarangays.length;
+      eligibility = {
+        tone: "warn",
+        text: `${eligibleBarangays.length} of ${populationBarangays.length} barangays are eligible. The other ${skipped} will be skipped until they submit their ${reportLabel} end-balance report.`,
+      };
+    } else {
+      eligibility = { tone: "ok", text: `All ${populationBarangays.length} barangays submitted their ${reportLabel} end-balance report and are eligible.` };
+    }
+  }
+
+  const selectedEntries = Object.entries(selectedItems);
+  const selectedCount   = selectedEntries.length;
+  const selectedBoxes   = selectedEntries.reduce((s, [, v]) => s + (parseInt(v, 10) || 0), 0);
 
   function handleMedicineCheck(item, checked) {
     if (checked) {
@@ -861,200 +946,254 @@ export default function RHUDistribution() {
         </div>
       )}
 
-      {/* ── New Distribution Modal (multi-medicine) ── */}
+      {/* ── New Distribution Modal ── */}
       {showNewModal && (
-        <div className="rhu-modal-overlay" onClick={() => { setShowNewModal(false); resetNewModal(); }}>
-          <div className="rhu-modal rhu-modal--lg" onClick={e => e.stopPropagation()}>
-            <div className="rhu-modal-header">
-              <h2 className="rhu-modal-title">New Distribution</h2>
-              <button className="rhu-modal-close" aria-label="Close" onClick={() => { setShowNewModal(false); resetNewModal(); }}>×</button>
-            </div>
-            <div className="rhu-modal-body">
-              <div className="rhu-dist-grid">
-
-              <div className="rhu-dist-col-left">
-
-              <div className="rhu-dist-step" style={{ marginBottom: "16px" }}>
-                <label className="rhu-dist-step-label">
-                  <span className="rhu-dist-step-num">1</span>
-                  Pick a date for this delivery
-                </label>
-                <input
-                  type="date"
-                  className="cho-input rhu-dist-date-input"
-                  value={distributeDate}
-                  onChange={e => setDistributeDate(e.target.value)}
-                />
+        <div className="rhu-modal-overlay" onClick={closeNewModal}>
+          <div
+            className="rhd-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rhd-title"
+            onClick={e => e.stopPropagation()}
+          >
+            <header className="rhd-header">
+              <div>
+                <h2 className="rhd-title" id="rhd-title">New Distribution</h2>
+                <p className="rhd-subtitle">Allocate RHU stock to your barangays, split by population share.</p>
               </div>
+              <button type="button" className="rhd-close" aria-label="Close" onClick={closeNewModal}>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                </svg>
+              </button>
+            </header>
 
-              {/* Read-only summary of configured barangays */}
-              <div className="rhu-dist-step" style={{ marginBottom: "8px" }}>
-                <label className="rhu-dist-step-label">
-                  <span className="rhu-dist-step-num">3</span>
-                  Who's receiving this delivery
-                </label>
-              </div>
-              <div className="rhu-barangay-summary">
-                <div className="rhu-barangay-summary-header">
-                  <span>Sending to {barangays.length} barangay{barangays.length !== 1 ? "s" : ""}</span>
-                  <button type="button" className="rhu-link-btn" onClick={() => navigate("/rhu/barangay")}>
-                    Edit barangays
-                  </button>
-                </div>
-                <div className="rhu-barangay-summary-chips">
-                  {barangays.map(b => {
-                    const pct = totalAssignedPopulation > 0
-                      ? ((b.population / totalAssignedPopulation) * 100).toFixed(1)
-                      : "0.0";
-                    return (
-                      <span className="rhu-barangay-chip" key={b.id}>
-                        {b.name} · {pct}%
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
+            <div className="rhd-body">
+              {/* ── Left: delivery details ── */}
+              <div className="rhd-side">
+                <section className="rhd-card">
+                  <h3 className="rhd-step"><span className="rhd-step-num">1</span>Delivery date</h3>
+                  <input
+                    type="date"
+                    className="rhd-input"
+                    value={distributeDate}
+                    onChange={e => setDistributeDate(e.target.value)}
+                    aria-label="Delivery date"
+                  />
+                </section>
 
-              <p className="rhu-dist-note" style={{ color: compliantBarangayNames.size < barangays.filter(b => b.population > 0).length ? "#b45309" : "#166534" }}>
-                {compliantBarangayNames.size} of {barangays.filter(b => b.population > 0).length} population-registered barangays have submitted their {monthKeyLabel(reportMonthKey)} end-balance report and are eligible for this replenishment.
-              </p>
+                <section className="rhd-card">
+                  <h3 className="rhd-step"><span className="rhd-step-num">2</span>Recipients</h3>
 
-              </div>
-
-              <div className="rhu-dist-col-right">
-
-              <div className="rhu-dist-step" style={{ marginBottom: "10px" }}>
-                <label className="rhu-dist-step-label">
-                  <span className="rhu-dist-step-num">2</span>
-                  Choose which medicines to send
-                </label>
-                <p className="rhu-dist-step-help">
-                  Check the box next to each medicine you want to send, then type how many boxes.
-                </p>
-                <p className="rhu-dist-step-help rhu-dist-step-help--tip">
-                  <strong>Tip:</strong> Rows with a star (★) and a light yellow background are the batch expiring soonest —
-                  send that one out first so nothing goes to waste (this is called "FEFO").
-                </p>
-              </div>
-
-              <div className="rhu-med-select-list">
-                {(() => {
-                  const sortedInventory = Object.keys(fefoGroups)
-                    .sort((a, b) => a.localeCompare(b))
-                    .flatMap(name => fefoGroups[name]);
-
-                  return sortedInventory.map((item) => {
-                    const checked = item.id in selectedItems;
-                    const avail = item.remaining ?? item.quantity;
-                    const group = fefoGroups[item.name || "Unnamed"] || [];
-                    const isEarliestInGroup = group[0]?.id === item.id;
-                    return (
-                      <div
-                        className={`rhu-med-select-row ${checked ? "rhu-med-select-row--active" : ""}`}
-                        style={isEarliestInGroup ? { background: "#fffbeb" } : undefined}
-                        key={item.id}
-                      >
-                        <label className="rhu-med-checkbox-label">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={e => handleMedicineCheck(item, e.target.checked)}
-                          />
-                          <span className="rhu-med-checkbox-text">
-                            <strong>{isEarliestInGroup ? "★ " : ""}{item.name} — Lot {item.lotNumber || "—"}</strong>
-                            <span className="rhu-med-checkbox-sub">
-                              Expires {formatExpiry(item.expiry)} · {avail} boxes available
-                              {isEarliestInGroup ? " · dispense first (FEFO)" : ""}
-                            </span>
-                          </span>
-                        </label>
-                        {checked && (
-                          <input
-                            className="rhu-input rhu-med-boxes-input"
-                            type="number"
-                            min="1"
-                            placeholder="Boxes"
-                            value={selectedItems[item.id]}
-                            onChange={e => updateMedicineBoxes(item.id, e.target.value)}
-                            aria-label={`Boxes of ${item.name} to distribute`}
-                          />
+                  {eligibility && (
+                    <div className={`rhd-alert rhd-alert--${eligibility.tone}`} role="status">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="16" x2="12" y2="12" />
+                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                      </svg>
+                      <div>
+                        {eligibility.text}
+                        {eligibility.action && (
+                          <>
+                            {" "}
+                            <button type="button" className="rhd-link" onClick={() => navigate(eligibility.action.to)}>
+                              {eligibility.action.label}
+                            </button>
+                          </>
                         )}
                       </div>
+                    </div>
+                  )}
+
+                  <div className="rhd-recip-head">
+                    <span>{barangays.length} barangay{barangays.length !== 1 ? "s" : ""}</span>
+                    <button type="button" className="rhd-link" onClick={() => navigate("/rhu/barangay")}>
+                      Edit barangays
+                    </button>
+                  </div>
+
+                  {barangays.length === 0 ? (
+                    <p className="rhd-empty">No barangays are assigned to this RHU yet.</p>
+                  ) : (
+                    <ul className="rhd-recip-list">
+                      {recipients.map(b => (
+                        <li className="rhd-recip" key={b.id}>
+                          <span className="rhd-recip-name">{b.name}</span>
+                          <span className="rhd-recip-right">
+                            {b.share !== null && <span className="rhd-recip-share">{b.share}%</span>}
+                            <span className={`rhd-pill rhd-pill--${b.eligible ? "ok" : b.hasPop ? "warn" : "muted"}`}>
+                              {b.eligible ? "Eligible" : b.hasPop ? "No report" : "No population"}
+                            </span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              </div>
+
+              {/* ── Right: medicines + plan ── */}
+              <div className="rhd-main">
+                <section className="rhd-card">
+                  <h3 className="rhd-step"><span className="rhd-step-num">3</span>Medicines to send</h3>
+                  <p className="rhd-help">
+                    Tick each lot you want to send, then enter the number of boxes. Yellow rows marked ★{" "}
+                    <span className="rhd-badge">Use first</span> are the lots expiring soonest — send those
+                    out first so nothing goes to waste (FEFO).
+                  </p>
+
+                  {Object.keys(fefoGroups).sort((a, b) => a.localeCompare(b)).map(name => {
+                    const group = fefoGroups[name];
+                    return (
+                      <div className="rhd-med-group" key={name}>
+                        <div className="rhd-med-group-head">
+                          <span>{name}</span>
+                          <span className="rhd-med-group-count">{group.length} lot{group.length !== 1 ? "s" : ""}</span>
+                        </div>
+                        {group.map((item, idx) => {
+                          const checked = item.id in selectedItems;
+                          const avail = item.remaining ?? item.quantity ?? 0;
+                          const val = selectedItems[item.id] ?? "";
+                          const n = parseInt(val, 10);
+                          const invalid = checked && val !== "" && (!n || n <= 0 || n > avail);
+                          return (
+                            <div
+                              className={`rhd-lot${idx === 0 ? " rhd-lot--first" : ""}${checked ? " rhd-lot--active" : ""}`}
+                              key={item.id}
+                            >
+                              <label className="rhd-lot-main">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={e => handleMedicineCheck(item, e.target.checked)}
+                                />
+                                <span>
+                                  <span className="rhd-lot-title">
+                                    {idx === 0 ? "★ " : ""}Lot {item.lotNumber || "—"}
+                                    {idx === 0 && <span className="rhd-badge">Use first</span>}
+                                  </span>
+                                  <span className="rhd-lot-meta">
+                                    Expires {formatExpiry(item.expiry)} · {avail} boxes available
+                                  </span>
+                                </span>
+                              </label>
+                              {checked && (
+                                <div className="rhd-boxes">
+                                  <input
+                                    className={`rhd-input rhd-input--sm${invalid ? " rhd-input--error" : ""}`}
+                                    type="number"
+                                    min="1"
+                                    max={avail}
+                                    placeholder="Boxes"
+                                    value={val}
+                                    autoFocus
+                                    onChange={e => updateMedicineBoxes(item.id, e.target.value)}
+                                    aria-label={`Boxes of ${item.name} to distribute`}
+                                  />
+                                  <span className={`rhd-boxes-hint${invalid ? " rhd-boxes-hint--error" : ""}`}>
+                                    {invalid ? `Max ${avail}` : `of ${avail}`}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     );
-                  });
-                })()}
-                {distributableInventory.length === 0 && (
-                  <p className="rhu-dist-note">No accepted medicines in inventory available for distribution.</p>
+                  })}
+
+                  {distributableInventory.length === 0 && (
+                    <p className="rhd-empty">No accepted medicines in inventory are available for distribution.</p>
+                  )}
+                </section>
+
+                <section className="rhd-card" ref={resultsRef}>
+                  <h3 className="rhd-step"><span className="rhd-step-num">4</span>Review the plan</h3>
+                  {calculatedPlans.length === 0 ? (
+                    <p className="rhd-help rhd-help--flush">
+                      Select your medicines, then press <strong>Calculate Distribution</strong>. The split by
+                      barangay will appear here for you to check before saving.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="rhd-help">Boxes are split by each eligible barangay's share of the population.</p>
+                      {calculatedPlans.map(plan => (
+                        <div className="rhd-plan-card" key={plan.inventoryId}>
+                          <div className="rhd-plan-head">
+                            <span>
+                              {plan.item.name}
+                              <span className="rhd-plan-lot">Lot {plan.item.lotNumber || "—"}</span>
+                            </span>
+                            <span>{plan.totalBoxes} boxes</span>
+                          </div>
+                          <div className="rhd-table-scroll">
+                            <table className="rhd-table">
+                              <thead>
+                                <tr>
+                                  <th>Barangay</th>
+                                  <th className="num">Pop. share</th>
+                                  <th className="num">Boxes</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {plan.dist.map(b => (
+                                  <tr key={b.id}>
+                                    <td>{b.name}</td>
+                                    <td className="num">{b.sharePercent}%</td>
+                                    <td className="num"><strong>{b.boxes}</strong></td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot>
+                                <tr>
+                                  <td colSpan={2}>Total</td>
+                                  <td className="num">{plan.dist.reduce((s, b) => s + b.boxes, 0)}</td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="rhd-grand">
+                        <span>Grand total</span>
+                        <strong>
+                          {grandTotalBoxes} boxes across {calculatedPlans.length} item{calculatedPlans.length > 1 ? "s" : ""}
+                        </strong>
+                      </div>
+                    </>
+                  )}
+                </section>
+              </div>
+            </div>
+
+            <footer className="rhd-footer">
+              <p className="rhd-footer-summary">
+                {selectedCount === 0 ? (
+                  "No medicines selected yet"
+                ) : (
+                  <>
+                    <strong>{selectedCount}</strong> item{selectedCount !== 1 ? "s" : ""} selected
+                    {selectedBoxes > 0 && <> · <strong>{selectedBoxes}</strong> boxes</>}
+                  </>
+                )}
+              </p>
+              <div className="rhd-footer-actions">
+                <button type="button" className="rhd-btn rhd-btn--secondary" onClick={closeNewModal}>
+                  Cancel
+                </button>
+                {calculatedPlans.length > 0 ? (
+                  <button type="button" className="rhd-btn rhd-btn--primary" onClick={saveDistributionPlan} disabled={saving}>
+                    {saving ? "Saving..." : "Save & Notify Barangays"}
+                  </button>
+                ) : (
+                  <button type="button" className="rhd-btn rhd-btn--primary" onClick={calculatePlans}>
+                    Calculate Distribution
+                  </button>
                 )}
               </div>
-
-              <div className="rhu-dist-step" style={{ margin: "16px 0 8px" }}>
-                <label className="rhu-dist-step-label">
-                  <span className="rhu-dist-step-num">4</span>
-                  See the plan, then save it
-                </label>
-                <p className="rhu-dist-step-help">
-                  Tap "Calculate Distribution" below — it's pinned at the bottom so you don't need to scroll for it.
-                </p>
-              </div>
-
-              {calculatedPlans.length > 0 && (
-                <div ref={resultsRef}>
-                <>
-                  <p className="rhu-dist-note" style={{ fontWeight: 600 }}>Here's the plan — boxes are split by each barangay's population:</p>
-                  {calculatedPlans.map(plan => (
-                    <div className="rhu-plan-preview" key={plan.inventoryId}>
-                      <p className="rhu-plan-preview-title">{plan.item.name} — {plan.totalBoxes} boxes</p>
-                      <div className="rhu-table-wrapper">
-                        <table className="rhu-inv-table">
-                          <thead>
-                            <tr>
-                              <th>BARANGAY</th>
-                              <th>POP SHARE %</th>
-                              <th>BOXES TO RECEIVE</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {plan.dist.map(b => (
-                              <tr key={b.id}>
-                                <td><strong>{b.name}</strong></td>
-                                <td>{b.sharePercent}%</td>
-                                <td><strong>{b.boxes} boxes</strong></td>
-                              </tr>
-                            ))}
-                            <tr className="rhu-table-total">
-                              <td colSpan={2}><strong>Total</strong></td>
-                              <td><strong>{plan.dist.reduce((s, b) => s + b.boxes, 0)} boxes</strong></td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ))}
-                  <div className="rhu-barangay-total-row rhu-pct-total--ok">
-                    <span>Grand Total</span>
-                    <strong>{grandTotalBoxes} boxes across {calculatedPlans.length} medicine{calculatedPlans.length > 1 ? "s" : ""}</strong>
-                  </div>
-                </>
-                </div>
-              )}
-
-              </div>
-
-              </div>
-            </div>
-            <div className="rhu-modal-footer">
-              <button className="rhu-btn-secondary" onClick={() => { setShowNewModal(false); resetNewModal(); }}>Cancel</button>
-              {calculatedPlans.length > 0 ? (
-                <button className="rhu-btn-primary" onClick={saveDistributionPlan} disabled={saving}>
-                  {saving ? "Saving..." : "Save & Notify All Barangays"}
-                </button>
-              ) : (
-                <button className="rhu-btn-primary rhu-calc-btn" onClick={calculatePlans}>
-                  Calculate Distribution
-                </button>
-              )}
-            </div>
+            </footer>
           </div>
         </div>
       )}
@@ -1126,121 +1265,6 @@ export default function RHUDistribution() {
           overflow: visible !important;
         }
 
-        /* New Distribution modal — larger, higher-contrast, and easier to
-           follow step by step for users less comfortable with software. */
-        .rhu-dist-grid {
-          display: grid;
-          grid-template-columns: 300px 1fr;
-          gap: 32px;
-          align-items: stretch;
-          flex: 1 1 auto;
-          min-height: 0;
-        }
-        .rhu-dist-col-left,
-        .rhu-dist-col-right {
-          min-width: 0;
-          overflow-y: auto;
-          padding-right: 4px;
-        }
-        @media (max-width: 760px) {
-          .rhu-dist-grid { grid-template-columns: 1fr; }
-          .rhu-dist-col-left, .rhu-dist-col-right {
-            overflow-y: visible !important;
-            height: auto !important;
-          }
-        }
-        .rhu-dist-step-label {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          font-size: 16px;
-          font-weight: 700;
-          color: #111827;
-          margin-bottom: 6px;
-        }
-        .rhu-dist-step-num {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 26px;
-          height: 26px;
-          flex-shrink: 0;
-          border-radius: 50%;
-          background: #2563eb;
-          color: #ffffff;
-          font-size: 14px;
-          font-weight: 700;
-        }
-        .rhu-dist-step-help {
-          font-size: 14.5px;
-          color: #374151;
-          margin: 0 0 4px;
-          line-height: 1.5;
-        }
-        .rhu-dist-step-help--tip {
-          background: #fffbeb;
-          border: 1px solid #fde68a;
-          border-radius: 8px;
-          padding: 8px 12px;
-          color: #78350f;
-        }
-        .rhu-dist-date-input {
-          width: 100% !important;
-          max-width: 280px !important;
-          font-size: 16px !important;
-          padding: 10px 12px !important;
-        }
-
-        .rhu-med-select-list {
-          font-size: 15px !important;
-        }
-        .rhu-med-checkbox-label input[type="checkbox"] {
-          width: 22px !important;
-          height: 22px !important;
-          accent-color: #2563eb;
-          cursor: pointer;
-        }
-        .rhu-med-select-row {
-          padding: 14px !important;
-          border-radius: 8px;
-          border: 2px solid transparent;
-        }
-        .rhu-med-checkbox-text strong {
-          font-size: 15.5px;
-        }
-        .rhu-med-checkbox-sub {
-          font-size: 13.5px !important;
-          color: #4b5563 !important;
-        }
-        /* A checked row gets an unmistakable blue outline — kept visually
-           distinct from the yellow "expires soonest" tint so the two signals
-           (recommended vs. actually selected) never get confused. */
-        .rhu-med-select-row--active {
-          border-color: #2563eb !important;
-          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-        }
-        .rhu-med-boxes-input {
-          font-size: 16px !important;
-          padding: 8px 10px !important;
-          min-width: 90px;
-        }
-
-        .rhu-barangay-chip {
-          font-size: 13.5px !important;
-          padding: 6px 12px !important;
-        }
-
-        .rhu-modal-footer .rhu-btn-primary,
-        .rhu-modal-footer .rhu-btn-secondary {
-          font-size: 15px !important;
-          padding: 12px 22px !important;
-        }
-
-        /* Let the New Distribution modal breathe a little more */
-        .rhu-modal--lg .rhu-modal-body {
-          padding: 24px !important;
-        }
-
         /* Let the distribution table expand to fit every row instead of
            clipping the last one inside a fixed-height scrollbox. */
         .rhu-table-wrapper {
@@ -1250,30 +1274,253 @@ export default function RHUDistribution() {
           overflow-x: auto !important;
         }
 
-        /* New Distribution modal: the body no longer scrolls as one whole
-           unit — it's a flex container sized to the available space, and
-           .rhu-dist-grid (below) fills it, with each column scrolling on
-           its own. Widened further so medicine names stop wrapping onto
-           3 lines and eating vertical space. */
-        .rhu-modal--lg {
-          max-height: 90vh !important;
-          height: auto !important;
-          width: min(1040px, 96vw) !important;
-          display: flex !important;
-          flex-direction: column !important;
+        /* ═══ New Distribution modal ═══════════════════════════════════════
+           Self-contained (rhd-*) so the shared .rhu-modal / .rhu-calc-btn
+           rules in RHUDistribution.css can't squeeze it. The whole body
+           scrolls as ONE area; header and footer stay pinned. */
+        .rhd-modal {
+          width: 100%;
+          max-width: 1000px;
+          max-height: 90vh;
+          display: flex;
+          flex-direction: column;
+          background: #ffffff;
+          border-radius: 16px;
+          box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+          overflow: hidden;
+          font-size: 14px;
+          line-height: 1.5;
+          color: #334155;
         }
-        .rhu-modal--lg .rhu-modal-body {
-          flex: 1 1 auto !important;
-          min-height: 0 !important;
-          max-height: none !important;
-          overflow-y: hidden !important;
-          display: flex !important;
-          flex-direction: column !important;
+        .rhd-modal button,
+        .rhd-modal input { font-family: inherit; }
+
+        .rhd-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 16px;
+          padding: 20px 24px 16px;
+          border-bottom: 1px solid #e2e8f0;
+          background: #ffffff;
         }
-        .rhu-modal--lg .rhu-med-select-list {
-          flex: none !important;
-          max-height: 300px !important;
-          overflow-y: auto !important;
+        .rhd-title { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.3; color: #0f172a; }
+        .rhd-subtitle { margin: 2px 0 0; font-size: 13px; color: #64748b; }
+        .rhd-close {
+          flex-shrink: 0;
+          width: 32px; height: 32px;
+          display: inline-flex; align-items: center; justify-content: center;
+          border: none; border-radius: 8px;
+          background: transparent; color: #64748b; cursor: pointer;
+        }
+        .rhd-close:hover { background: #f1f5f9; color: #0f172a; }
+
+        .rhd-body {
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow-y: auto;
+          padding: 20px 24px;
+          background: #f8fafc;
+          display: grid;
+          grid-template-columns: 320px minmax(0, 1fr);
+          gap: 20px;
+          align-items: start;
+        }
+        .rhd-side, .rhd-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+        .rhd-card {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          padding: 16px;
+        }
+        .rhd-step {
+          display: flex; align-items: center; gap: 10px;
+          margin: 0 0 12px;
+          font-size: 14px; font-weight: 700; color: #0f172a;
+        }
+        .rhd-step-num {
+          flex-shrink: 0;
+          width: 22px; height: 22px; border-radius: 50%;
+          display: inline-flex; align-items: center; justify-content: center;
+          background: #1a56db; color: #ffffff;
+          font-size: 12px; font-weight: 700;
+        }
+        .rhd-help { margin: 0 0 12px; font-size: 13px; line-height: 1.55; color: #64748b; }
+        .rhd-help--flush { margin: 0; }
+        .rhd-empty { margin: 0; padding: 12px 0 4px; font-size: 13px; color: #64748b; text-align: center; }
+
+        .rhd-input {
+          width: 100%; box-sizing: border-box;
+          height: 40px; padding: 0 12px;
+          border: 1px solid #cbd5e1; border-radius: 8px;
+          background: #ffffff; color: #0f172a;
+          font-size: 14px;
+        }
+        .rhd-input:focus {
+          outline: none;
+          border-color: #1a56db;
+          box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.15);
+        }
+        .rhd-input--sm { width: 96px; height: 34px; padding: 0 10px; text-align: right; }
+        .rhd-input--error { border-color: #dc2626; }
+        .rhd-input--error:focus { border-color: #dc2626; box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15); }
+
+        .rhd-link {
+          padding: 0; border: none; background: none;
+          font-size: inherit; font-weight: 600; color: #1a56db; cursor: pointer;
+        }
+        .rhd-link:hover { text-decoration: underline; }
+
+        .rhd-alert {
+          display: flex; gap: 8px;
+          margin-bottom: 12px; padding: 10px 12px;
+          border: 1px solid; border-radius: 8px;
+          font-size: 13px; line-height: 1.45;
+        }
+        .rhd-alert svg { flex-shrink: 0; margin-top: 2px; }
+        .rhd-alert--warn   { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+        .rhd-alert--danger { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+        .rhd-alert--ok     { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+        .rhd-alert .rhd-link { color: inherit; text-decoration: underline; }
+
+        .rhd-recip-head {
+          display: flex; align-items: center; justify-content: space-between;
+          margin-bottom: 8px;
+          font-size: 12px; font-weight: 600; color: #64748b;
+        }
+        .rhd-recip-list {
+          list-style: none; margin: 0; padding: 0;
+          border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden;
+        }
+        .rhd-recip {
+          display: flex; align-items: center; justify-content: space-between; gap: 8px;
+          padding: 9px 12px;
+          border-bottom: 1px solid #eef2f7;
+          font-size: 13px;
+        }
+        .rhd-recip:last-child { border-bottom: none; }
+        .rhd-recip-name { font-weight: 600; color: #0f172a; }
+        .rhd-recip-right { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .rhd-recip-share { font-variant-numeric: tabular-nums; color: #475569; }
+        .rhd-pill {
+          padding: 2px 8px; border-radius: 999px;
+          font-size: 11px; font-weight: 600; white-space: nowrap;
+        }
+        .rhd-pill--ok    { background: #dcfce7; color: #166534; }
+        .rhd-pill--warn  { background: #fef3c7; color: #92400e; }
+        .rhd-pill--muted { background: #f1f5f9; color: #64748b; }
+
+        .rhd-badge {
+          display: inline-block;
+          padding: 1px 8px; border-radius: 999px;
+          background: #fef3c7; color: #92400e; border: 1px solid #fde68a;
+          font-size: 11px; font-weight: 700; line-height: 1.5;
+          vertical-align: middle;
+        }
+
+        .rhd-med-group {
+          border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden;
+        }
+        .rhd-med-group + .rhd-med-group { margin-top: 12px; }
+        .rhd-med-group-head {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 9px 14px;
+          background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+          font-size: 14px; font-weight: 700; color: #0f172a;
+        }
+        .rhd-med-group-count { font-size: 12px; font-weight: 500; color: #64748b; }
+
+        .rhd-lot {
+          display: flex; align-items: center; justify-content: space-between; gap: 12px;
+          padding: 11px 14px;
+          border-bottom: 1px solid #eef2f7;
+          background: #ffffff;
+        }
+        .rhd-lot:last-child { border-bottom: none; }
+        .rhd-lot:hover { background: #f8fafc; }
+        .rhd-lot--active { background: #eff6ff; box-shadow: inset 3px 0 0 #1a56db; }
+        .rhd-lot--active:hover { background: #eff6ff; }
+        /* The lot expiring soonest keeps the yellow tint, even once ticked —
+           the blue bar on the left is what shows it is selected. */
+        .rhd-lot--first { background: #fffbeb; }
+        .rhd-lot--first:hover { background: #fef3c7; }
+        .rhd-lot--first.rhd-lot--active,
+        .rhd-lot--first.rhd-lot--active:hover { background: #fffbeb; }
+        .rhd-lot-main {
+          display: flex; align-items: center; gap: 12px;
+          flex: 1 1 auto; min-width: 0; cursor: pointer;
+        }
+        .rhd-lot-main input[type="checkbox"] {
+          flex-shrink: 0;
+          width: 18px; height: 18px; margin: 0;
+          accent-color: #1a56db; cursor: pointer;
+        }
+        .rhd-lot-title {
+          display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+          font-size: 14px; font-weight: 600; color: #0f172a;
+        }
+        .rhd-lot-meta { display: block; margin-top: 1px; font-size: 12.5px; color: #64748b; }
+
+        .rhd-boxes { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+        .rhd-boxes-hint { font-size: 11px; color: #64748b; }
+        .rhd-boxes-hint--error { color: #dc2626; font-weight: 600; }
+
+        .rhd-plan-card {
+          border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden;
+        }
+        .rhd-plan-card + .rhd-plan-card { margin-top: 12px; }
+        .rhd-plan-head {
+          display: flex; align-items: center; justify-content: space-between; gap: 12px;
+          padding: 9px 14px;
+          background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+          font-size: 14px; font-weight: 700; color: #0f172a;
+        }
+        .rhd-plan-lot { margin-left: 8px; font-size: 12px; font-weight: 500; color: #64748b; }
+        .rhd-table-scroll { overflow-x: auto; }
+        .rhd-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .rhd-table th {
+          padding: 8px 14px; text-align: left;
+          border-bottom: 1px solid #e2e8f0;
+          font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+          color: #64748b; background: #ffffff;
+        }
+        .rhd-table td { padding: 8px 14px; border-bottom: 1px solid #eef2f7; color: #334155; }
+        .rhd-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+        .rhd-table tfoot td { border-bottom: none; background: #f8fafc; font-weight: 700; color: #0f172a; }
+        .rhd-grand {
+          display: flex; align-items: center; justify-content: space-between; gap: 12px;
+          margin-top: 12px; padding: 12px 14px;
+          border: 1px solid #bfdbfe; border-radius: 10px;
+          background: #eff6ff; color: #1e3a8a; font-size: 14px;
+        }
+
+        .rhd-footer {
+          display: flex; align-items: center; justify-content: space-between; gap: 12px;
+          padding: 14px 24px;
+          border-top: 1px solid #e2e8f0; background: #ffffff;
+        }
+        .rhd-footer-summary { margin: 0; font-size: 13px; color: #64748b; }
+        .rhd-footer-summary strong { color: #0f172a; }
+        .rhd-footer-actions { display: flex; gap: 10px; flex-shrink: 0; }
+        .rhd-btn {
+          height: 40px; padding: 0 20px;
+          border: 1px solid transparent; border-radius: 8px;
+          font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+        }
+        .rhd-btn--primary { background: #1a56db; color: #ffffff; }
+        .rhd-btn--primary:hover { background: #1e40af; }
+        .rhd-btn--primary:disabled { opacity: 0.6; cursor: not-allowed; }
+        .rhd-btn--secondary { background: #ffffff; color: #334155; border-color: #cbd5e1; }
+        .rhd-btn--secondary:hover { background: #f1f5f9; }
+
+        @media (max-width: 820px) {
+          .rhd-body { grid-template-columns: 1fr; padding: 16px; }
+          .rhd-header, .rhd-footer { padding-left: 16px; padding-right: 16px; }
+          .rhd-footer { flex-direction: column; align-items: stretch; }
+          .rhd-footer-summary { text-align: center; }
+          .rhd-footer-actions { justify-content: stretch; }
+          .rhd-footer-actions .rhd-btn { flex: 1; }
         }
       `}</style>
     </div>

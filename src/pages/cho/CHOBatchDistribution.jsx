@@ -43,6 +43,30 @@ function sortByFEFO(items) {
   return [...items].sort((a, b) => getExpiryTime(a) - getExpiryTime(b));
 }
 
+function toMillis(ts) {
+  if (!ts) return 0;
+  if (typeof ts.toMillis === "function") return ts.toMillis();
+  if (typeof ts.seconds === "number") return ts.seconds * 1000;
+  const t = new Date(ts).getTime();
+  return isNaN(t) ? 0 : t;
+}
+
+// When a distribution plan was created. createdAt is a full-precision server
+// timestamp, so it orders same-day plans correctly; very old records without
+// it fall back to their date string.
+function getCreatedTime(d) {
+  const t = toMillis(d.createdAt);
+  if (t) return t;
+  const p = d.date ? new Date(d.date).getTime() : NaN;
+  return isNaN(p) ? 0 : p;
+}
+
+// Newest first. (Firestore hands documents back in random ID order, so without
+// this the newest plan could land anywhere — often at the bottom.)
+function sortNewestFirst(a, b) {
+  return getCreatedTime(b) - getCreatedTime(a);
+}
+
 const BATCHES_COLLECTION      = "cho_batches";
 const RHU_REGISTRY_COLLECTION = "cho_rhu_registry";
 
@@ -387,7 +411,7 @@ export default function CHOBatchDistribution() {
       return false;
     }
     return true;
-  });
+  }).sort(sortNewestFirst);
 
   const pendingCount = filteredDistributions.filter(d => d.status === "Pending" || d.status === "Partial").length;
   const totalDistributed = filteredDistributions.reduce((s, d) => s + (d.totalBoxes || 0), 0);
