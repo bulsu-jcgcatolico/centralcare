@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
-  collection, addDoc, getDocs, deleteDoc, doc,
+  collection, addDoc, getDocs, doc,
   serverTimestamp, query, where, updateDoc
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
@@ -364,14 +364,6 @@ export default function CHOBatchDistribution() {
     setDistributingId(null);
   }
 
-  async function deleteDistribution(id) {
-    if (!confirm("Delete this distribution record?")) return;
-    try {
-      await deleteDoc(doc(db, "distributions", id));
-      setDistributions(distributions.filter(d => d.id !== id));
-    } catch (err) { showToast("Error: " + err.message, "error"); }
-  }
-
   const availableBatches = (() => {
     const filtered = batches.filter(b => {
       const hasRemaining = (b.remaining ?? b.quantity) > 0;
@@ -597,7 +589,6 @@ export default function CHOBatchDistribution() {
                             {distributingId === "all-" + dist.id ? "Distributing..." : "Distribute All"}
                           </button>
                         )}
-                        <button className="rhu-btn-danger-sm" onClick={() => deleteDistribution(dist.id)}>Delete Plan</button>
                       </div>
                     </div>
 

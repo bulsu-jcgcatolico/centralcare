@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
-  collection, addDoc, getDocs, doc,
+  collection, addDoc, getDocs, doc, updateDoc,
   serverTimestamp
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
@@ -31,15 +31,29 @@ const BATCHES_COLLECTION  = "cho_batches";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-function getMonthYear(dateStr) {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  if (isNaN(d)) return null;
-  return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+// Month key like "2026-09" (sortable). Parsed from the YYYY-MM-DD string
+// directly so time zones can't shift a date into the wrong month.
+function getMonthKey(dateStr) {
+  const m = /^(\d{4})-(\d{2})/.exec(String(dateStr || ""));
+  if (!m || +m[2] < 1 || +m[2] > 12) return null;
+  return `${m[1]}-${m[2]}`;
+}
+
+function monthLabel(key) {
+  if (!key) return "";
+  const [y, m] = key.split("-");
+  return `${MONTHS[+m - 1]} ${y}`;
 }
 
 function generateBatchId() {
   return "BAT" + Math.floor(10000 + Math.random() * 89999).toString();
+}
+
+const EXPIRY_WARNING_DAYS = 90; // items expiring within this many days count as "Expiring Soon"
+function daysUntil(dateStr) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const [y, m, d] = String(dateStr).slice(0, 10).split("-").map(Number);
+  return Math.round((new Date(y, m - 1, d) - today) / 86400000);
 }
 
 export default function CHOBatchInventory() {
@@ -50,6 +64,7 @@ export default function CHOBatchInventory() {
 
   const [search, setSearch] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("all");
+  const [selectedProduct, setSelectedProduct] = useState("all");
   
   const [products, setProducts] = useState([]);
   const [batches, setBatches] = useState([]);
@@ -57,6 +72,13 @@ export default function CHOBatchInventory() {
   const [saving, setSaving] = useState(false);
 
   const [showAddModal, setShowAddModal] = useState(false);
+
+  // Edit-batch modal (fix mistakes in lot number, quantity, or dates)
+  const [editingBatch, setEditingBatch] = useState(null);
+  const [editLot, setEditLot] = useState("");
+  const [editQty, setEditQty] = useState("");
+  const [editMfg, setEditMfg] = useState("");
+  const [editExpiry, setEditExpiry] = useState("");
   const [productIdInput, setProductIdInput] = useState("");
   const [lotNumber, setLotNumber] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -82,11 +104,16 @@ export default function CHOBatchInventory() {
     setLoading(true);
     try {
       const snap = await getDocs(collection(db, BATCHES_COLLECTION));
-      const list = snap.docs.map(d => ({ 
-        id: d.id, 
-        ...d.data(),
-        month: getMonthYear(d.manufactureDate || d.expiryDate)
-      }));
+      const list = snap.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          // Month the batch was added to inventory (falls back to the
+          // manufacture / expiry date for older records without addedDate).
+          month: getMonthKey(data.addedDate || data.manufactureDate || data.expiryDate),
+        };
+      });
       setBatches(list);
       runExpiryChecks(
         list.map(b => ({ id: b.id, name: b.name, expiry: b.expiryDate })),
@@ -106,6 +133,49 @@ export default function CHOBatchInventory() {
     setManufactureDate(""); setExpiryDate("");
     setIsVaccine(false); setDoseType("single"); setDosesPerVial(""); setFhsisAntigen("other");
     setShowAddModal(true);
+  }
+
+  function openEditModal(b) {
+    setEditingBatch(b);
+    setEditLot(b.lotNumber || "");
+    setEditQty(String(b.quantity ?? ""));
+    setEditMfg(b.manufactureDate || "");
+    setEditExpiry(b.expiryDate || "");
+  }
+
+  async function saveEdit() {
+    if (!editLot.trim() || !editQty || !editMfg || !editExpiry) {
+      alert("Please fill in Lot Number, Quantity, Manufacture Date, and Expiry Date.");
+      return;
+    }
+    const newQty = parseInt(editQty);
+    if (isNaN(newQty) || newQty < 0) { alert("Quantity must be a valid number."); return; }
+    if (editExpiry <= editMfg) { alert("Expiry Date must be after the Manufacture Date."); return; }
+
+    // Keep "remaining" consistent: stock already given out stays given out,
+    // so shift remaining by the same amount the initial quantity changed.
+    const oldQty = editingBatch.quantity || 0;
+    const oldRemaining = editingBatch.remaining ?? oldQty;
+    const newRemaining = oldRemaining + (newQty - oldQty);
+    if (newRemaining < 0) {
+      alert(`Quantity can't be lower than what was already distributed (${oldQty - oldRemaining}).`);
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, BATCHES_COLLECTION, editingBatch.id), {
+        lotNumber: editLot.trim(),
+        quantity: newQty,
+        remaining: newRemaining,
+        manufactureDate: editMfg,
+        expiryDate: editExpiry,
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.uid ?? "",
+      });
+      setEditingBatch(null);
+      loadBatches();
+    } catch (err) { alert("Error: " + err.message); }
+    setSaving(false);
   }
 
   async function saveBatch() {
@@ -161,6 +231,11 @@ export default function CHOBatchInventory() {
   // Generate dynamic list of available months from batches
   const months = [...new Set(batches.map(b => b.month).filter(Boolean))].sort().reverse();
 
+  // Product ID dropdown options (one entry per product that has batches)
+  const productOptions = [...new Map(
+    batches.filter(b => b.productId).map(b => [b.productId, b.name])
+  ).entries()].sort((a, b) => a[0].localeCompare(b[0]));
+
   // Filter batches by search keyword and dropdown month selection
   const filteredBatches = batches
     .filter(b => {
@@ -170,10 +245,9 @@ export default function CHOBatchInventory() {
         (b.batchId || "").toLowerCase().includes(search.toLowerCase()) ||
         (b.lotNumber || "").toLowerCase().includes(search.toLowerCase());
 
-      if (selectedMonth === "all") return matchesSearch;
-
-      const matchesMonth = b.month === selectedMonth;
-      return matchesSearch && matchesMonth;
+      const matchesMonth = selectedMonth === "all" || b.month === selectedMonth;
+      const matchesProduct = selectedProduct === "all" || b.productId === selectedProduct;
+      return matchesSearch && matchesMonth && matchesProduct;
     })
     .slice()
     .sort((a, b) => {
@@ -187,16 +261,16 @@ export default function CHOBatchInventory() {
 
   const totalRemainingQuantity = filteredBatches.reduce((s, b) => s + ((b.remaining ?? b.quantity) || 0), 0);
   const totalInitialQuantity = filteredBatches.reduce((s, b) => s + (b.quantity || 0), 0);
-  // Same "due within 30 days" rule already used on the RHU and Midwife
+  // Same "due within N days" rule (EXPIRY_WARNING_DAYS) used on the RHU and Midwife
   // Inventory pages — only counts batches that still have stock left.
   const expiringCount = filteredBatches.filter(b => {
     if (!b.expiryDate) return false;
     const remaining = b.remaining ?? b.quantity ?? 0;
     if (remaining <= 0) return false;
-    const days = (new Date(b.expiryDate) - new Date()) / (1000 * 60 * 60 * 24);
-    return days <= 30 && days >= 0;
+    const days = daysUntil(b.expiryDate);
+    return days <= EXPIRY_WARNING_DAYS && days >= 0;
   }).length;
-  const periodLabel = selectedMonth === "all" ? "All time" : selectedMonth;
+  const periodLabel = selectedMonth === "all" ? "All time" : monthLabel(selectedMonth);
 
   return (
     <div>
@@ -258,10 +332,15 @@ export default function CHOBatchInventory() {
                 </div>
                 {/* Header Action Bar matching CHOReports filter format */}
                 <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                  <select className="cho-input" style={{ width: "auto", minWidth: "180px" }}
+                    value={selectedProduct} onChange={e => setSelectedProduct(e.target.value)}>
+                    <option value="all">All Product IDs</option>
+                    {productOptions.map(([id, name]) => <option key={id} value={id}>{id} — {name}</option>)}
+                  </select>
                   <select className="cho-input" style={{ width: "auto", minWidth: "160px" }}
                     value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
-                    <option value="all">All Months</option>
-                    {months.map(m => <option key={m} value={m}>{m}</option>)}
+                    <option value="all">All Months (date added)</option>
+                    {months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
                   </select>
                   <button className="cho-btn-secondary" onClick={() => window.print()}>Print / PDF</button>
                   <button className="cho-btn-primary" onClick={openAddModal}>+ Add New Batch</button>
@@ -289,7 +368,7 @@ export default function CHOBatchInventory() {
                   <div className="cho-stat-row">
                     <span className="cho-stat-value" style={{ color: expiringCount > 0 ? "#dc2626" : undefined }}>{expiringCount}</span>
                   </div>
-                  <p className="cho-stat-sub">Within 30 days</p>
+                  <p className="cho-stat-sub">Within {EXPIRY_WARNING_DAYS} days</p>
                 </div>
               </div>
 
@@ -323,6 +402,7 @@ export default function CHOBatchInventory() {
                         <th>MANUFACTURE DATE</th>
                         <th>DATE ADDED</th>
                         <th>EXPIRY</th>
+                        <th>ACTIONS</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -350,6 +430,10 @@ export default function CHOBatchInventory() {
                             <td>{b.manufactureDate || "—"}</td>
                             <td>{b.addedDate || "—"}</td>
                             <td>{b.expiryDate}</td>
+                            <td>
+                              <button className="cho-btn-secondary" style={{ padding: "4px 12px", fontSize: "12px" }}
+                                onClick={() => openEditModal(b)}>Edit</button>
+                            </td>
                           </tr>
                         );
                       })}
@@ -433,6 +517,54 @@ export default function CHOBatchInventory() {
           overflow-x: auto !important;
         }
       `}</style>
+
+      {/* ── Edit Batch Modal ── */}
+      {editingBatch && (
+        <div className="cho-modal-overlay" onClick={() => setEditingBatch(null)}>
+          <div className="cho-modal cho-modal--md" onClick={e => e.stopPropagation()}>
+            <div className="cho-modal-header">
+              <h2 className="cho-modal-title">Edit Batch — {editingBatch.batchId}</h2>
+              <button className="cho-modal-close" aria-label="Close" onClick={() => setEditingBatch(null)}>×</button>
+            </div>
+            <div className="cho-modal-body">
+              <div className="cho-product-preview">
+                <div className="cho-product-preview-row"><span>Product</span><strong>{editingBatch.productId} — {editingBatch.name}</strong></div>
+                <div className="cho-product-preview-row"><span>Remaining</span><strong>{(editingBatch.remaining ?? editingBatch.quantity) || 0} {editingBatch.isVaccine ? "vials" : "boxes"}</strong></div>
+              </div>
+              {(editingBatch.remaining ?? editingBatch.quantity) < editingBatch.quantity && (
+                <p className="cho-form-hint" style={{ color: "#b45309" }}>
+                  Part of this batch has already been distributed. Changes here won't update copies already sent to RHUs.
+                </p>
+              )}
+              <div className="cho-form-row cho-form-row--3">
+                <div className="cho-form-field">
+                  <label className="cho-label">Lot Number <span className="cho-required">*</span></label>
+                  <input className="cho-input" type="text" value={editLot} onChange={e => setEditLot(e.target.value)} />
+                </div>
+                <div className="cho-form-field">
+                  <label className="cho-label">Initial Quantity <span className="cho-required">*</span></label>
+                  <input className="cho-input" type="number" min="0" value={editQty} onChange={e => setEditQty(e.target.value)} />
+                </div>
+                <div className="cho-form-field">
+                  <label className="cho-label">Manufacture Date <span className="cho-required">*</span></label>
+                  <input className="cho-input" type="date" value={editMfg} onChange={e => setEditMfg(e.target.value)} />
+                </div>
+              </div>
+              <div className="cho-form-field">
+                <label className="cho-label">Expiry Date <span className="cho-required">*</span></label>
+                <input className="cho-input" type="date" value={editExpiry} onChange={e => setEditExpiry(e.target.value)} />
+              </div>
+              <p className="cho-form-hint">Product and batch ID can't be changed. Remaining stock adjusts automatically if you change the quantity.</p>
+            </div>
+            <div className="cho-modal-footer">
+              <button className="cho-btn-secondary" onClick={() => setEditingBatch(null)}>Cancel</button>
+              <button className="cho-btn-primary" onClick={saveEdit} disabled={saving}>
+                {saving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Add Batch Modal ── */}
       {showAddModal && (

@@ -44,6 +44,13 @@ function getStatusClass(remaining) {
   return "rhu-status--good";
 }
 
+const EXPIRY_WARNING_DAYS = 90; // items expiring within this many days count as "Expiring Soon"
+function daysUntil(dateStr) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const [y, m, d] = String(dateStr).slice(0, 10).split("-").map(Number);
+  return Math.round((new Date(y, m - 1, d) - today) / 86400000);
+}
+
 export default function RHUInventory() {
   const { logout, user, userData } = useAuth();
   const navigate = useNavigate();
@@ -289,7 +296,8 @@ export default function RHUInventory() {
   });
 
   const displayList = (activeTab === "active" ? activeInventory : pendingInventory)
-    .filter(item => item.name?.toLowerCase().includes(search.toLowerCase()))
+    .filter(item => [item.name, item.productKey, item.lotNumber, item.category, item.subCategory]
+      .some(v => String(v ?? "").toLowerCase().includes(search.trim().toLowerCase())))
     .slice()
     .sort((a, b) => {
       if (activeTab !== "active") return 0;
@@ -306,12 +314,67 @@ export default function RHUInventory() {
   const pendingCount  = pendingInventory.length;
   const expiringCount = activeInventory.filter(i => {
     if (!i.expiry) return false;
-    const days = (new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24);
-    return days <= 30 && days >= 0;
+    if ((i.remaining ?? i.quantity ?? 0) <= 0) return false;
+    const days = daysUntil(i.expiry);
+    return days <= EXPIRY_WARNING_DAYS && days >= 0;
   }).length;
 
   return (
     <div className="rhu-layout">
+      <style>{`
+        /* ── UI polish (scoped; loads after the page stylesheet) ── */
+        .rhu-layout .rhu-page-title { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; }
+        .rhu-layout .rhu-page-sub { color: #6b7280; }
+
+        /* Stat cards */
+        .rhu-layout .rhu-stat-card {
+          border-radius: 14px; border: 1px solid #e5e7eb; background: #fff;
+          box-shadow: 0 1px 2px rgba(16,24,40,.04); transition: box-shadow .15s, transform .15s;
+        }
+        .rhu-layout .rhu-stat-card:hover { box-shadow: 0 6px 16px rgba(16,24,40,.08); transform: translateY(-1px); }
+
+        /* Tabs */
+        .rhu-layout .rhu-tabs { border-bottom: 1px solid #e5e7eb; gap: 4px; }
+
+        /* Toolbar + search */
+        .rhu-layout .rhu-inv-toolbar { gap: 12px; }
+        .rhu-layout .rhu-search {
+          border-radius: 10px; border: 1px solid #d1d5db; background: #fff; padding-top: 10px; padding-bottom: 10px;
+        }
+        .rhu-layout .rhu-search:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+
+        /* Table */
+        .rhu-layout .rhu-inv-table { border-collapse: separate; border-spacing: 0; width: 100%; }
+        .rhu-layout .rhu-inv-table thead th {
+          background: #f9fafb; color: #6b7280; font-size: 11px; font-weight: 700;
+          letter-spacing: .06em; text-transform: uppercase; padding: 12px 14px; border-bottom: 1px solid #e5e7eb;
+          position: sticky; top: 0; z-index: 1;
+        }
+        .rhu-layout .rhu-inv-table tbody td { padding: 14px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .rhu-layout .rhu-inv-table tbody tr:hover td { background: #f8fafc; }
+        .rhu-layout .rhu-inv-table tbody tr:last-child td { border-bottom: none; }
+
+        /* Add-item modal */
+        .rhu-modal-overlay .rhu-modal { border-radius: 16px; box-shadow: 0 24px 60px rgba(15,23,42,.25); }
+        .rhu-modal-overlay .rhu-modal-header { padding: 18px 24px; border-bottom: 1px solid #eef0f3; }
+        .rhu-modal-overlay .rhu-modal-title { font-size: 1.1rem; font-weight: 700; }
+        .rhu-modal-overlay .rhu-modal-body { padding: 8px 24px 20px; }
+        .rhu-modal-overlay .rhu-form-section-title {
+          font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #475569;
+          margin: 22px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #eef0f3;
+        }
+        .rhu-modal-overlay .rhu-form-row { gap: 16px; margin-bottom: 14px; }
+        .rhu-modal-overlay .rhu-form-field { margin-bottom: 14px; }
+        .rhu-modal-overlay .rhu-form-row .rhu-form-field { margin-bottom: 0; }
+        .rhu-modal-overlay .rhu-label { display: block; font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 6px; }
+        .rhu-modal-overlay .rhu-input {
+          width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px;
+          font-size: 14px; background: #fff; transition: border-color .15s, box-shadow .15s;
+        }
+        .rhu-modal-overlay .rhu-input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+        .rhu-modal-overlay .rhu-form-hint { font-size: 12px; color: #6b7280; }
+        .rhu-modal-overlay .rhu-modal-footer { padding: 14px 24px; border-top: 1px solid #eef0f3; gap: 10px; }
+      `}</style>
       <aside className="rhu-sidebar">
         <div className="rhu-brand">
           <div className="rhu-brand-icon">
@@ -428,7 +491,7 @@ export default function RHUInventory() {
               <input
                 className="rhu-search"
                 type="text"
-                placeholder="Search Medicine"
+                placeholder="Search by name, product key, lot #, or category"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 style={{ width: "100%" }}
@@ -561,9 +624,9 @@ export default function RHUInventory() {
 
       {showAddModal && (
         <div className="rhu-modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div className="rhu-modal rhu-modal--md" onClick={e => e.stopPropagation()}>
+          <div className="rhu-modal rhu-modal--md" style={{ maxWidth: "760px", width: "100%" }} onClick={e => e.stopPropagation()}>
             <div className="rhu-modal-header">
-              <h2 className="rhu-modal-title">Add New Inventory Item</h2>
+              <h2 className="rhu-modal-title">Log New Shipment</h2>
               <button className="rhu-modal-close" aria-label="Close" onClick={() => setShowAddModal(false)}>×</button>
             </div>
             <div className="rhu-modal-body">
@@ -594,27 +657,16 @@ export default function RHUInventory() {
               </div>
 
               <h3 className="rhu-form-section-title">Stock Details</h3>
-              <div className="rhu-form-row">
+              <div className="rhu-form-row rhu-form-row--3">
                 <div className="rhu-form-field">
-                  <label className="rhu-label">Quantity (boxes) <span className="rhu-required">*</span></label>
-                  <input className="rhu-input" type="number" placeholder="e.g., 100"
+                  <label className="rhu-label">Boxes Received (30's) <span className="rhu-required">*</span></label>
+                  <input className="rhu-input" type="number" placeholder="e.g., 20"
                     value={quantity} onChange={e => setQuantity(e.target.value)} />
                 </div>
                 <div className="rhu-form-field">
-                  <label className="rhu-label">Tablets per Box <span className="rhu-required">*</span></label>
-                  <input className="rhu-input" type="number" placeholder="e.g., 30"
-                    value={tabletsPerBox} onChange={e => setTabletsPerBox(e.target.value)} />
-                </div>
-              </div>
-              <div className="rhu-form-row">
-                <div className="rhu-form-field">
                   <label className="rhu-label">Source</label>
-                  <select className="rhu-input" value={source} onChange={e => setSource(e.target.value)}>
-                    <option value="">Select Source</option>
-                    <option value="CHO">From CHO</option>
-                    <option value="DOH">DOH</option>
-                    <option value="LGU">LGU</option>
-                  </select>
+                  <input className="rhu-input" type="text" placeholder="e.g., DOH, LGU, donation"
+                    value={source} onChange={e => setSource(e.target.value)} />
                 </div>
                 <div className="rhu-form-field">
                   <label className="rhu-label">Expiry Date <span className="rhu-required">*</span></label>
@@ -662,7 +714,7 @@ export default function RHUInventory() {
             <div className="rhu-modal-footer">
               <button className="rhu-btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
               <button className="rhu-btn-primary" onClick={saveItem} disabled={saving}>
-                {saving ? "Saving..." : "Save Item"}
+                {saving ? "Saving..." : "Save Shipment"}
               </button>
             </div>
           </div>

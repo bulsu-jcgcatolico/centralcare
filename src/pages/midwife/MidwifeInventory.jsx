@@ -44,6 +44,13 @@ function getStatusClass(remaining) {
   return "midwife-status--good";
 }
 
+const EXPIRY_WARNING_DAYS = 90; // items expiring within this many days count as "Expiring Soon"
+function daysUntil(dateStr) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const [y, m, d] = String(dateStr).slice(0, 10).split("-").map(Number);
+  return Math.round((new Date(y, m - 1, d) - today) / 86400000);
+}
+
 export default function MidwifeInventory() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
@@ -260,7 +267,8 @@ export default function MidwifeInventory() {
   // For the actual table rows rendered
   const currentList = activeTab === "active" ? activeInventory : pendingInventory;
   const filtered = currentList
-    .filter(i => i.name?.toLowerCase().includes(search.toLowerCase()))
+    .filter(i => [i.name, i.productKey, i.lotNumber, i.category, i.subCategory]
+      .some(v => String(v ?? "").toLowerCase().includes(search.trim().toLowerCase())))
     .slice()
     .sort((a, b) => {
       // Only reorder within Active Stock — pending shipments don't have a
@@ -279,12 +287,67 @@ export default function MidwifeInventory() {
   const pendingReceiptCount = pendingInventory.length;
   const expiringCount   = activeInventory.filter(i => {
     if (!i.expiry) return false;
-    const days = (new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24);
-    return days <= 30 && days >= 0;
+    if ((i.remaining ?? 0) <= 0) return false;
+    const days = daysUntil(i.expiry);
+    return days <= EXPIRY_WARNING_DAYS && days >= 0;
   }).length;
 
   return (
     <div className="midwife-layout">
+      <style>{`
+        /* ── UI polish (scoped; loads after the page stylesheet) ── */
+        .midwife-layout .midwife-page-title { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; }
+        .midwife-layout .midwife-page-sub { color: #6b7280; }
+
+        /* Stat cards */
+        .midwife-layout .midwife-inv-stat-card {
+          border-radius: 14px; border: 1px solid #e5e7eb; background: #fff;
+          box-shadow: 0 1px 2px rgba(16,24,40,.04); transition: box-shadow .15s, transform .15s;
+        }
+        .midwife-layout .midwife-inv-stat-card:hover { box-shadow: 0 6px 16px rgba(16,24,40,.08); transform: translateY(-1px); }
+
+        /* Tabs */
+        .midwife-layout .midwife-tabs { border-bottom: 1px solid #e5e7eb; gap: 4px; }
+
+        /* Toolbar + search */
+        .midwife-layout .midwife-inv-toolbar { gap: 12px; }
+        .midwife-layout .midwife-search-med {
+          border-radius: 10px; border: 1px solid #d1d5db; background: #fff; padding-top: 10px; padding-bottom: 10px;
+        }
+        .midwife-layout .midwife-search-med:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+
+        /* Table */
+        .midwife-layout .midwife-table { border-collapse: separate; border-spacing: 0; width: 100%; }
+        .midwife-layout .midwife-table thead th {
+          background: #f9fafb; color: #6b7280; font-size: 11px; font-weight: 700;
+          letter-spacing: .06em; text-transform: uppercase; padding: 12px 14px; border-bottom: 1px solid #e5e7eb;
+          position: sticky; top: 0; z-index: 1;
+        }
+        .midwife-layout .midwife-table tbody td { padding: 14px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .midwife-layout .midwife-table tbody tr:hover td { background: #f8fafc; }
+        .midwife-layout .midwife-table tbody tr:last-child td { border-bottom: none; }
+
+        /* Add-item modal */
+        .midwife-modal-overlay .midwife-modal { border-radius: 16px; box-shadow: 0 24px 60px rgba(15,23,42,.25); }
+        .midwife-modal-overlay .midwife-modal-header { padding: 18px 24px; border-bottom: 1px solid #eef0f3; }
+        .midwife-modal-overlay .midwife-modal-title { font-size: 1.1rem; font-weight: 700; }
+        .midwife-modal-overlay .midwife-modal-body { padding: 8px 24px 20px; }
+        .midwife-modal-overlay .midwife-form-section-title {
+          font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #475569;
+          margin: 22px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #eef0f3;
+        }
+        .midwife-modal-overlay .midwife-form-row { gap: 16px; margin-bottom: 14px; }
+        .midwife-modal-overlay .midwife-form-field { margin-bottom: 14px; }
+        .midwife-modal-overlay .midwife-form-row .midwife-form-field { margin-bottom: 0; }
+        .midwife-modal-overlay .midwife-label { display: block; font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 6px; }
+        .midwife-modal-overlay .midwife-input {
+          width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px;
+          font-size: 14px; background: #fff; transition: border-color .15s, box-shadow .15s;
+        }
+        .midwife-modal-overlay .midwife-input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+        .midwife-modal-overlay .midwife-form-hint { font-size: 12px; color: #6b7280; }
+        .midwife-modal-overlay .midwife-modal-footer { padding: 14px 24px; border-top: 1px solid #eef0f3; gap: 10px; }
+      `}</style>
       <aside className="midwife-sidebar">
         <div className="midwife-brand">
           <div className="midwife-brand-icon">
@@ -440,7 +503,7 @@ export default function MidwifeInventory() {
               <input
                 className="midwife-search-med"
                 type="text"
-                placeholder="Search Medicine"
+                placeholder="Search by name, product key, lot #, or category"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
@@ -638,12 +701,8 @@ export default function MidwifeInventory() {
                 </div>
                 <div className="midwife-form-field">
                   <label className="midwife-label">Source</label>
-                  <select className="midwife-input" value={shipSource} onChange={e => setShipSource(e.target.value)}>
-                    <option value="">Select Source</option>
-                    <option value="RHU">From RHU</option>
-                    <option value="DOH">DOH</option>
-                    <option value="LGU">LGU</option>
-                  </select>
+                  <input className="midwife-input" type="text" placeholder="e.g., DOH, LGU, donation"
+                    value={shipSource} onChange={e => setShipSource(e.target.value)} />
                 </div>
                 <div className="midwife-form-field">
                   <label className="midwife-label">Expiry Date <span className="midwife-required">*</span></label>

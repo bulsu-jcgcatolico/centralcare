@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
-  collection, addDoc, getDocs, getDoc, deleteDoc, doc,
+  collection, addDoc, getDocs, getDoc, doc,
   serverTimestamp, query, where, updateDoc, Timestamp
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
@@ -535,14 +535,6 @@ export default function RHUDistribution() {
     setDistributingId(null);
   }
 
-  async function deleteDistribution(id) {
-    if (!confirm("Delete this distribution?")) return;
-    try {
-      await deleteDoc(doc(db, "rhu_distributions", id));
-      setDistributions(distributions.filter(d => d.id !== id));
-    } catch (err) { showToast("Error: " + err.message, "error"); }
-  }
-
   // Derive available months for dropdown filter
   const allMonths = [...new Set(distributions.map(d => getMonthYear(d.date, d.createdAt?.seconds)).filter(Boolean))].sort().reverse();
 
@@ -806,7 +798,6 @@ export default function RHUDistribution() {
                             {distributingId === "all-" + dist.id ? "Distributing..." : "Distribute All"}
                           </button>
                         )}
-                        <button className="rhu-btn-danger-sm" onClick={() => deleteDistribution(dist.id)}>Delete</button>
                       </div>
                     </div>
 
