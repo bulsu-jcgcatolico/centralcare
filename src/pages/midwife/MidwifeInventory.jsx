@@ -51,6 +51,26 @@ function daysUntil(dateStr) {
   return Math.round((new Date(y, m - 1, d) - today) / 86400000);
 }
 
+const INV_MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// Month an item came into this inventory, as a sortable key like "2026-09".
+// Uses the date received, falling back to when the record was created.
+function itemMonthKey(item) {
+  const m = /^(\d{4})-(\d{2})/.exec(String(item.receivedAt || ""));
+  if (m) return `${m[1]}-${m[2]}`;
+  const sec = item.createdAt?.seconds;
+  if (sec) {
+    const d = new Date(sec * 1000);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+  return null;
+}
+
+function invMonthLabel(key) {
+  const [y, m] = key.split("-");
+  return `${INV_MONTH_NAMES[+m - 1]} ${y}`;
+}
+
 export default function MidwifeInventory() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
@@ -62,6 +82,10 @@ export default function MidwifeInventory() {
   const [loading, setLoading]       = useState(false);
   const [saving, setSaving]         = useState(false);
   const [search, setSearch]         = useState("");
+  const [selectedMonth, setSelectedMonth]     = useState("all");
+  const [selectedExpiry, setSelectedExpiry]   = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedSubCategory, setSelectedSubCategory] = useState("all");
   const [activeTab, setActiveTab]   = useState("active"); // "active" | "pending"
 
   // Log New Shipment modal
@@ -264,11 +288,32 @@ export default function MidwifeInventory() {
     return status !== "received" && status !== "accepted";
   });
 
+  // Filter dropdown options (built from everything in this inventory)
+  const monthOptions = [...new Set(inventory.map(itemMonthKey).filter(Boolean))].sort().reverse();
+
+  // Category / sub-category dropdown options (sub-categories follow the chosen category)
+  const categoryOptions = [...new Set(inventory.map(i => (i.category || "").trim()).filter(Boolean))].sort();
+  const subCategoryOptions = [...new Set(
+    inventory
+      .filter(i => selectedCategory === "all" || (i.category || "").trim() === selectedCategory)
+      .map(i => (i.subCategory || "").trim()).filter(Boolean)
+  )].sort();
+
   // For the actual table rows rendered
   const currentList = activeTab === "active" ? activeInventory : pendingInventory;
   const filtered = currentList
     .filter(i => [i.name, i.productKey, i.lotNumber, i.category, i.subCategory]
       .some(v => String(v ?? "").toLowerCase().includes(search.trim().toLowerCase())))
+    .filter(i => (selectedCategory === "all" || (i.category || "").trim() === selectedCategory) && (selectedSubCategory === "all" || (i.subCategory || "").trim() === selectedSubCategory))
+    .filter(i => selectedMonth === "all" || itemMonthKey(i) === selectedMonth)
+    .filter(i => {
+      if (selectedExpiry === "all") return true;
+      if (!i.expiry) return false;
+      const d = daysUntil(i.expiry);
+      if (selectedExpiry === "expired") return d < 0;
+      if (selectedExpiry === "soon") return d >= 0 && d <= EXPIRY_WARNING_DAYS;
+      return d > EXPIRY_WARNING_DAYS; // "ok"
+    })
     .slice()
     .sort((a, b) => {
       // Only reorder within Active Stock — pending shipments don't have a
@@ -530,6 +575,36 @@ export default function MidwifeInventory() {
                 Export
               </button>
             </div>
+          </div>
+
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", marginBottom: "1.25rem" }}>
+            <select className="midwife-input" style={{ width: "190px", flex: "0 0 auto", padding: "6px 10px", fontSize: "13px" }}
+              value={selectedCategory} onChange={e => { setSelectedCategory(e.target.value); setSelectedSubCategory("all"); }}>
+              <option value="all">All Categories</option>
+              {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select className="midwife-input" style={{ width: "190px", flex: "0 0 auto", padding: "6px 10px", fontSize: "13px" }}
+              value={selectedSubCategory} onChange={e => setSelectedSubCategory(e.target.value)}>
+              <option value="all">All Sub-Categories</option>
+              {subCategoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select className="midwife-input" style={{ width: "190px", flex: "0 0 auto", padding: "6px 10px", fontSize: "13px" }}
+              value={selectedExpiry} onChange={e => setSelectedExpiry(e.target.value)}>
+              <option value="all">All Expiry</option>
+              <option value="expired">Expired</option>
+              <option value="soon">Expiring within {EXPIRY_WARNING_DAYS} days</option>
+              <option value="ok">Not expiring soon</option>
+            </select>
+            <select className="midwife-input" style={{ width: "190px", flex: "0 0 auto", padding: "6px 10px", fontSize: "13px" }}
+              value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
+              <option value="all">All Months (date received)</option>
+              {monthOptions.map(m => <option key={m} value={m}>{invMonthLabel(m)}</option>)}
+            </select>
+            {(selectedExpiry !== "all" || selectedMonth !== "all" || selectedCategory !== "all" || selectedSubCategory !== "all" || search) && (
+              <button className="midwife-btn-secondary" onClick={() => { setSelectedExpiry("all"); setSelectedMonth("all"); setSelectedCategory("all"); setSelectedSubCategory("all"); setSearch(""); }}>
+                Clear filters
+              </button>
+            )}
           </div>
 
           {!checkingBalance && !balanceAlreadySubmitted && (

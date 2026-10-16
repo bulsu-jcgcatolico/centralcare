@@ -65,6 +65,9 @@ export default function CHOBatchInventory() {
   const [search, setSearch] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("all");
   const [selectedProduct, setSelectedProduct] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedSubCategory, setSelectedSubCategory] = useState("all");
+  const [selectedExpiry, setSelectedExpiry] = useState("all");
   
   const [products, setProducts] = useState([]);
   const [batches, setBatches] = useState([]);
@@ -236,6 +239,14 @@ export default function CHOBatchInventory() {
     batches.filter(b => b.productId).map(b => [b.productId, b.name])
   ).entries()].sort((a, b) => a[0].localeCompare(b[0]));
 
+  // Category / sub-category dropdown options (sub-categories follow the chosen category)
+  const categoryOptions = [...new Set(batches.map(i => (i.category || "").trim()).filter(Boolean))].sort();
+  const subCategoryOptions = [...new Set(
+    batches
+      .filter(i => selectedCategory === "all" || (i.category || "").trim() === selectedCategory)
+      .map(i => (i.subCategory || "").trim()).filter(Boolean)
+  )].sort();
+
   // Filter batches by search keyword and dropdown month selection
   const filteredBatches = batches
     .filter(b => {
@@ -247,7 +258,19 @@ export default function CHOBatchInventory() {
 
       const matchesMonth = selectedMonth === "all" || b.month === selectedMonth;
       const matchesProduct = selectedProduct === "all" || b.productId === selectedProduct;
-      return matchesSearch && matchesMonth && matchesProduct;
+      const i = b;
+      const matchesCategory = (selectedCategory === "all" || (i.category || "").trim() === selectedCategory) && (selectedSubCategory === "all" || (i.subCategory || "").trim() === selectedSubCategory);
+      let matchesExpiry = true;
+      if (selectedExpiry !== "all") {
+        if (!b.expiryDate) matchesExpiry = false;
+        else {
+          const d = daysUntil(b.expiryDate);
+          matchesExpiry = selectedExpiry === "expired" ? d < 0
+            : selectedExpiry === "soon" ? (d >= 0 && d <= EXPIRY_WARNING_DAYS)
+            : d > EXPIRY_WARNING_DAYS;
+        }
+      }
+      return matchesSearch && matchesMonth && matchesProduct && matchesCategory && matchesExpiry;
     })
     .slice()
     .sort((a, b) => {
@@ -345,6 +368,31 @@ export default function CHOBatchInventory() {
                   <button className="cho-btn-secondary" onClick={() => window.print()}>Print / PDF</button>
                   <button className="cho-btn-primary" onClick={openAddModal}>+ Add New Batch</button>
                 </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", margin: "0 0 1rem" }}>
+                <select className="cho-input" style={{ width: "190px", flex: "0 0 auto", padding: "6px 10px", fontSize: "13px" }}
+                  value={selectedCategory} onChange={e => { setSelectedCategory(e.target.value); setSelectedSubCategory("all"); }}>
+                  <option value="all">All Categories</option>
+                  {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select className="cho-input" style={{ width: "190px", flex: "0 0 auto", padding: "6px 10px", fontSize: "13px" }}
+                  value={selectedSubCategory} onChange={e => setSelectedSubCategory(e.target.value)}>
+                  <option value="all">All Sub-Categories</option>
+                  {subCategoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select className="cho-input" style={{ width: "190px", flex: "0 0 auto", padding: "6px 10px", fontSize: "13px" }}
+                  value={selectedExpiry} onChange={e => setSelectedExpiry(e.target.value)}>
+                  <option value="all">All Expiry</option>
+                  <option value="expired">Expired</option>
+                  <option value="soon">Expiring within {EXPIRY_WARNING_DAYS} days</option>
+                  <option value="ok">Not expiring soon</option>
+                </select>
+                {(selectedCategory !== "all" || selectedSubCategory !== "all" || selectedExpiry !== "all" || selectedProduct !== "all" || selectedMonth !== "all" || search) && (
+                  <button className="cho-btn-secondary" onClick={() => { setSelectedCategory("all"); setSelectedSubCategory("all"); setSelectedExpiry("all"); setSelectedProduct("all"); setSelectedMonth("all"); setSearch(""); }}>
+                    Clear filters
+                  </button>
+                )}
               </div>
 
               <div className="cho-stats-grid cho-stats-grid--3" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
