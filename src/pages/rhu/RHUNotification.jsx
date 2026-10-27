@@ -11,7 +11,6 @@ const navItems = [
   { label: "Inventory",       to: "/rhu/inventory"         },
   { label: "Barangay",        to: "/rhu/barangay"          },
   { label: "Distribution",    to: "/rhu/distribution"      },
-  { label: "Balance Reports", to: "/rhu/balance-reports"   },
   { label: "Reports",         to: "/rhu/reports"           },
   { label: "Messages",        to: "/rhu/messages"          },
   { label: "Notifications",   to: "/rhu/notifications"     },

@@ -64,7 +64,7 @@ export default function MidwifeReports() {
 
   // "End-of-Month Report" tab — patient consumption + immunization/wastage
   // metrics, separate from the Activity Log tab above.
-  const [activeTab, setActiveTab] = useState("activity"); // "activity" | "eom"
+  const [activeTab, setActiveTab] = useState("activity"); // "activity" | "dispensed" | "eom" | "fhsis"
   const [immunizationLogs, setImmunizationLogs] = useState([]);
   const [eomMonthKey, setEomMonthKey] = useState(getCurrentMonthKey());
 
@@ -161,6 +161,21 @@ export default function MidwifeReports() {
     .reduce((s, d) => s + (d.boxesDispensed || 0), 0);
 
   const periodLabel = selectedMonth === "all" ? "All time" : selectedMonth;
+
+  // "Dispensed to Patients" tab — one row per dispense log, filtered by the
+  // same month dropdown and search box as the Activity tab.
+  const dispensedRows = dispenseLogs
+    .filter(l => selectedMonth === "all" || getMonthYear(l.date) === selectedMonth)
+    .filter(l => {
+      const q = search.trim().toLowerCase();
+      if (!q) return true;
+      return [l.patientName, l.medicineName, l.lotNumber, l.productKey]
+        .some(v => String(v ?? "").toLowerCase().includes(q));
+    })
+    .slice()
+    .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+  const dispensedBoxes = dispensedRows.reduce((sum, l) => sum + (Number(l.boxesDispensed) || 0), 0);
+  const dispensedPatients = new Set(dispensedRows.map(l => (l.patientName || "").trim().toLowerCase()).filter(Boolean)).size;
 
   // ── End-of-Month tab metrics ──
   const eomMonthOptions = recentMonthKeys(6);
@@ -333,18 +348,20 @@ export default function MidwifeReports() {
               <div className="midwife-page-header">
                 <div>
                   <h1 className="midwife-page-title">
-                    {activeTab === "eom" ? "End-of-Month Report" : activeTab === "fhsis" ? "FHSIS Report" : "Activity Reports"}
+                    {activeTab === "eom" ? "End-of-Month Report" : activeTab === "fhsis" ? "FHSIS Report" : activeTab === "dispensed" ? "Dispensed to Patients" : "Activity Reports"}
                   </h1>
                   <p className="midwife-page-sub">
                     {activeTab === "eom"
                       ? "Patient consumption and immunization/vaccine wastage metrics."
                       : activeTab === "fhsis"
                       ? "DOH-aligned immunization coverage and commodity report."
+                      : activeTab === "dispensed"
+                      ? "Every medicine dispensed to a patient, with quantity and lot."
                       : "Monthly summary of medicine received and dispensed."}
                   </p>
                 </div>
                 <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                  {activeTab === "activity" ? (
+                  {activeTab === "activity" || activeTab === "dispensed" ? (
                     <select className="midwife-input" style={{ width: "auto", minWidth: "160px" }}
                       value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
                       <option value="all">All Months</option>
@@ -372,6 +389,13 @@ export default function MidwifeReports() {
                 </button>
                 <button
                   type="button"
+                  className={activeTab === "dispensed" ? "midwife-btn-primary" : "midwife-btn-secondary"}
+                  onClick={() => setActiveTab("dispensed")}
+                >
+                  Dispensed to Patients
+                </button>
+                <button
+                  type="button"
                   className={activeTab === "eom" ? "midwife-btn-primary" : "midwife-btn-secondary"}
                   onClick={() => setActiveTab("eom")}
                 >
@@ -386,7 +410,61 @@ export default function MidwifeReports() {
                 </button>
               </div>
 
-              {activeTab === "activity" ? (
+              {activeTab === "dispensed" ? (
+                <>
+                  <div className="midwife-stats-grid midwife-stats-grid--3">
+                    <div className="midwife-stat-card-box">
+                      <p className="midwife-stat-label">DISPENSE RECORDS</p>
+                      <div className="midwife-stat-row"><span className="midwife-stat-value">{dispensedRows.length}</span></div>
+                      <p className="midwife-stat-sub">{periodLabel}</p>
+                    </div>
+                    <div className="midwife-stat-card-box">
+                      <p className="midwife-stat-label">PATIENTS SERVED</p>
+                      <div className="midwife-stat-row"><span className="midwife-stat-value">{dispensedPatients}</span></div>
+                      <p className="midwife-stat-sub">{periodLabel}</p>
+                    </div>
+                    <div className="midwife-stat-card-box">
+                      <p className="midwife-stat-label">BOXES DISPENSED</p>
+                      <div className="midwife-stat-row"><span className="midwife-stat-value">{dispensedBoxes}</span></div>
+                      <p className="midwife-stat-sub">{periodLabel}</p>
+                    </div>
+                  </div>
+
+                  {loading ? (
+                    <div className="midwife-empty-state"><p>Loading...</p></div>
+                  ) : dispensedRows.length === 0 ? (
+                    <div className="midwife-empty-state">
+                      <h2 className="midwife-empty-title">No Dispense Records for {periodLabel}</h2>
+                      <p className="midwife-empty-text">Medicines you dispense to patients will appear here.</p>
+                    </div>
+                  ) : (
+                    <section className="midwife-section">
+                      <table className="midwife-table">
+                        <thead>
+                          <tr>
+                            <th>DATE</th>
+                            <th>PATIENT</th>
+                            <th>MEDICINE</th>
+                            <th>QUANTITY</th>
+                            <th>LOT #</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dispensedRows.map(l => (
+                            <tr key={l.id}>
+                              <td>{l.date || "—"}</td>
+                              <td><strong>{l.patientName || "—"}</strong></td>
+                              <td>{l.medicineName || "—"}</td>
+                              <td>{l.boxesDispensed ?? 0} box{(l.boxesDispensed ?? 0) !== 1 ? "es" : ""}</td>
+                              <td style={{ fontSize: "12px", color: "#6b7280" }}>{l.lotNumber || "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </section>
+                  )}
+                </>
+              ) : activeTab === "activity" ? (
               <>
 
               <div className="midwife-stats-grid midwife-stats-grid--3">
@@ -732,7 +810,41 @@ export default function MidwifeReports() {
       {/* ════════════════════ PRINT-ONLY VIEW ════════════════════ */}
       <div className="midwife-print-only" style={{ display: "none" }}>
         <div style={{ fontFamily: "Arial, sans-serif", color: "#000", padding: "20px" }}>
-          {activeTab === "activity" ? (
+          {activeTab === "dispensed" ? (
+            <>
+              <h1 style={{ fontSize: "20px", margin: "0 0 4px" }}>Dispensed to Patients</h1>
+              <p style={{ fontSize: "12px", color: "#333", margin: "0 0 16px" }}>
+                Barangay {userData?.barangayName || ""} — {periodLabel}
+              </p>
+              <p style={{ fontSize: "12px", margin: "0 0 12px" }}>
+                <strong>Records:</strong> {dispensedRows.length} · <strong>Patients:</strong> {dispensedPatients} · <strong>Boxes:</strong> {dispensedBoxes}
+              </p>
+              {dispensedRows.length === 0 ? (
+                <p style={{ fontSize: "13px" }}>No dispense records for {periodLabel}.</p>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
+                  <thead>
+                    <tr>
+                      {["Date", "Patient", "Medicine", "Quantity", "Lot #"].map(h => (
+                        <th key={h} style={{ border: "1px solid #999", padding: "6px", textAlign: "left", background: "#eee" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dispensedRows.map(l => (
+                      <tr key={l.id}>
+                        <td style={{ border: "1px solid #999", padding: "6px" }}>{l.date || "—"}</td>
+                        <td style={{ border: "1px solid #999", padding: "6px" }}>{l.patientName || "—"}</td>
+                        <td style={{ border: "1px solid #999", padding: "6px" }}>{l.medicineName || "—"}</td>
+                        <td style={{ border: "1px solid #999", padding: "6px" }}>{l.boxesDispensed ?? 0}</td>
+                        <td style={{ border: "1px solid #999", padding: "6px" }}>{l.lotNumber || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </>
+          ) : activeTab === "activity" ? (
             <>
               <h1 style={{ fontSize: "20px", margin: "0 0 4px" }}>Activity Reports</h1>
               <p style={{ fontSize: "12px", color: "#333", margin: "0 0 16px" }}>

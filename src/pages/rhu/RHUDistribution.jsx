@@ -20,7 +20,6 @@ const navItems = [
   { label: "Inventory",     to: "/rhu/inventory"     },
   { label: "Barangay",      to: "/rhu/barangay"      },
   { label: "Distribution",  to: "/rhu/distribution"  },
-  { label: "Balance Reports", to: "/rhu/balance-reports" },
   { label: "Reports",       to: "/rhu/reports"       },
   { label: "Messages",      to: "/rhu/messages"      },
   { label: "Notifications", to: "/rhu/notifications" },
@@ -594,7 +593,7 @@ export default function RHUDistribution() {
       eligibility = {
         tone: "danger",
         text: `No barangay is eligible yet — none have submitted their ${reportLabel} end-balance report.`,
-        action: { label: "Review balance reports", to: "/rhu/balance-reports" },
+        action: { label: "Review balance reports", to: "/rhu/reports?tab=balance" },
       };
     } else if (eligibleBarangays.length < populationBarangays.length) {
       const skipped = populationBarangays.length - eligibleBarangays.length;
@@ -728,7 +727,7 @@ export default function RHUDistribution() {
                   <button className="rhu-btn-secondary" onClick={() => navigate("/rhu/barangay")}>
                     Manage Barangays
                   </button>
-                  <button className="rhu-btn-secondary" onClick={() => navigate("/rhu/balance-reports")}>
+                  <button className="rhu-btn-secondary" onClick={() => navigate("/rhu/reports?tab=balance")}>
                     Review Midwife Balance Reports
                   </button>
                   <button className="rhu-btn-primary" onClick={() => setShowNewModal(true)}>

@@ -10,9 +10,7 @@ import CHOItemManagement from "./pages/cho/CHOItemManagement";
 import CHOBatchInventory from "./pages/cho/CHOBatchInventory";
 import CHOBarangay from "./pages/cho/CHOBarangay";
 import CHORHUManagement from "./pages/cho/CHORHUManagement";
-import CHOPopulationReport from "./pages/cho/CHOPopulationReport";
 import CHOBatchDistribution from "./pages/cho/CHOBatchDistribution";
-import CHOBalanceReports from "./pages/cho/CHOBalanceReports";
 import CHOReports from "./pages/cho/CHOReports";
 import CHONotification from "./pages/cho/CHONotification";
 import CHOMessages from "./pages/cho/CHOMessages";
@@ -22,7 +20,6 @@ import RHUDashboard from "./pages/rhu/RHUDashboard";
 import RHUInventory from "./pages/rhu/RHUInventory";
 import RHUBarangay from "./pages/rhu/RHUBarangay";
 import RHUDistribution from "./pages/rhu/RHUDistribution";
-import RHUBalanceReports from "./pages/rhu/RHUBalanceReports";
 import RHUReports from "./pages/rhu/RHUReports";
 import RHUMessages from "./pages/rhu/RHUMessages";
 import RHUNotification from "./pages/rhu/RHUNotification";
@@ -59,9 +56,9 @@ export default function App() {
           <Route path="/cho/batch-inventory"    element={<PR roles={["cho"]}><CHOBatchInventory /></PR>} />
           <Route path="/cho/barangay"           element={<PR roles={["cho"]}><CHOBarangay /></PR>} />
           <Route path="/cho/rhu-management"     element={<PR roles={["cho"]}><CHORHUManagement /></PR>} />
-          <Route path="/cho/population-report"  element={<PR roles={["cho"]}><CHOPopulationReport /></PR>} />
+          <Route path="/cho/population-report"  element={<Navigate to="/cho/reports?tab=population" replace />} />
           <Route path="/cho/batch-distribution" element={<PR roles={["cho"]}><CHOBatchDistribution /></PR>} />
-          <Route path="/cho/balance-reports"    element={<PR roles={["cho"]}><CHOBalanceReports /></PR>} />
+          <Route path="/cho/balance-reports"    element={<Navigate to="/cho/reports?tab=balance" replace />} />
           <Route path="/cho/reports"            element={<PR roles={["cho"]}><CHOReports /></PR>} />
           <Route path="/cho/messages"           element={<PR roles={["cho"]}><CHOMessages /></PR>} />
           <Route path="/cho/notifications"      element={<PR roles={["cho"]}><CHONotification /></PR>} />
@@ -72,7 +69,7 @@ export default function App() {
           <Route path="/rhu/inventory"     element={<PR roles={["rhu"]}><RHUInventory /></PR>} />
           <Route path="/rhu/barangay"      element={<PR roles={["rhu"]}><RHUBarangay /></PR>} />
           <Route path="/rhu/distribution"  element={<PR roles={["rhu"]}><RHUDistribution /></PR>} />
-          <Route path="/rhu/balance-reports" element={<PR roles={["rhu"]}><RHUBalanceReports /></PR>} />
+          <Route path="/rhu/balance-reports" element={<Navigate to="/rhu/reports?tab=balance" replace />} />
           <Route path="/rhu/reports"       element={<PR roles={["rhu"]}><RHUReports /></PR>} />
           <Route path="/rhu/messages"      element={<PR roles={["rhu"]}><RHUMessages /></PR>} />
           <Route path="/rhu/notifications" element={<PR roles={["rhu"]}><RHUNotification /></PR>} />

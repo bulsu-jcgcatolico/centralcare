@@ -20,9 +20,7 @@ const navItems = [
   { label: "Batch Inventory",   to: "/cho/batch-inventory"    },
   { label: "Barangay",          to: "/cho/barangay"           },
   { label: "RHU Management",    to: "/cho/rhu-management"     },
-  { label: "Population Report", to: "/cho/population-report"  },
   { label: "Batch Distribution",to: "/cho/batch-distribution" },
-  { label: "Balance Reports",   to: "/cho/balance-reports"    },
   { label: "Reports",           to: "/cho/reports"            },
   { label: "Messages",          to: "/cho/messages"           },
   { label: "Notifications",     to: "/cho/notifications"      },
@@ -477,7 +475,7 @@ export default function CHOBatchDistribution() {
                       <option key={m} value={m}>{m}</option>
                     ))}
                   </select>
-                  <button className="rhu-btn-secondary" onClick={() => navigate("/cho/balance-reports")}>
+                  <button className="rhu-btn-secondary" onClick={() => navigate("/cho/reports?tab=balance")}>
                     Review RHU Balance Reports
                   </button>
                   <button className="rhu-btn-primary" onClick={() => window.print()}>
