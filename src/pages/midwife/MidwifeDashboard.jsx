@@ -13,10 +13,12 @@ const navItems = [
   { label: "Inventory",     to: "/midwife/inventory"     },
   { label: "Dispense",      to: "/midwife/dispense"      },
   { label: "Reports",       to: "/midwife/reports"       },
-  { label: "BHW & Campaigns", to: "/midwife/bhw"         },
+  { label: "BHW",           to: "/midwife/bhw"         },
   { label: "Messages",      to: "/midwife/messages"      },
   { label: "Notifications", to: "/midwife/notifications" },
 ];
+
+const EXPIRY_WARNING_DAYS = 90; // "Expiring Soon" window (days)
 
 export default function MidwifeDashboard() {
   const { logout, userData } = useAuth();
@@ -97,6 +99,14 @@ export default function MidwifeDashboard() {
     setLoading(false);
   }
 
+  // Moved here from the Inventory and Patient Records pages.
+  const pendingReceiptCount = inventory.filter(i => {
+    const status = String(i.receivedStatus || "").trim().toLowerCase();
+    return status !== "received" && status !== "accepted";
+  }).length;
+  const childPatientCount = patients.filter(p => p.type === "child").length;
+  const adultPatientCount = patients.filter(p => p.type === "adult").length;
+
   const lowStockItems = inventory.filter(i => (i.remaining ?? i.quantity ?? 0) <= 50);
   const availableMedicines = inventory.filter(i => (i.remaining ?? i.quantity ?? 0) > 0);
   const totalBoxesDispensed = dispenseLogs.reduce((s, l) => s + (l.boxesDispensed || 0), 0);
@@ -109,7 +119,7 @@ export default function MidwifeDashboard() {
     const remaining = i.remaining ?? i.quantity ?? 0;
     if (remaining <= 0) return false;
     const days = (new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24);
-    return days <= 30 && days >= 0;
+    return days <= EXPIRY_WARNING_DAYS && days >= 0;
   });
   const expiringSoonList = expiringItems
     .map(i => {
@@ -232,7 +242,7 @@ export default function MidwifeDashboard() {
           </div>
 
           {/* Stat Cards */}
-          <div className="midwife-stats-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
+          <div className="midwife-stats-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
             <div className="midwife-stat-card">
               <div className="midwife-stat-icon-wrap blue">
                 <svg viewBox="0 0 24 24" fill="#1a56db" width="24" height="24">
@@ -290,8 +300,41 @@ export default function MidwifeDashboard() {
               <p className="midwife-stat-label">Expiring Soon</p>
               <p className="midwife-stat-value">{expiringItems.length}</p>
               <span className="midwife-stat-trend warning">
-                {expiringItems.length > 0 ? "Within 30 days" : "None expiring soon"}
+                {expiringItems.length > 0 ? `Within ${EXPIRY_WARNING_DAYS} days` : "None expiring soon"}
               </span>
+            </div>
+
+            <div className="midwife-stat-card">
+              <div className="midwife-stat-icon-wrap blue">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/>
+                </svg>
+              </div>
+              <p className="midwife-stat-label">Pending Receipt</p>
+              <p className="midwife-stat-value">{pendingReceiptCount}</p>
+              <span className="midwife-stat-trend warning">Shipments awaiting acceptance</span>
+            </div>
+
+            <div className="midwife-stat-card">
+              <div className="midwife-stat-icon-wrap orange">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                  <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                </svg>
+              </div>
+              <p className="midwife-stat-label">Child Patients</p>
+              <p className="midwife-stat-value">{childPatientCount}</p>
+              <span className="midwife-stat-trend up">Registered children</span>
+            </div>
+
+            <div className="midwife-stat-card">
+              <div className="midwife-stat-icon-wrap purple">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                  <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                </svg>
+              </div>
+              <p className="midwife-stat-label">Adult Patients</p>
+              <p className="midwife-stat-value">{adultPatientCount}</p>
+              <span className="midwife-stat-trend up">Registered adults</span>
             </div>
           </div>
 

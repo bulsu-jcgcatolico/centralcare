@@ -24,7 +24,7 @@ const navItems = [
   { label: "Inventory",     to: "/midwife/inventory"     },
   { label: "Dispense",      to: "/midwife/dispense"      },
   { label: "Reports",       to: "/midwife/reports"       },
-  { label: "BHW & Campaigns", to: "/midwife/bhw"        },
+  { label: "BHW",           to: "/midwife/bhw"        },
   { label: "Messages",      to: "/midwife/messages"      },
   { label: "Notifications", to: "/midwife/notifications" },
 ];
@@ -341,6 +341,10 @@ export default function MidwifeInventory() {
     <div className="midwife-layout">
       <style>{`
         /* ── UI polish (scoped; loads after the page stylesheet) ── */
+        /* Even vertical spacing: the content area already spaces its blocks with a flex gap,
+           so per-block margins were stacking on top of it and creating dead space. */
+        .midwife-layout .midwife-content { gap: 0.875rem; }
+        .midwife-layout .midwife-content > * { margin-top: 0; margin-bottom: 0; }
         .midwife-layout .midwife-page-title { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; }
         .midwife-layout .midwife-page-sub { color: #6b7280; }
 
@@ -460,55 +464,8 @@ export default function MidwifeInventory() {
             </div>
           </div>
 
-          <div className="midwife-inv-stats-row">
-            <div className="midwife-inv-stat-card">
-              <div className="midwife-inv-stat-icon midwife-inv-icon--blue">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                  <path d="M20 7h-3V4a2 2 0 00-2-2H9a2 2 0 00-2 2v3H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
-                </svg>
-              </div>
-              <div>
-                <p className="midwife-inv-stat-label">Active Items</p>
-                <p className="midwife-inv-stat-value">{activeInventory.length}</p>
-              </div>
-            </div>
-            <div className="midwife-inv-stat-card" onClick={() => setActiveTab("pending")} style={{ cursor: "pointer" }}>
-              <div className="midwife-inv-stat-icon midwife-inv-icon--blue">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
-                  <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-              </div>
-              <div>
-                <p className="midwife-inv-stat-label">Pending Receipt</p>
-                <p className="midwife-inv-stat-value">{pendingReceiptCount}</p>
-              </div>
-            </div>
-            <div className="midwife-inv-stat-card">
-              <div className="midwife-inv-stat-icon midwife-inv-icon--orange">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                  <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
-                </svg>
-              </div>
-              <div>
-                <p className="midwife-inv-stat-label">Low Stock</p>
-                <p className="midwife-inv-stat-value">{lowStockCount}</p>
-              </div>
-            </div>
-            <div className="midwife-inv-stat-card">
-              <div className="midwife-inv-stat-icon midwife-inv-icon--red">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                  <path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"/>
-                </svg>
-              </div>
-              <div>
-                <p className="midwife-inv-stat-label">Expiring Soon</p>
-                <p className="midwife-inv-stat-value">{expiringCount}</p>
-              </div>
-            </div>
-          </div>
-
           {/* Tab Navigation */}
-          <div className="midwife-tabs" style={{ display: "flex", gap: "1rem", marginBottom: "1.25rem", borderBottom: "1px solid #e2e8f0", paddingBottom: "0.5rem" }}>
+          <div className="midwife-tabs" style={{ display: "flex", gap: "1rem", marginBottom: 0, borderBottom: "1px solid #e2e8f0", paddingBottom: "0.5rem" }}>
             <button 
               className={`midwife-tab-btn ${activeTab === "active" ? "active" : ""}`}
               onClick={() => setActiveTab("active")}
@@ -577,7 +534,7 @@ export default function MidwifeInventory() {
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", marginBottom: "1.25rem" }}>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", marginBottom: 0 }}>
             <select className="midwife-input" style={{ width: "190px", flex: "0 0 auto", padding: "6px 10px", fontSize: "13px" }}
               value={selectedCategory} onChange={e => { setSelectedCategory(e.target.value); setSelectedSubCategory("all"); }}>
               <option value="all">All Categories</option>
@@ -608,7 +565,7 @@ export default function MidwifeInventory() {
           </div>
 
           {!checkingBalance && !balanceAlreadySubmitted && (
-            <div className="midwife-empty-state" style={{ background: "#fff7ed", border: "1px solid #fed7aa", padding: "12px 16px", marginBottom: "1.25rem", textAlign: "left" }}>
+            <div className="midwife-empty-state" style={{ background: "#fff7ed", border: "1px solid #fed7aa", padding: "12px 16px", marginBottom: 0, textAlign: "left" }}>
               <p style={{ margin: 0, color: "#9a3412", fontWeight: 600 }}>
                 Present End Balance report for {monthKeyLabel(reportMonthKey)} is missing.
               </p>

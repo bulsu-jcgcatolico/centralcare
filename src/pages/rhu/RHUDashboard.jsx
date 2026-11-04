@@ -28,6 +28,8 @@ const PIE_COLORS = ["#1a56db", "#93c5fd", "#dbeafe", "#bfdbfe", "#eff6ff"];
 const BARANGAYS_COLLECTION = "cho_barangays";
 const RHU_REGISTRY_COLLECTION = "cho_rhu_registry";
 
+const EXPIRY_WARNING_DAYS = 90; // "Expiring Soon" window (days)
+
 export default function RHUDashboard() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
@@ -151,11 +153,17 @@ export default function RHUDashboard() {
     setLoading(false);
   }
 
+  // Same accepted / pending split the Inventory page uses.
+  const recvStatus = (i) => String(i.receivedStatus || "").trim().toLowerCase();
+  const activeInv = inventory.filter(i => recvStatus(i) === "accepted" || recvStatus(i) === "received");
+  const pendingCount = inventory.filter(i => recvStatus(i) === "" || recvStatus(i) === "pending").length;
+  const totalBoxes = activeInv.reduce((s, i) => s + (i.remaining ?? i.quantity ?? 0), 0);
+
   const lowStockItems = inventory.filter(i => (i.remaining ?? i.quantity) <= 50);
   const expiringItems = inventory.filter(i => {
     if (!i.expiry) return false;
     const days = (new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24);
-    return days <= 30 && days >= 0;
+    return days <= EXPIRY_WARNING_DAYS && days >= 0;
   });
 
   // Items Expiring Soon — same batches counted in the EXPIRING SOON stat
@@ -289,6 +297,18 @@ export default function RHUDashboard() {
                 <span className="rhu-stat-value">{inventory.length}</span>
                 <span className="rhu-stat-arrow">›</span>
               </div>
+            </div>
+            <div className={`rhu-stat-card ${pendingCount > 0 ? "rhu-stat--blue" : ""}`}>
+              <p className="rhu-stat-label">PENDING ACCEPTANCE</p>
+              <div className="rhu-stat-row">
+                <span className="rhu-stat-value">{pendingCount}</span>
+                <NavLink to="/rhu/inventory" className="rhu-stat-arrow">›</NavLink>
+              </div>
+            </div>
+            <div className="rhu-stat-card">
+              <p className="rhu-stat-label">TOTAL BOXES</p>
+              <div className="rhu-stat-row"><span className="rhu-stat-value">{totalBoxes}</span></div>
+              <p className="rhu-stat-sub">Accepted, in stock</p>
             </div>
             <div className="rhu-stat-card rhu-stat--orange">
               <p className="rhu-stat-label">LOW STOCK ALERTS</p>

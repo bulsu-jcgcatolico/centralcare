@@ -45,6 +45,11 @@ export default function App() {
   return (
     <ToastProvider>
     <AuthProvider>
+      {/* Trim the dead space above the page content on every CHO / RHU / Midwife page */}
+      <style>{`
+        .cho-content, .rhu-content, .midwife-content { padding-top: 16px !important; }
+        .cho-content > :first-child, .rhu-content > :first-child, .midwife-content > :first-child { margin-top: 0 !important; }
+      `}</style>
       <OfflineBanner />
       <BrowserRouter>
         <Routes>

@@ -367,6 +367,10 @@ export default function RHUInventory() {
     <div className="rhu-layout">
       <style>{`
         /* ── UI polish (scoped; loads after the page stylesheet) ── */
+        /* Even vertical spacing: the content area already spaces its blocks with a flex gap,
+           so per-block margins were stacking on top of it and creating dead space. */
+        .rhu-layout .rhu-content { gap: 0.875rem; }
+        .rhu-layout .rhu-content > * { margin-top: 0; margin-bottom: 0; }
         .rhu-layout .rhu-page-title { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; }
         .rhu-layout .rhu-page-sub { color: #6b7280; }
 
@@ -474,32 +478,7 @@ export default function RHUInventory() {
             </div>
           </div>
 
-          <div className="rhu-stats-grid rhu-stats-grid--5">
-            <div className="rhu-stat-card">
-              <p className="rhu-stat-label">ACTIVE ITEMS</p>
-              <div className="rhu-stat-row"><span className="rhu-stat-value">{activeInventory.length}</span></div>
-            </div>
-            <div className={`rhu-stat-card ${pendingCount > 0 ? "rhu-stat--blue" : ""}`} onClick={() => setActiveTab("pending")} style={{ cursor: "pointer" }}>
-              <p className="rhu-stat-label">PENDING ACCEPTANCE</p>
-              <div className="rhu-stat-row"><span className="rhu-stat-value">{pendingCount}</span></div>
-            </div>
-            <div className="rhu-stat-card rhu-stat--orange">
-              <p className="rhu-stat-label">LOW STOCK</p>
-              <div className="rhu-stat-row"><span className="rhu-stat-value">{lowStockCount}</span></div>
-            </div>
-            <div className="rhu-stat-card rhu-stat--red">
-              <p className="rhu-stat-label">EXPIRING SOON</p>
-              <div className="rhu-stat-row"><span className="rhu-stat-value">{expiringCount}</span></div>
-            </div>
-            <div className="rhu-stat-card">
-              <p className="rhu-stat-label">TOTAL BOXES</p>
-              <div className="rhu-stat-row">
-                <span className="rhu-stat-value">{activeInventory.reduce((s, i) => s + (i.remaining ?? i.quantity ?? 0), 0)}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="midwife-tabs" style={{ display: "flex", gap: "1rem", marginBottom: "1.25rem", borderBottom: "1px solid #e2e8f0", paddingBottom: "0.5rem" }}>
+          <div className="midwife-tabs" style={{ display: "flex", gap: "1rem", marginBottom: 0, borderBottom: "1px solid #e2e8f0", paddingBottom: "0.5rem" }}>
             <button 
               className={`midwife-tab-btn ${activeTab === "active" ? "active" : ""}`}
               onClick={() => setActiveTab("active")}
@@ -530,7 +509,7 @@ export default function RHUInventory() {
             </button>
           </div>
 
-          <div className="rhu-inv-toolbar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "1rem" }}>
+          <div className="rhu-inv-toolbar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 0, flexWrap: "wrap", gap: "1rem" }}>
             <div className="rhu-inv-search-wrap" style={{ flex: 1, minWidth: "240px" }}>
               <input
                 className="rhu-search"
@@ -554,7 +533,7 @@ export default function RHUInventory() {
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", marginBottom: "1.25rem" }}>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", marginBottom: 0 }}>
             <select className="rhu-input" style={{ width: "190px", flex: "0 0 auto", padding: "6px 10px", fontSize: "13px" }}
               value={selectedCategory} onChange={e => { setSelectedCategory(e.target.value); setSelectedSubCategory("all"); }}>
               <option value="all">All Categories</option>
@@ -585,7 +564,7 @@ export default function RHUInventory() {
           </div>
 
           {!checkingBalance && !balanceAlreadySubmitted && (
-            <div className="rhu-empty-state" style={{ background: "#fff7ed", border: "1px solid #fed7aa", padding: "12px 16px", marginBottom: "1.25rem", textAlign: "left" }}>
+            <div className="rhu-empty-state" style={{ background: "#fff7ed", border: "1px solid #fed7aa", padding: "12px 16px", marginBottom: 0, textAlign: "left" }}>
               <p style={{ margin: 0, color: "#9a3412", fontWeight: 600 }}>
                 Present End Balance report for {monthKeyLabel(reportMonthKey)} is missing.
               </p>

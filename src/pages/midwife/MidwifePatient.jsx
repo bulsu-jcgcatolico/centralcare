@@ -3,7 +3,7 @@ import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
   collection, getDocs, query, where,
-  doc, deleteDoc, getDoc
+  doc, getDoc
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
@@ -17,10 +17,17 @@ const navItems = [
   { label: "Inventory",     to: "/midwife/inventory"     },
   { label: "Dispense",      to: "/midwife/dispense"      },
   { label: "Reports",       to: "/midwife/reports"       },
-  { label: "BHW & Campaigns", to: "/midwife/bhw"         },
+  { label: "BHW",           to: "/midwife/bhw"         },
   { label: "Messages",      to: "/midwife/messages"      },
   { label: "Notifications", to: "/midwife/notifications" },
 ];
+
+// Compact styling for the per-column filter row under the table header
+const FILTER_TH = { padding: "6px 8px", textTransform: "none", background: "#fff", fontWeight: 400 };
+const FILTER_INPUT = {
+  width: "100%", boxSizing: "border-box", padding: "5px 8px", fontSize: "12px",
+  border: "1px solid #d1d5db", borderRadius: "6px", background: "#fff", color: "#111827",
+};
 
 export default function MidwifePatients() {
   const { logout, userData } = useAuth();
@@ -32,6 +39,10 @@ export default function MidwifePatients() {
   const [search, setSearch]       = useState("");
   const [activeTab, setActiveTab] = useState("child");
   const [filterBy, setFilterBy]   = useState("all");
+  // Per-column filters shown under the table header
+  const [colFilters, setColFilters] = useState({});
+  const setCol = (key, value) => setColFilters(prev => ({ ...prev, [key]: value }));
+  const hasColFilters = Object.values(colFilters).some(v => String(v ?? "").trim() !== "");
   const [patients, setPatients]   = useState([]);
   const [barangayPopulation, setBarangayPopulation] = useState(0);
   const [loading, setLoading]     = useState(false);
@@ -84,16 +95,6 @@ export default function MidwifePatients() {
     }
   }
 
-  async function deletePatient(id) {
-    if (!confirm("Delete this patient record?")) return;
-    try {
-      await deleteDoc(doc(db, "patients", id));
-      setPatients(patients.filter(p => p.id !== id));
-    } catch (err) {
-      showToast("Error: " + err.message, "error");
-    }
-  }
-
   // Split patients by type
   const childPatients = patients.filter(p => p.type === "child");
   const adultPatients = patients.filter(p => p.type === "adult");
@@ -114,9 +115,31 @@ export default function MidwifePatients() {
     return list;
   };
 
-  const displayList = applyFilter(searchFilter(
-    activeTab === "child" ? childPatients : adultPatients
-  ));
+  // Column filters (the row under the table header)
+  const norm = (v) => String(v ?? "").trim().toLowerCase();
+  const contains = (value, q) => !norm(q) || norm(value).includes(norm(q));
+  const sexIs = (p, q) => {
+    if (!q) return true;
+    const sx = norm(p.sex);
+    return q === "male" ? (sx === "male" || sx === "m") : (sx === "female" || sx === "f");
+  };
+  const applyColumnFilters = (list) => list.filter(p =>
+    contains(p.patientId, colFilters.patientId) &&
+    contains(p.name, colFilters.name) &&
+    (!norm(colFilters.age) || norm(p.age) === norm(colFilters.age)) &&
+    sexIs(p, colFilters.sex) &&
+    contains(p.birthday, colFilters.birthday) &&
+    contains(p.motherName, colFilters.guardian) &&
+    contains(p.contact, colFilters.contact) &&
+    (!colFilters.status || norm(p.immunizationStatus || "Incomplete") === norm(colFilters.status)) &&
+    (!colFilters.civilStatus || norm(p.civilStatus) === norm(colFilters.civilStatus)) &&
+    contains(p.lastVisit, colFilters.lastVisit)
+  );
+
+  const tabPatients = activeTab === "child" ? childPatients : adultPatients;
+  const civilStatusOptions = [...new Set(adultPatients.map(p => (p.civilStatus || "").trim()).filter(Boolean))].sort();
+
+  const displayList = applyColumnFilters(applyFilter(searchFilter(tabPatients)));
 
 
   // Print / Export Handler function
@@ -200,6 +223,12 @@ export default function MidwifePatients() {
 
   return (
     <div className="midwife-layout">
+      <style>{`
+        /* Even vertical spacing: the content area already spaces its blocks with a flex gap,
+           so per-block margins were stacking on top of it and creating dead space. */
+        .midwife-layout .midwife-content { gap: 0.875rem; }
+        .midwife-layout .midwife-content > * { margin-top: 0; margin-bottom: 0; }
+      `}</style>
       {/* Sidebar */}
       <aside className="midwife-sidebar">
         <div className="midwife-brand">
@@ -288,57 +317,6 @@ export default function MidwifePatients() {
             </div>
           </div>
 
-          {/* Stats Grid */}
-          <div className="midwife-stats-grid midwife-stats-grid--4">
-            <div className="midwife-stat-card-box">
-              <div className="midwife-stat-icon-box blue">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-                  <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-                </svg>
-              </div>
-              <div>
-                <p className="midwife-stat-label-box">Barangay Population</p>
-                <p className="midwife-stat-value-box">{barangayPopulation.toLocaleString()}</p>
-              </div>
-            </div>
-
-            <div className="midwife-stat-card-box">
-              <div className="midwife-stat-icon-box green">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-                  <path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
-                </svg>
-              </div>
-              <div>
-                <p className="midwife-stat-label-box">Total Registered Patients</p>
-                <p className="midwife-stat-value-box">{patients.length}</p>
-              </div>
-            </div>
-
-            <div className="midwife-stat-card-box">
-              <div className="midwife-stat-icon-box orange">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-                  <path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"/>
-                </svg>
-              </div>
-              <div>
-                <p className="midwife-stat-label-box">Child Patients</p>
-                <p className="midwife-stat-value-box">{childPatients.length}</p>
-              </div>
-            </div>
-
-            <div className="midwife-stat-card-box">
-              <div className="midwife-stat-icon-box purple">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-                  <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-                </svg>
-              </div>
-              <div>
-                <p className="midwife-stat-label-box">Adult Patients</p>
-                <p className="midwife-stat-value-box">{adultPatients.length}</p>
-              </div>
-            </div>
-          </div>
-
           {/* Search & Category Tabs */}
           <div className="midwife-patient-toolbar">
             <input
@@ -351,13 +329,13 @@ export default function MidwifePatients() {
             <div className="midwife-tab-buttons">
               <button
                 className={`midwife-tab-btn ${activeTab === "child" ? "active" : ""}`}
-                onClick={() => setActiveTab("child")}
+                onClick={() => { setActiveTab("child"); setColFilters({}); }}
               >
                 Child
               </button>
               <button
                 className={`midwife-tab-btn ${activeTab === "adult" ? "active" : ""}`}
-                onClick={() => setActiveTab("adult")}
+                onClick={() => { setActiveTab("adult"); setColFilters({}); }}
               >
                 Adult
               </button>
@@ -398,7 +376,7 @@ export default function MidwifePatients() {
           {/* Table Container */}
           {loading ? (
             <div className="midwife-empty-state"><p>Loading records...</p></div>
-          ) : displayList.length === 0 ? (
+          ) : tabPatients.length === 0 ? (
             <div className="midwife-empty-state">
               <div className="midwife-empty-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="64" height="64">
@@ -443,8 +421,57 @@ export default function MidwifePatients() {
                     <th>LAST VISIT</th>
                     <th>ACTION</th>
                   </tr>
+                  <tr className="midwife-col-filter-row">
+                    <th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="Filter…" value={colFilters.patientId || ""} onChange={e => setCol("patientId", e.target.value)} /></th>
+                    <th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="Filter…" value={colFilters.name || ""} onChange={e => setCol("name", e.target.value)} /></th>
+                    <th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="Age" inputMode="numeric" value={colFilters.age || ""} onChange={e => setCol("age", e.target.value)} /></th>
+                    <th style={FILTER_TH}>
+                      <select style={FILTER_INPUT} value={colFilters.sex || ""} onChange={e => setCol("sex", e.target.value)}>
+                        <option value="">All</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                      </select>
+                    </th>
+                    {activeTab === "child" ? (
+                      <>
+                        <th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="e.g. 2025-09" value={colFilters.birthday || ""} onChange={e => setCol("birthday", e.target.value)} /></th>
+                        <th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="Filter…" value={colFilters.guardian || ""} onChange={e => setCol("guardian", e.target.value)} /></th>
+                        <th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="Filter…" value={colFilters.contact || ""} onChange={e => setCol("contact", e.target.value)} /></th>
+                        <th style={FILTER_TH}>
+                          <select style={FILTER_INPUT} value={colFilters.status || ""} onChange={e => setCol("status", e.target.value)}>
+                            <option value="">All</option>
+                            <option value="complete">Complete</option>
+                            <option value="incomplete">Incomplete</option>
+                          </select>
+                        </th>
+                      </>
+                    ) : (
+                      <>
+                        <th style={FILTER_TH}>
+                          <select style={FILTER_INPUT} value={colFilters.civilStatus || ""} onChange={e => setCol("civilStatus", e.target.value)}>
+                            <option value="">All</option>
+                            {civilStatusOptions.map(cs => <option key={cs} value={cs}>{cs}</option>)}
+                          </select>
+                        </th>
+                        <th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="Filter…" value={colFilters.contact || ""} onChange={e => setCol("contact", e.target.value)} /></th>
+                      </>
+                    )}
+                    <th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="e.g. 9/29" value={colFilters.lastVisit || ""} onChange={e => setCol("lastVisit", e.target.value)} /></th>
+                    <th style={FILTER_TH}>
+                      {hasColFilters && (
+                        <button type="button" className="midwife-btn-icon" onClick={() => setColFilters({})}>Clear</button>
+                      )}
+                    </th>
+                  </tr>
                 </thead>
                 <tbody>
+                  {displayList.length === 0 && (
+                    <tr>
+                      <td colSpan={activeTab === "child" ? 10 : 8} style={{ textAlign: "center", padding: "28px", color: "#6b7280" }}>
+                        No patients match the current filters.
+                      </td>
+                    </tr>
+                  )}
                   {displayList.map((patient) => (
                     <tr key={patient.id}>
                       <td>{patient.patientId || "—"}</td>
@@ -478,13 +505,7 @@ export default function MidwifePatients() {
                             className="midwife-btn-icon"
                             onClick={() => navigate(`/midwife/patients/edit/${patient.id}`)}
                           >
-                            Edit
-                          </button>
-                          <button
-                            className="midwife-btn-icon midwife-btn-icon--danger"
-                            onClick={() => deletePatient(patient.id)}
-                          >
-                            Delete
+                            View/Edit
                           </button>
                         </div>
                       </td>

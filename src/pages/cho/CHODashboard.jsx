@@ -25,6 +25,8 @@ const navItems = [
 
 const PIE_COLORS = ["#1a56db", "#93c5fd", "#dbeafe", "#bfdbfe", "#eff6ff"];
 
+const EXPIRY_WARNING_DAYS = 90; // "Expiring Soon" window (days)
+
 export default function CHODashboard() {
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -83,7 +85,7 @@ export default function CHODashboard() {
     const remaining = b.remaining ?? b.quantity ?? 0;
     if (remaining <= 0) return false;
     const days = (new Date(b.expiryDate) - new Date()) / (1000 * 60 * 60 * 24);
-    return days <= 30 && days >= 0;
+    return days <= EXPIRY_WARNING_DAYS && days >= 0;
   });
 
   // Items Expiring Soon — same batches counted in the EXPIRING SOON stat
@@ -233,6 +235,25 @@ export default function CHODashboard() {
                 <span className="cho-stat-value">{inventory.length}</span>
                 <span className="cho-stat-arrow">›</span>
               </div>
+            </div>
+            <div className="cho-stat-card">
+              <p className="cho-stat-label">TOTAL BATCHES</p>
+              <div className="cho-stat-row"><span className="cho-stat-value">{choBatches.length}</span></div>
+              <p className="cho-stat-sub">Accepted batches in CHO stock</p>
+            </div>
+            <div className="cho-stat-card cho-stat--green">
+              <p className="cho-stat-label">REMAINING MEDICINES / BOXES</p>
+              <div className="cho-stat-row">
+                <span className="cho-stat-value">{choBatches.reduce((s, b) => s + ((b.remaining ?? b.quantity) || 0), 0)}</span>
+              </div>
+              <p className="cho-stat-sub">Currently in stock</p>
+            </div>
+            <div className="cho-stat-card">
+              <p className="cho-stat-label">INITIAL QUANTITY</p>
+              <div className="cho-stat-row">
+                <span className="cho-stat-value">{choBatches.reduce((s, b) => s + (b.quantity || 0), 0)}</span>
+              </div>
+              <p className="cho-stat-sub">Total received</p>
             </div>
             <div className="cho-stat-card cho-stat--orange">
               <p className="cho-stat-label">LOW STOCK ALERTS</p>

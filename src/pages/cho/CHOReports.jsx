@@ -949,7 +949,28 @@ export default function CHOReports() {
         </div>
 
       <style>{`
+        /* ── Population tab styling (restores the deleted CHOPopulationReport.css look) ── */
+        .cho-report-toolbar { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .cho-view-tabs { display: inline-flex; gap: 4px; padding: 4px; background: #f1f5f9; border-radius: 10px; }
+        .cho-tab-btn { padding: 8px 16px; border: none; background: transparent; border-radius: 8px; font-size: 13px; font-weight: 600; color: #64748b; cursor: pointer; }
+        .cho-tab-btn:hover { color: #0f172a; }
+        .cho-tab-btn.active { background: #fff; color: #1d4ed8; box-shadow: 0 1px 3px rgba(15,23,42,.12); }
+        .cho-report-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .cho-btn-group { display: inline-flex; border: 1px solid #d1d5db; border-radius: 10px; overflow: hidden; background: #fff; }
+        .cho-toggle-btn { padding: 8px 14px; border: none; background: #fff; font-size: 13px; font-weight: 600; color: #475569; cursor: pointer; }
+        .cho-toggle-btn + .cho-toggle-btn { border-left: 1px solid #d1d5db; }
+        .cho-toggle-btn.active { background: #2563eb; color: #fff; }
+        .cho-select-sm { width: auto !important; min-width: 120px; padding: 8px 12px; font-size: 13px; }
+        .cho-btn-print { display: inline-flex; align-items: center; }
+        .cho-table-wrapper { max-height: 520px; overflow: auto; border: 1px solid #e5e7eb; border-radius: 12px; }
+        .cho-report-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+        .cho-report-table thead th { position: sticky; top: 0; z-index: 1; background: #f9fafb; }
+        .print-header-only { display: none; }
         @media print {
+          .no-print { display: none !important; }
+          .print-header-only { display: block !important; }
+          .cho-table-wrapper { max-height: none; overflow: visible; border: none; }
+
           .cho-sidebar, .cho-topbar, .reports-tabbar, .reports-screen-only { display: none !important; }
           .cho-print-only, .cho-balance-print-only { display: block !important; }
           .cho-main { margin-left: 0 !important; }

@@ -9,6 +9,9 @@ import {
   getPriorMonthKey, monthKeyLabel, recentMonthKeys,
   getAllSubmittedReports, displayFacilityName,
 } from "../../utils/monthlyBalance";
+// Optional stylesheets: loaded if the file exists, silently skipped if it was deleted,
+// so a missing .css file can no longer crash the page.
+import.meta.glob(["./RHUBalanceReports.css"], { eager: true });
 
 const navItems = [
   { label: "Dashboard",       to: "/rhu/dashboard"         },

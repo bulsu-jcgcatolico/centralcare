@@ -297,6 +297,12 @@ export default function CHOBatchInventory() {
     <div>
       <div className="cho-screen-only">
         <div className="cho-layout">
+          <style>{`
+        /* Even vertical spacing: the content area already spaces its blocks with a flex gap,
+           so per-block margins were stacking on top of it and creating dead space. */
+        .cho-layout .cho-content { gap: 0.875rem; }
+        .cho-layout .cho-content > * { margin-top: 0; margin-bottom: 0; }
+          `}</style>
           <aside className="cho-sidebar">
             <div className="cho-brand">
               <div className="cho-brand-icon">
@@ -368,7 +374,7 @@ export default function CHOBatchInventory() {
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", margin: "0 0 1rem" }}>
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", margin: 0 }}>
                 <select className="cho-input" style={{ width: "190px", flex: "0 0 auto", padding: "6px 10px", fontSize: "13px" }}
                   value={selectedCategory} onChange={e => { setSelectedCategory(e.target.value); setSelectedSubCategory("all"); }}>
                   <option value="all">All Categories</option>
@@ -391,31 +397,6 @@ export default function CHOBatchInventory() {
                     Clear filters
                   </button>
                 )}
-              </div>
-
-              <div className="cho-stats-grid cho-stats-grid--3" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-                <div className="cho-stat-card">
-                  <p className="cho-stat-label">TOTAL BATCHES</p>
-                  <div className="cho-stat-row"><span className="cho-stat-value">{filteredBatches.length}</span></div>
-                  <p className="cho-stat-sub">{periodLabel}</p>
-                </div>
-                <div className="cho-stat-card cho-stat--green">
-                  <p className="cho-stat-label">REMAINING MEDICINES / BOXES</p>
-                  <div className="cho-stat-row"><span className="cho-stat-value">{totalRemainingQuantity}</span></div>
-                  <p className="cho-stat-sub">{periodLabel}</p>
-                </div>
-                <div className="cho-stat-card">
-                  <p className="cho-stat-label">INITIAL QUANTITY</p>
-                  <div className="cho-stat-row"><span className="cho-stat-value">{totalInitialQuantity}</span></div>
-                  <p className="cho-stat-sub">{periodLabel}</p>
-                </div>
-                <div className="cho-stat-card" style={{ borderColor: expiringCount > 0 ? "#fecaca" : undefined }}>
-                  <p className="cho-stat-label" style={{ color: expiringCount > 0 ? "#dc2626" : undefined }}>EXPIRING SOON</p>
-                  <div className="cho-stat-row">
-                    <span className="cho-stat-value" style={{ color: expiringCount > 0 ? "#dc2626" : undefined }}>{expiringCount}</span>
-                  </div>
-                  <p className="cho-stat-sub">Within {EXPIRY_WARNING_DAYS} days</p>
-                </div>
               </div>
 
               {loading ? (

@@ -11,7 +11,7 @@ import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import { calculateDoseWastage } from "../../utils/vaccineWastage";
 import { getDoseOptionsForAntigen } from "../../utils/fhsisImmunization";
 import { getCurrentMonthKey } from "../../utils/monthlyBalance";
-import { getAllocationStatus, buildCampaignSummary, isCampaignActive } from "../../utils/bhw";
+import { getAllocationStatus } from "../../utils/bhw";
 import "./MidwifeBHW.css";
 
 const navItems = [
@@ -20,7 +20,7 @@ const navItems = [
   { label: "Inventory",     to: "/midwife/inventory"     },
   { label: "Dispense",      to: "/midwife/dispense"      },
   { label: "Reports",       to: "/midwife/reports"       },
-  { label: "BHW & Campaigns", to: "/midwife/bhw"         },
+  { label: "BHW",           to: "/midwife/bhw"         },
   { label: "Messages",      to: "/midwife/messages"      },
   { label: "Notifications", to: "/midwife/notifications" },
 ];
@@ -34,16 +34,17 @@ export default function MidwifeBHW() {
 
   const barangayName = userData?.barangayName ?? "";
 
-  const [activeTab, setActiveTab] = useState("allocations"); // "allocations" | "roster" | "campaigns"
+  const [activeTab, setActiveTab] = useState("allocations"); // "allocations" | "roster"
   const [loading, setLoading] = useState(false);
 
   const [roster, setRoster] = useState([]);
-  const [campaigns, setCampaigns] = useState([]);
   const [allocations, setAllocations] = useState([]);
   const [inventory, setInventory] = useState([]);
-  const [usageReports, setUsageReports] = useState([]);
-  const [immunizationLogs, setImmunizationLogs] = useState([]);
-  const [dispenseLogs, setDispenseLogs] = useState([]);
+
+  // Filters for the tables
+  const [search, setSearch] = useState("");
+  const [filterBhw, setFilterBhw] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
 
   function handleLogout() { logout(); navigate("/"); }
 
@@ -52,80 +53,56 @@ export default function MidwifeBHW() {
   async function loadAll() {
     setLoading(true);
     try {
-      const [rosterSnap, campSnap, allocSnap, invSnap, usageSnap, immunSnap, dispSnap] = await Promise.all([
+      const [rosterSnap, allocSnap, invSnap] = await Promise.all([
         getDocs(query(collection(db, "bhw_roster"), where("barangayName", "==", barangayName))),
-        getDocs(query(collection(db, "bhw_campaigns"), where("barangayName", "==", barangayName))),
         getDocs(query(collection(db, "bhw_allocations"), where("barangayName", "==", barangayName))),
         getDocs(query(collection(db, "inventory"), where("ownerType", "==", "midwife"), where("barangayName", "==", barangayName))),
-        getDocs(query(collection(db, "bhw_usage_reports"), where("barangayName", "==", barangayName))),
-        getDocs(query(collection(db, "immunization_logs"), where("barangayName", "==", barangayName))),
-        getDocs(query(collection(db, "dispense_logs"), where("barangayName", "==", barangayName))),
       ]);
       setRoster(rosterSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setCampaigns(campSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setAllocations(allocSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setInventory(invSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setUsageReports(usageSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setImmunizationLogs(immunSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setDispenseLogs(dispSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (err) { console.error("Error loading BHW data:", err); }
     setLoading(false);
   }
 
   // ══════════════════════ BHW Roster ══════════════════════
   const [showAddBhwModal, setShowAddBhwModal] = useState(false);
+  const [editingBhwId, setEditingBhwId] = useState(null); // null = adding a new BHW
   const [bhwName, setBhwName] = useState("");
   const [bhwPurok, setBhwPurok] = useState("");
   const [bhwContact, setBhwContact] = useState("");
   const [savingBhw, setSavingBhw] = useState(false);
 
+  function openAddBhw() {
+    setEditingBhwId(null);
+    setBhwName(""); setBhwPurok(""); setBhwContact("");
+    setShowAddBhwModal(true);
+  }
+
+  function openEditBhw(b) {
+    setEditingBhwId(b.id);
+    setBhwName(b.name || ""); setBhwPurok(b.purok || ""); setBhwContact(b.contact || "");
+    setShowAddBhwModal(true);
+  }
+
   async function saveBhw() {
     if (!bhwName.trim() || !bhwPurok.trim()) { showToast("Name and assigned purok/zone are required.", "error"); return; }
     setSavingBhw(true);
     try {
-      await addDoc(collection(db, "bhw_roster"), {
-        barangayName, name: bhwName.trim(), purok: bhwPurok.trim(), contact: bhwContact.trim(),
-        active: true, createdAt: serverTimestamp(),
-      });
-      showToast(`${bhwName.trim()} added to your BHW roster.`, "success");
-      setBhwName(""); setBhwPurok(""); setBhwContact(""); setShowAddBhwModal(false);
+      const fields = { name: bhwName.trim(), purok: bhwPurok.trim(), contact: bhwContact.trim() };
+      if (editingBhwId) {
+        await updateDoc(doc(db, "bhw_roster", editingBhwId), fields);
+        showToast(`${fields.name} updated.`, "success");
+      } else {
+        await addDoc(collection(db, "bhw_roster"), {
+          barangayName, ...fields, createdAt: serverTimestamp(),
+        });
+        showToast(`${fields.name} added to your BHW roster.`, "success");
+      }
+      setShowAddBhwModal(false);
       loadAll();
     } catch (err) { showToast("Error: " + err.message, "error"); }
     setSavingBhw(false);
-  }
-
-  async function toggleBhwActive(bhw) {
-    try {
-      await updateDoc(doc(db, "bhw_roster", bhw.id), { active: !bhw.active });
-      loadAll();
-    } catch (err) { showToast("Error: " + err.message, "error"); }
-  }
-
-  // ══════════════════════ Campaigns ══════════════════════
-  const [showAddCampaignModal, setShowAddCampaignModal] = useState(false);
-  const [campaignName, setCampaignName] = useState("");
-  const [campaignDescription, setCampaignDescription] = useState("");
-  const [campaignStart, setCampaignStart] = useState("");
-  const [campaignEnd, setCampaignEnd] = useState("");
-  const [campaignTarget, setCampaignTarget] = useState("");
-  const [savingCampaign, setSavingCampaign] = useState(false);
-
-  async function saveCampaign() {
-    if (!campaignName.trim() || !campaignStart) { showToast("Campaign name and start date are required.", "error"); return; }
-    setSavingCampaign(true);
-    try {
-      await addDoc(collection(db, "bhw_campaigns"), {
-        barangayName, name: campaignName.trim(), description: campaignDescription.trim(),
-        startDate: campaignStart, endDate: campaignEnd || null,
-        targetPopulation: campaignTarget ? parseInt(campaignTarget) : 0,
-        createdBy: userData?.username || "", createdAt: serverTimestamp(),
-      });
-      showToast(`Campaign "${campaignName.trim()}" created.`, "success");
-      setCampaignName(""); setCampaignDescription(""); setCampaignStart(""); setCampaignEnd(""); setCampaignTarget("");
-      setShowAddCampaignModal(false);
-      loadAll();
-    } catch (err) { showToast("Error: " + err.message, "error"); }
-    setSavingCampaign(false);
   }
 
   // ══════════════════════ Allocations ══════════════════════
@@ -133,14 +110,12 @@ export default function MidwifeBHW() {
   const [allocBhwId, setAllocBhwId] = useState("");
   const [allocItemId, setAllocItemId] = useState("");
   const [allocQuantity, setAllocQuantity] = useState("");
-  const [allocCampaignId, setAllocCampaignId] = useState("");
   const [savingAllocation, setSavingAllocation] = useState(false);
 
-  const activeRoster = roster.filter(b => b.active);
   const allocatableItems = inventory.filter(i => (i.remaining ?? i.quantity ?? 0) > 0);
 
   function openAllocateModal() {
-    setAllocBhwId(""); setAllocItemId(""); setAllocQuantity(""); setAllocCampaignId("");
+    setAllocBhwId(""); setAllocItemId(""); setAllocQuantity("");
     setShowAllocateModal(true);
   }
 
@@ -165,7 +140,7 @@ export default function MidwifeBHW() {
         itemId: item.id, itemName: item.name, lotNumber: item.lotNumber || "",
         isVaccine: !!item.isVaccine, doseType: item.doseType || "", dosesPerVial: item.dosesPerVial || 0,
         fhsisAntigen: item.fhsisAntigen || "",
-        campaignId: allocCampaignId || null,
+        campaignId: null,
         quantityAllocated: qty, quantityRemaining: qty,
         allocatedBy: userData?.username || "", allocatedAt: serverTimestamp(), allocatedDate: new Date().toLocaleDateString(),
       });
@@ -254,8 +229,43 @@ export default function MidwifeBHW() {
     setSavingReport(false);
   }
 
+  // ── Derived table data ──
+  const q = search.trim().toLowerCase();
+  const rosterRows = roster
+    .filter(b => !q || [b.name, b.purok, b.contact].some(v => String(v ?? "").toLowerCase().includes(q)))
+    .slice().sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+
+  const allocationsWithStatus = allocations.map(a => ({ a, status: getAllocationStatus(a) }));
+  const statusOptions = [...new Set(allocationsWithStatus.map(x => x.status.label).filter(Boolean))];
+  const allocationRows = allocationsWithStatus
+    .filter(({ a, status }) =>
+      (filterBhw === "all" || a.bhwId === filterBhw) &&
+      (filterStatus === "all" || status.label === filterStatus) &&
+      (!q || [a.bhwName, a.itemName, a.lotNumber, a.purok].some(v => String(v ?? "").toLowerCase().includes(q))))
+    .slice().sort((x, y) => String(y.a.allocatedDate || "").localeCompare(String(x.a.allocatedDate || "")));
+
+  // Units a BHW still holds across all their allocations
+  const stockOnHand = (bhwId) => {
+    const mine = allocations.filter(a => a.bhwId === bhwId && (a.quantityRemaining ?? 0) > 0);
+    if (mine.length === 0) return "—";
+    return mine.map(a => `${a.quantityRemaining} ${a.isVaccine ? "vials" : "boxes"} ${a.itemName}`).join(", ");
+  };
+
   return (
     <div className="midwife-layout">
+      <style>{`
+        .midwife-layout .midwife-content { gap: 0.875rem; }
+        .midwife-layout .midwife-content > * { margin-top: 0; margin-bottom: 0; }
+        .bhw-tabs { display: flex; gap: 4px; border-bottom: 1px solid #e5e7eb; }
+        .bhw-tab { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: 14px; font-weight: 500; color: #6b7280; cursor: pointer; }
+        .bhw-tab:hover { color: #0f172a; }
+        .bhw-tab.active { color: #1d4ed8; font-weight: 700; border-bottom-color: #2563eb; }
+        .bhw-tab-count { background: #eff6ff; color: #1d4ed8; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 99px; }
+        .bhw-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .bhw-toolbar-right { margin-left: auto; }
+        .midwife-layout .bhw-search { width: 280px; flex: 0 0 auto; padding: 8px 12px; font-size: 13px; }
+        .midwife-layout .bhw-select { width: 190px; flex: 0 0 auto; padding: 8px 12px; font-size: 13px; }
+      `}</style>
       <aside className="midwife-sidebar">
         <div className="midwife-brand">
           <div className="midwife-brand-icon">
@@ -311,21 +321,21 @@ export default function MidwifeBHW() {
         <main className="midwife-content">
           <div className="midwife-page-header">
             <div>
-              <h1 className="midwife-page-title">BHW & Campaigns</h1>
-              <p className="midwife-page-sub">Track stock handed to Barangay Health Workers and MR-SIA-style campaign activity.</p>
+              <h1 className="midwife-page-title">BHW</h1>
+              <p className="midwife-page-sub">Track the stock you hand to Barangay Health Workers and what they have used.</p>
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.25rem" }}>
+          {/* Tabs */}
+          <div className="bhw-tabs">
             {[
-              { key: "allocations", label: "Allocations" },
-              { key: "roster", label: "BHW Roster" },
-              { key: "campaigns", label: "Campaigns" },
+              { key: "allocations", label: "Allocations", count: allocations.length },
+              { key: "roster", label: "BHW Roster", count: roster.length },
             ].map(t => (
               <button key={t.key} type="button"
-                className={activeTab === t.key ? "midwife-btn-primary" : "midwife-btn-secondary"}
-                onClick={() => setActiveTab(t.key)}>
-                {t.label}
+                className={"bhw-tab" + (activeTab === t.key ? " active" : "")}
+                onClick={() => { setActiveTab(t.key); setSearch(""); setFilterBhw("all"); setFilterStatus("all"); }}>
+                {t.label}<span className="bhw-tab-count">{t.count}</span>
               </button>
             ))}
           </div>
@@ -333,146 +343,109 @@ export default function MidwifeBHW() {
           {loading ? (
             <div className="midwife-empty-state"><p>Loading...</p></div>
           ) : activeTab === "roster" ? (
-            <section className="midwife-section">
-              <div className="midwife-section-hd">
-                <h2 className="midwife-section-title">Your BHWs</h2>
-                <button className="midwife-btn-primary" onClick={() => setShowAddBhwModal(true)}>+ Add BHW</button>
+            <>
+              <div className="bhw-toolbar">
+                <input className="midwife-input bhw-search" type="text" placeholder="Search name, purok or contact"
+                  value={search} onChange={e => setSearch(e.target.value)} />
+                {search && <button className="midwife-btn-secondary" onClick={() => setSearch("")}>Clear</button>}
+                <button className="midwife-btn-primary bhw-toolbar-right" onClick={openAddBhw}>+ Add BHW</button>
               </div>
-              {roster.length === 0 ? (
-                <div className="midwife-empty-state">
-                  <h2 className="midwife-empty-title">No BHWs Registered Yet</h2>
-                  <p className="midwife-empty-text">Add the Barangay Health Workers who help cover different puroks/zones in your barangay.</p>
-                </div>
-              ) : (
-                <table className="midwife-table">
-                  <thead><tr><th>NAME</th><th>PUROK / ZONE</th><th>CONTACT</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
-                  <tbody>
-                    {roster.map(b => (
-                      <tr key={b.id}>
-                        <td><strong>{b.name}</strong></td>
-                        <td>{b.purok}</td>
-                        <td>{b.contact || "—"}</td>
-                        <td>
-                          <span style={{ padding: "3px 10px", borderRadius: "99px", fontSize: "11px", fontWeight: 700,
-                            background: b.active ? "#d1fae5" : "#f3f4f6", color: b.active ? "#065f46" : "#6b7280" }}>
-                            {b.active ? "Active" : "Inactive"}
-                          </span>
-                        </td>
-                        <td>
-                          <button className="midwife-btn-secondary" onClick={() => toggleBhwActive(b)}>
-                            {b.active ? "Deactivate" : "Reactivate"}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </section>
-          ) : activeTab === "campaigns" ? (
-            <section className="midwife-section">
-              <div className="midwife-section-hd">
-                <h2 className="midwife-section-title">Campaigns (e.g. MR-SIA)</h2>
-                <button className="midwife-btn-primary" onClick={() => setShowAddCampaignModal(true)}>+ New Campaign</button>
-              </div>
-              {campaigns.length === 0 ? (
-                <div className="midwife-empty-state">
-                  <h2 className="midwife-empty-title">No Campaigns Yet</h2>
-                  <p className="midwife-empty-text">Create one for events like MR-SIA (Measles-Rubella Supplemental Immunization Activity) so stock and coverage during the campaign are tracked separately from routine monthly activity.</p>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  {campaigns.map(c => {
-                    const summary = buildCampaignSummary(c, allocations, usageReports, immunizationLogs, dispenseLogs);
-                    const active = isCampaignActive(c);
-                    return (
-                      <div key={c.id} style={{ border: "1px solid #e5e7eb", borderRadius: "10px", padding: "16px 20px", background: "#fff" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "8px" }}>
-                          <div>
-                            <p style={{ margin: 0, fontWeight: 700, fontSize: "1.05rem", color: "#0f172a" }}>
-                              {c.name}
-                              <span style={{
-                                marginLeft: "10px", fontSize: "11px", fontWeight: 700, padding: "2px 8px", borderRadius: "99px",
-                                background: active ? "#d1fae5" : "#f3f4f6", color: active ? "#065f46" : "#6b7280",
-                              }}>{active ? "Active" : "Ended"}</span>
-                            </p>
-                            <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#6b7280" }}>
-                              {c.startDate}{c.endDate ? ` – ${c.endDate}` : ""} {c.description ? `· ${c.description}` : ""}
-                            </p>
-                          </div>
-                          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                            {summary.coveragePercent !== null && (
-                              <span style={{
-                                fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "99px",
-                                background: summary.coveragePercent >= 95 ? "#d1fae5" : summary.coveragePercent >= 80 ? "#fef3c7" : "#fee2e2",
-                                color: summary.coveragePercent >= 95 ? "#065f46" : summary.coveragePercent >= 80 ? "#92400e" : "#991b1b",
-                              }}>{summary.coveragePercent}% of target</span>
-                            )}
-                          </div>
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "10px", marginTop: "12px" }}>
-                          <div><p style={{ margin: 0, fontSize: "11px", color: "#9ca3af" }}>BHWs INVOLVED</p><p style={{ margin: "2px 0 0", fontWeight: 700 }}>{summary.bhwCount}</p></div>
-                          <div><p style={{ margin: 0, fontSize: "11px", color: "#9ca3af" }}>ALLOCATED</p><p style={{ margin: "2px 0 0", fontWeight: 700 }}>{summary.totalAllocated}</p></div>
-                          <div><p style={{ margin: 0, fontSize: "11px", color: "#9ca3af" }}>USED</p><p style={{ margin: "2px 0 0", fontWeight: 700 }}>{summary.totalUsed}</p></div>
-                          <div><p style={{ margin: 0, fontSize: "11px", color: "#9ca3af" }}>CHILDREN REACHED</p><p style={{ margin: "2px 0 0", fontWeight: 700 }}>{summary.childrenReached}</p></div>
-                          <div><p style={{ margin: 0, fontSize: "11px", color: "#9ca3af" }}>DOSES WASTED</p><p style={{ margin: "2px 0 0", fontWeight: 700, color: summary.dosesWasted > 0 ? "#b91c1c" : undefined }}>{summary.dosesWasted}</p></div>
-                          {summary.target > 0 && (
-                            <div><p style={{ margin: 0, fontSize: "11px", color: "#9ca3af" }}>TARGET POPULATION</p><p style={{ margin: "2px 0 0", fontWeight: 700 }}>{summary.target}</p></div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
+
+              <section className="midwife-section">
+                {roster.length === 0 ? (
+                  <div className="midwife-empty-state">
+                    <h2 className="midwife-empty-title">No BHWs Registered Yet</h2>
+                    <p className="midwife-empty-text">Add the Barangay Health Workers who help cover different puroks/zones in your barangay.</p>
+                  </div>
+                ) : rosterRows.length === 0 ? (
+                  <div className="midwife-empty-small" style={{ padding: "2rem", textAlign: "center", color: "#6b7280" }}>No BHWs match your search.</div>
+                ) : (
+                  <table className="midwife-table">
+                    <thead><tr><th>NAME</th><th>PUROK / ZONE</th><th>CONTACT</th><th>STOCK ON HAND</th><th>ACTIONS</th></tr></thead>
+                    <tbody>
+                      {rosterRows.map(b => (
+                        <tr key={b.id}>
+                          <td><strong>{b.name}</strong></td>
+                          <td>{b.purok}</td>
+                          <td>{b.contact || "—"}</td>
+                          <td>{stockOnHand(b.id)}</td>
+                          <td>
+                            <button className="midwife-btn-secondary" onClick={() => openEditBhw(b)}>Edit</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </section>
+            </>
           ) : (
-            <section className="midwife-section">
-              <div className="midwife-section-hd">
-                <h2 className="midwife-section-title">Stock Handed to BHWs</h2>
-                <button className="midwife-btn-primary" onClick={openAllocateModal}
-                  disabled={activeRoster.length === 0 || allocatableItems.length === 0}
-                  title={activeRoster.length === 0 ? "Add a BHW first" : allocatableItems.length === 0 ? "No stock available to allocate" : ""}>
+            <>
+              <div className="bhw-toolbar">
+                <input className="midwife-input bhw-search" type="text" placeholder="Search BHW, item or lot #"
+                  value={search} onChange={e => setSearch(e.target.value)} />
+                <select className="midwife-input bhw-select" value={filterBhw} onChange={e => setFilterBhw(e.target.value)}>
+                  <option value="all">All BHWs</option>
+                  {roster.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+                <select className="midwife-input bhw-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                  <option value="all">All Statuses</option>
+                  {statusOptions.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+                {(search || filterBhw !== "all" || filterStatus !== "all") && (
+                  <button className="midwife-btn-secondary" onClick={() => { setSearch(""); setFilterBhw("all"); setFilterStatus("all"); }}>Clear filters</button>
+                )}
+                <button className="midwife-btn-primary bhw-toolbar-right" onClick={openAllocateModal}
+                  disabled={roster.length === 0 || allocatableItems.length === 0}
+                  title={roster.length === 0 ? "Add a BHW first" : allocatableItems.length === 0 ? "No stock available to allocate" : ""}>
                   + Hand Stock to BHW
                 </button>
               </div>
-              {allocations.length === 0 ? (
-                <div className="midwife-empty-state">
-                  <h2 className="midwife-empty-title">No Allocations Yet</h2>
-                  <p className="midwife-empty-text">When you hand a batch of medicine or vaccines to a BHW for their purok, record it here so you can track what they still have and what's been used.</p>
-                </div>
-              ) : (
-                <table className="midwife-table">
-                  <thead><tr><th>BHW</th><th>ITEM</th><th>ALLOCATED</th><th>REMAINING</th><th>CAMPAIGN</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
-                  <tbody>
-                    {allocations.map(a => {
-                      const status = getAllocationStatus(a);
-                      const campaign = campaigns.find(c => c.id === a.campaignId);
-                      return (
-                        <tr key={a.id}>
-                          <td><strong>{a.bhwName}</strong><br /><span style={{ fontSize: "12px", color: "#6b7280" }}>{a.purok}</span></td>
-                          <td>{a.itemName}{a.isVaccine ? " 💉" : ""}</td>
-                          <td>{a.quantityAllocated} {a.isVaccine ? "vials" : "boxes"}</td>
-                          <td>{a.quantityRemaining} {a.isVaccine ? "vials" : "boxes"}</td>
-                          <td>{campaign ? campaign.name : "—"}</td>
-                          <td>
-                            <span style={{ padding: "3px 10px", borderRadius: "99px", fontSize: "11px", fontWeight: 700, background: status.bg, color: status.color }}>
-                              {status.label}
-                            </span>
-                          </td>
-                          <td>
-                            <button className="midwife-btn-secondary" disabled={a.quantityRemaining <= 0}
-                              onClick={() => openReportModal(a)}>
-                              Report Usage
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </section>
+
+              <section className="midwife-section">
+                {allocations.length === 0 ? (
+                  <div className="midwife-empty-state">
+                    <h2 className="midwife-empty-title">No Allocations Yet</h2>
+                    <p className="midwife-empty-text">When you hand a batch of medicine or vaccines to a BHW for their purok, record it here so you can track what they still have and what's been used.</p>
+                  </div>
+                ) : allocationRows.length === 0 ? (
+                  <div className="midwife-empty-small" style={{ padding: "2rem", textAlign: "center", color: "#6b7280" }}>No allocations match the current filters.</div>
+                ) : (
+                  <table className="midwife-table">
+                    <thead><tr><th>BHW</th><th>ITEM</th><th>DATE</th><th>ALLOCATED</th><th>USED</th><th>REMAINING</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
+                    <tbody>
+                      {allocationRows.map(({ a, status }) => {
+                        const unit = a.isVaccine ? "vials" : "boxes";
+                        return (
+                          <tr key={a.id}>
+                            <td><strong>{a.bhwName}</strong><br /><span style={{ fontSize: "12px", color: "#6b7280" }}>{a.purok}</span></td>
+                            <td>
+                              {a.itemName}{a.isVaccine ? " 💉" : ""}
+                              {a.lotNumber && <><br /><span style={{ fontSize: "12px", color: "#6b7280" }}>Lot {a.lotNumber}</span></>}
+                            </td>
+                            <td>{a.allocatedDate || "—"}</td>
+                            <td>{a.quantityAllocated} {unit}</td>
+                            <td>{(a.quantityAllocated ?? 0) - (a.quantityRemaining ?? 0)} {unit}</td>
+                            <td><strong>{a.quantityRemaining}</strong> {unit}</td>
+                            <td>
+                              <span style={{ padding: "3px 10px", borderRadius: "99px", fontSize: "11px", fontWeight: 700, background: status.bg, color: status.color }}>
+                                {status.label}
+                              </span>
+                            </td>
+                            <td>
+                              <button className="midwife-btn-secondary" disabled={a.quantityRemaining <= 0}
+                                onClick={() => openReportModal(a)}>
+                                Report Usage
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </section>
+            </>
           )}
         </main>
       </div>
@@ -481,7 +454,7 @@ export default function MidwifeBHW() {
         <div className="midwife-modal-overlay" onClick={() => setShowAddBhwModal(false)}>
           <div className="midwife-modal" onClick={e => e.stopPropagation()}>
             <div className="midwife-modal-header">
-              <h2 className="midwife-modal-title">Add BHW</h2>
+              <h2 className="midwife-modal-title">{editingBhwId ? "Edit BHW" : "Add BHW"}</h2>
               <button className="midwife-modal-close" onClick={() => setShowAddBhwModal(false)}>×</button>
             </div>
             <div className="midwife-modal-body">
@@ -500,47 +473,7 @@ export default function MidwifeBHW() {
             </div>
             <div className="midwife-modal-footer">
               <button className="midwife-btn-secondary" onClick={() => setShowAddBhwModal(false)}>Cancel</button>
-              <button className="midwife-btn-primary" onClick={saveBhw} disabled={savingBhw}>{savingBhw ? "Saving..." : "Add BHW"}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showAddCampaignModal && (
-        <div className="midwife-modal-overlay" onClick={() => setShowAddCampaignModal(false)}>
-          <div className="midwife-modal" onClick={e => e.stopPropagation()}>
-            <div className="midwife-modal-header">
-              <h2 className="midwife-modal-title">New Campaign</h2>
-              <button className="midwife-modal-close" onClick={() => setShowAddCampaignModal(false)}>×</button>
-            </div>
-            <div className="midwife-modal-body">
-              <div className="midwife-form-field">
-                <label className="midwife-label">Campaign Name <span className="midwife-required">*</span></label>
-                <input className="midwife-input" value={campaignName} onChange={e => setCampaignName(e.target.value)} placeholder="e.g., MR-SIA 2026 Phase 1" />
-              </div>
-              <div className="midwife-form-field">
-                <label className="midwife-label">Description</label>
-                <input className="midwife-input" value={campaignDescription} onChange={e => setCampaignDescription(e.target.value)} placeholder="e.g., Measles-Rubella catch-up, ages 6-59 months" />
-              </div>
-              <div className="midwife-form-row">
-                <div className="midwife-form-field">
-                  <label className="midwife-label">Start Date <span className="midwife-required">*</span></label>
-                  <input className="midwife-input" type="date" value={campaignStart} onChange={e => setCampaignStart(e.target.value)} />
-                </div>
-                <div className="midwife-form-field">
-                  <label className="midwife-label">End Date</label>
-                  <input className="midwife-input" type="date" value={campaignEnd} onChange={e => setCampaignEnd(e.target.value)} />
-                </div>
-              </div>
-              <div className="midwife-form-field">
-                <label className="midwife-label">Target Population (optional)</label>
-                <input className="midwife-input" type="number" min="0" value={campaignTarget} onChange={e => setCampaignTarget(e.target.value)} placeholder="e.g., estimated eligible children in barangay" />
-                <p className="midwife-input-hint">If you have a local estimate (e.g. from RHU/CHO), coverage % will be calculated against it.</p>
-              </div>
-            </div>
-            <div className="midwife-modal-footer">
-              <button className="midwife-btn-secondary" onClick={() => setShowAddCampaignModal(false)}>Cancel</button>
-              <button className="midwife-btn-primary" onClick={saveCampaign} disabled={savingCampaign}>{savingCampaign ? "Saving..." : "Create Campaign"}</button>
+              <button className="midwife-btn-primary" onClick={saveBhw} disabled={savingBhw}>{savingBhw ? "Saving..." : editingBhwId ? "Save Changes" : "Add BHW"}</button>
             </div>
           </div>
         </div>
@@ -558,7 +491,7 @@ export default function MidwifeBHW() {
                 <label className="midwife-label">BHW <span className="midwife-required">*</span></label>
                 <select className="midwife-input" value={allocBhwId} onChange={e => setAllocBhwId(e.target.value)}>
                   <option value="">-- Select BHW --</option>
-                  {activeRoster.map(b => <option key={b.id} value={b.id}>{b.name} ({b.purok})</option>)}
+                  {roster.map(b => <option key={b.id} value={b.id}>{b.name} ({b.purok})</option>)}
                 </select>
               </div>
               <div className="midwife-form-field">
@@ -575,13 +508,6 @@ export default function MidwifeBHW() {
               <div className="midwife-form-field">
                 <label className="midwife-label">Quantity <span className="midwife-required">*</span></label>
                 <input className="midwife-input" type="number" min="1" value={allocQuantity} onChange={e => setAllocQuantity(e.target.value)} />
-              </div>
-              <div className="midwife-form-field">
-                <label className="midwife-label">Campaign (optional)</label>
-                <select className="midwife-input" value={allocCampaignId} onChange={e => setAllocCampaignId(e.target.value)}>
-                  <option value="">-- Routine (not tied to a campaign) --</option>
-                  {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
               </div>
             </div>
             <div className="midwife-modal-footer">
