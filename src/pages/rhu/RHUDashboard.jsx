@@ -6,8 +6,8 @@ import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
 import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell, Sector,
 } from "recharts";
 import "./RHUDashboard.css";
 
@@ -21,7 +21,121 @@ const navItems = [
   { label: "Notifications",   to: "/rhu/notifications"     },
 ];
 
-const PIE_COLORS = ["#1a56db", "#93c5fd", "#dbeafe", "#bfdbfe", "#eff6ff"];
+const DONUT_COLORS = ["#1a56db", "#16a34a", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#64748b"];
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// "2026-09-15", "9/15/2026", a Date, or a Firestore timestamp -> "2026-09"
+function monthKeyOf(value) {
+  if (!value) return null;
+  if (typeof value === "object" && value.seconds) value = new Date(value.seconds * 1000);
+  if (value instanceof Date) {
+    return isNaN(value) ? null : `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}`;
+  }
+  const s = String(value).trim();
+  let m = /^(\d{4})-(\d{2})/.exec(s);
+  if (m) return `${m[1]}-${m[2]}`;
+  m = /^(\d{1,2})\/\d{1,2}\/(\d{4})/.exec(s); // M/D/YYYY
+  if (m) return `${m[2]}-${String(m[1]).padStart(2, "0")}`;
+  const d = new Date(s);
+  return isNaN(d) ? null : monthKeyOf(d);
+}
+
+// Years that have any received/distributed data, plus the current year (newest first)
+function trendYears(receivedItems, distributionList) {
+  const years = new Set([new Date().getFullYear()]);
+  receivedItems.forEach(i => {
+    const k = monthKeyOf(i.addedDate || i.receivedAt || i.date || i.createdAt || i.manufactureDate);
+    if (k) years.add(Number(k.slice(0, 4)));
+  });
+  distributionList.forEach(d => {
+    const k = monthKeyOf(d.date || d.createdAt);
+    if (k) years.add(Number(k.slice(0, 4)));
+  });
+  return [...years].sort((a, b) => b - a);
+}
+
+// Boxes received vs. boxes distributed for EVERY month of the chosen year
+// (Jan -> Dec); months with no activity show as 0.
+function buildTrend(receivedItems, distributionList, year) {
+  const map = {};
+  const add = (key, field, n) => {
+    if (!key || !key.startsWith(`${year}-`)) return;
+    map[key] = map[key] || { received: 0, distributed: 0 };
+    map[key][field] += Number(n) || 0;
+  };
+  receivedItems.forEach(i => add(monthKeyOf(i.addedDate || i.receivedAt || i.date || i.createdAt || i.manufactureDate), "received", i.quantity));
+  distributionList.forEach(d => add(monthKeyOf(d.date || d.createdAt), "distributed", d.totalBoxes));
+  return MONTH_SHORT.map((label, idx) => {
+    const r = map[`${year}-${String(idx + 1).padStart(2, "0")}`] || { received: 0, distributed: 0 };
+    return { month: label, received: r.received, distributed: r.distributed };
+  });
+}
+
+// Donut you can hover or click: the chosen slice pops out, the rest fade,
+// and the centre shows that slice's boxes. Every item gets a legend row
+// (scrolls if there are many), including ones with 0 boxes.
+function InteractiveDonut({ items, prefix }) {
+  const [selected, setSelected] = useState(null);
+  const [hovered, setHovered] = useState(null);
+  const active = hovered ?? selected;
+  const ring = items.filter(i => i.value > 0);
+  const total = ring.reduce((s, i) => s + i.value, 0);
+  const colorOf = (name) => DONUT_COLORS[Math.max(0, items.findIndex(i => i.name === name)) % DONUT_COLORS.length];
+  const activeItem = items.find(i => i.name === active);
+  const activeIdx = ring.findIndex(i => i.name === active);
+  const pct = (v) => (total ? Math.round((v / total) * 1000) / 10 : 0);
+  const toggle = (name) => setSelected(prev => (prev === name ? null : name));
+
+  return (
+    <>
+      <div className={`${prefix}-donut-wrap`}>
+        <PieChart width={190} height={190}>
+          <Pie data={ring} cx={90} cy={90} innerRadius={58} outerRadius={80} dataKey="value"
+            startAngle={90} endAngle={-270} stroke="#fff"
+            activeIndex={activeIdx >= 0 ? activeIdx : undefined}
+            activeShape={(p) => <Sector {...p} outerRadius={p.outerRadius + 7} />}
+            onMouseEnter={(_, i) => setHovered(ring[i]?.name ?? null)}
+            onMouseLeave={() => setHovered(null)}
+            onClick={(_, i) => toggle(ring[i]?.name)}
+            style={{ cursor: "pointer" }}>
+            {ring.map(r => (
+              <Cell key={r.name} fill={colorOf(r.name)} fillOpacity={!active || active === r.name ? 1 : 0.25} />
+            ))}
+          </Pie>
+        </PieChart>
+        <div className={`${prefix}-donut-center`}>
+          <p className={`${prefix}-donut-pct`}>{activeItem ? activeItem.value : total}</p>
+          <p className={`${prefix}-donut-label`}>{activeItem ? `${pct(activeItem.value)}% OF TOTAL` : "BOXES"}</p>
+        </div>
+      </div>
+
+      <p style={{ textAlign: "center", fontSize: 12, color: "#6b7280", margin: "0 0 8px", minHeight: 16 }}>
+        {activeItem ? <><strong style={{ color: "#0f172a" }}>{activeItem.name}</strong> · {activeItem.value} boxes</> : "Hover or click a slice or a row to highlight it"}
+      </p>
+
+      <div className={`${prefix}-rhu-legend`} style={{ maxHeight: 240, overflowY: "auto", paddingRight: 4 }}>
+        {items.map(it => {
+          const isActive = active === it.name;
+          return (
+            <div key={it.name} className={`${prefix}-rhu-row`}
+              onMouseEnter={() => setHovered(it.name)} onMouseLeave={() => setHovered(null)}
+              onClick={() => toggle(it.name)}
+              style={{
+                cursor: "pointer", padding: "4px 8px", borderRadius: 6,
+                background: isActive ? "#eff6ff" : "transparent",
+                opacity: active && !isActive ? 0.55 : 1,
+                outline: selected === it.name ? "1px solid #bfdbfe" : "none",
+              }}>
+              <span className={`${prefix}-rhu-dot`} style={{ background: colorOf(it.name) }} />
+              <span className={`${prefix}-rhu-name`}>{it.name}</span>
+              <span className={`${prefix}-rhu-pct`}>{it.value} boxes</span>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
 
 // Same collections/matching logic as RHUBarangay.jsx, so this dashboard stat
 // and the Assigned Barangays page always agree on the same number.
@@ -36,11 +150,12 @@ export default function RHUDashboard() {
   const unreadCount = useUnreadCount();
   const unreadMessages = useUnreadMessageCount();
   const [search, setSearch] = useState("");
+  const [trendYear, setTrendYear] = useState(new Date().getFullYear());
   const [inventory, setInventory] = useState([]);
   const [distributions, setDistributions] = useState([]);
-  const [notifications, setNotifications] = useState([]);
   const [monthlyReports, setMonthlyReports] = useState([]);
   const [assignedBarangayCount, setAssignedBarangayCount] = useState(0);
+  const [assignedBarangayNames, setAssignedBarangayNames] = useState([]);
   const [loading, setLoading] = useState(false);
 
   function handleLogout() { logout(); navigate("/"); }
@@ -97,6 +212,10 @@ export default function RHUDashboard() {
       });
 
       setAssignedBarangayCount(assigned.length);
+      setAssignedBarangayNames(
+        assigned.map(b => String(b.barangayName || b.name || b.id).trim()).filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))
+      );
     } catch (err) {
       console.error("Error loading assigned barangay count:", err);
     }
@@ -115,10 +234,9 @@ export default function RHUDashboard() {
       // exactly the "No inventory data yet" symptom. Fetch by ownerType/fromType only,
       // then filter client-side with normalized (trimmed, lowercased) string comparison,
       // matching the same robust approach already used in RHUInventory.jsx.
-      const [invSnap, distSnap, notifSnap, reportsSnap] = await Promise.all([
+      const [invSnap, distSnap, reportsSnap] = await Promise.all([
         getDocs(query(collection(db, "inventory"), where("ownerType", "==", "rhu"))),
         getDocs(query(collection(db, "rhu_distributions"))),
-        getDocs(query(collection(db, "notifications"))),
         getDocs(query(collection(db, "monthly_balance_reports"), where("ownerType", "==", "rhu")))
       ]);
       const matchesRhu = (idField, nameField) => {
@@ -137,17 +255,12 @@ export default function RHUDashboard() {
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(item => matchesRhu(item.fromRhuId, item.fromRhuName));
 
-      const notifList = notifSnap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(item => matchesRhu(item.toRhuId, item.toRhuName));
-
       const reportsList = reportsSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(r => matchesRhu(r.ownerId, r.ownerName));
 
       setInventory(invList);
       setDistributions(distList);
-      setNotifications(notifList);
       setMonthlyReports(reportsList);
     } catch (err) { console.error(err); }
     setLoading(false);
@@ -166,61 +279,24 @@ export default function RHUDashboard() {
     return days <= EXPIRY_WARNING_DAYS && days >= 0;
   });
 
-  // Items Expiring Soon — same batches counted in the EXPIRING SOON stat
-  // card above, shown soonest-first. Replaces the old consumption-forecast
-  // widget with a simpler, directly-verifiable date-based list (matching
-  // the same change made on the CHO dashboard).
-  const expiringSoonList = expiringItems
-    .map(i => {
-      const daysRemaining = (new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24);
-      return {
-        id: i.id,
-        name: i.name,
-        lotNumber: i.lotNumber,
-        expiry: i.expiry,
-        remaining: i.remaining ?? i.quantity ?? 0,
-        isVaccine: !!i.isVaccine,
-        daysRemaining,
-        status: daysRemaining <= 7 ? "critical" : "warning",
-      };
-    })
-    .sort((a, b) => a.daysRemaining - b.daysRemaining)
-    .slice(0, 5);
+  // Inventory trend: boxes received into this RHU vs. boxes it distributed, per month
+  const yearOptions = trendYears(activeInv, distributions);
+  const trendData = buildTrend(activeInv, distributions, trendYear);
+  const trendEmpty = trendData.every(r => !r.received && !r.distributed);
 
-  // Bar chart — inventory by category
-  const categoryMap = {};
-  inventory.forEach(i => {
-    const cat = i.category || "Other";
-    categoryMap[cat] = (categoryMap[cat] || 0) + (i.remaining ?? i.quantity ?? 0);
-  });
-  const barData = Object.entries(categoryMap).map(([category, value]) => ({ category, value }));
-
-  // Pie chart — distributions by barangay
+  // Distribution by barangay: only the barangays THIS RHU handles (from the
+  // registry), each with the boxes it received -- including barangays still at 0.
   const barangayMap = {};
   distributions.forEach(d => {
     (d.barangayDistribution || []).forEach(b => {
-      barangayMap[b.name] = (barangayMap[b.name] || 0) + (b.boxes || 0);
+      const key = String(b.name || "").trim().toLowerCase();
+      barangayMap[key] = (barangayMap[key] || 0) + (b.boxes || 0);
     });
   });
-  const pieData = Object.entries(barangayMap).slice(0, 5).map(([name, value]) => ({ name, value }));
-  const pieTotal = pieData.reduce((s, d) => s + d.value, 0);
-
-  const recentActivity = [
-    ...inventory.map(i => ({
-      id: i.id,
-      title: `Added: ${i.name}`,
-      sub: `${i.quantity} boxes`,
-      time: i.date || "—",
-      color: "#1a56db"
-    })),
-    ...distributions.map(d => ({
-      id: d.id,
-      title: `Distributed: ${d.medicineName}`,
-      sub: `${d.totalBoxes} boxes to barangays`,
-      time: d.date || "—",
-      color: "#16a34a"
-    }))
-  ].slice(0, 5);
+  const pieData = assignedBarangayNames.map(name => ({
+    name,
+    value: barangayMap[name.toLowerCase()] || 0,
+  }));
 
   return (
     <div className="rhu-layout">
@@ -291,13 +367,6 @@ export default function RHUDashboard() {
 
           {/* Stat Cards */}
           <div className="rhu-stats-grid">
-            <div className="rhu-stat-card">
-              <p className="rhu-stat-label">TOTAL INVENTORY</p>
-              <div className="rhu-stat-row">
-                <span className="rhu-stat-value">{inventory.length}</span>
-                <span className="rhu-stat-arrow">›</span>
-              </div>
-            </div>
             <div className={`rhu-stat-card ${pendingCount > 0 ? "rhu-stat--blue" : ""}`}>
               <p className="rhu-stat-label">PENDING ACCEPTANCE</p>
               <div className="rhu-stat-row">
@@ -329,96 +398,35 @@ export default function RHUDashboard() {
               <div className="rhu-stat-row"><span className="rhu-stat-value">{assignedBarangayCount}</span></div>
               <p className="rhu-stat-sub">Active barangay health posts</p>
             </div>
-            <div className="rhu-stat-card">
-              <p className="rhu-stat-label">DISTRIBUTIONS MADE</p>
-              <div className="rhu-stat-row"><span className="rhu-stat-value">{distributions.length}</span></div>
-              <p className="rhu-stat-sub">To all barangays</p>
-            </div>
           </div>
-
-          {/* Latest Notifications */}
-          <section className="rhu-section">
-            <div className="rhu-section-hd">
-              <h2 className="rhu-section-title">Latest Notifications</h2>
-              <NavLink to="/rhu/notifications" className="rhu-view-all">View All</NavLink>
-            </div>
-            {notifications.length === 0 ? (
-              <div className="rhu-empty-small">
-                <p>No notifications yet. They will appear here once CHO distributes supplies.</p>
-              </div>
-            ) : (
-              <div className="rhu-notif-list">
-                {notifications.slice(0, 4).map(n => (
-                  <div key={n.id} className="rhu-notif-item"
-                    style={{ background: n.read ? "#f9fafb" : "#eff6ff", borderLeft: "3px solid #1a56db" }}>
-                    <div className="rhu-notif-body">
-                      <div>
-                        <p className="rhu-notif-title">{n.title}</p>
-                        <p className="rhu-notif-msg">{n.message}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* Items Expiring Soon */}
-          <section className="rhu-section">
-            <div className="rhu-section-hd">
-              <h2 className="rhu-section-title">Items Expiring Soon</h2>
-              <NavLink to="/rhu/inventory" className="rhu-view-all">View Inventory</NavLink>
-            </div>
-            {expiringSoonList.length === 0 ? (
-              <div className="rhu-empty-small">
-                <p>No items are expiring within the next 30 days.</p>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {expiringSoonList.map(f => (
-                  <div key={f.id} style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "12px 14px", borderRadius: "8px",
-                    background: f.status === "critical" ? "#fef2f2" : "#fffbeb",
-                    border: `1px solid ${f.status === "critical" ? "#fecaca" : "#fde68a"}`,
-                  }}>
-                    <div>
-                      <p style={{ margin: 0, fontWeight: 600, color: "#0f172a" }}>
-                        {f.name}{f.lotNumber ? ` (Lot ${f.lotNumber})` : ""}
-                      </p>
-                      <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#6b7280" }}>
-                        {f.remaining} boxes remaining · expires {f.expiry}
-                      </p>
-                    </div>
-                    <span style={{
-                      fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "99px",
-                      background: f.status === "critical" ? "#dc2626" : "#d97706", color: "#fff",
-                    }}>
-                      ~{Math.round(f.daysRemaining)} days left
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
 
           {/* Charts */}
           <div className="rhu-charts-row">
             <div className="rhu-chart-card">
               <div className="rhu-section-hd">
-                <h2 className="rhu-section-title">Inventory by Category</h2>
-                <span className="rhu-badge">Live</span>
+                <h2 className="rhu-section-title">Inventory Trend</h2>
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <select value={trendYear} onChange={e => setTrendYear(Number(e.target.value))}
+                    style={{ padding: "4px 8px", fontSize: 12, border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", color: "#374151" }}>
+                    {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <span className="rhu-badge">Live</span>
+                </span>
               </div>
-              {barData.length === 0 ? (
-                <div className="rhu-empty-small"><p>No inventory data yet.</p></div>
+              <p style={{ fontSize: 12, color: "#6b7280", margin: "-6px 0 10px" }}>Boxes received into your RHU stock vs. boxes you distributed, per month.</p>
+              {trendEmpty ? (
+                <div className="rhu-empty-small"><p>No inventory activity in {trendYear}.</p></div>
               ) : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={barData} barSize={36}>
-                    <XAxis dataKey="category" tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} />
+                <ResponsiveContainer width="100%" height={240}>
+                  <LineChart data={trendData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                    <XAxis dataKey="month" interval={0} tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13 }} cursor={{ fill: "#f3f4f6" }} />
-                    <Bar dataKey="value" fill="#93c5fd" radius={[4, 4, 0, 0]} />
-                  </BarChart>
+                    <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13 }} />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                    <Line type="monotone" dataKey="received" name="Received" stroke="#1a56db" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                    <Line type="monotone" dataKey="distributed" name="Distributed" stroke="#16a34a" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  </LineChart>
                 </ResponsiveContainer>
               )}
             </div>
@@ -428,64 +436,13 @@ export default function RHUDashboard() {
                 <h2 className="rhu-section-title">Distribution by Barangay</h2>
               </div>
               {pieData.length === 0 ? (
-                <div className="rhu-empty-small"><p>No distribution data yet.</p></div>
+                <div className="rhu-empty-small"><p>No barangays are assigned to your RHU yet.</p></div>
               ) : (
-                <>
-                  <div className="rhu-donut-wrap">
-                    <PieChart width={190} height={190}>
-                      <Pie data={pieData} cx={90} cy={90} innerRadius={58} outerRadius={82}
-                        dataKey="value" startAngle={90} endAngle={-270}>
-                        {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                      </Pie>
-                    </PieChart>
-                    <div className="rhu-donut-center">
-                      <p className="rhu-donut-pct">{pieTotal}</p>
-                      <p className="rhu-donut-label">BOXES</p>
-                    </div>
-                  </div>
-                  <div className="rhu-rhu-legend">
-                    {pieData.map((d, i) => (
-                      <div key={d.name} className="rhu-rhu-row">
-                        <span className="rhu-rhu-dot" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                        <span className="rhu-rhu-name">{d.name}</span>
-                        <span className="rhu-rhu-pct">{d.value} boxes</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
+                <InteractiveDonut items={pieData} prefix="rhu" />
               )}
             </div>
           </div>
 
-          {/* Recent Activity */}
-          <section className="rhu-section">
-            <div className="rhu-section-hd">
-              <h2 className="rhu-section-title">Recent Activity</h2>
-              <NavLink to="/rhu/reports" className="rhu-view-all">View All</NavLink>
-            </div>
-            {recentActivity.length === 0 ? (
-              <div className="rhu-empty-small">
-                <p>No recent activity. Logs will appear here as you manage inventory and distributions.</p>
-              </div>
-            ) : (
-              <div className="rhu-activity-list">
-                {recentActivity.map(a => (
-                  <div key={a.id} className="rhu-activity-item">
-                    <div className="rhu-activity-icon" style={{ background: a.color + "18", color: a.color }}>
-                      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                        <path d="M20 7h-3V4a2 2 0 00-2-2H9a2 2 0 00-2 2v3H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
-                      </svg>
-                    </div>
-                    <div className="rhu-activity-body">
-                      <p className="rhu-activity-title">{a.title}</p>
-                      <p className="rhu-activity-sub">{a.sub}</p>
-                    </div>
-                    <span className="rhu-activity-time">{a.time}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
         </main>
       </div>
     </div>

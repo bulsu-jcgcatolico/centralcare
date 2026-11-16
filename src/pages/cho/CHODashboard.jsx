@@ -6,8 +6,8 @@ import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
 import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell, Sector,
 } from "recharts";
 import "./CHODashboard.css";
 
@@ -23,7 +23,121 @@ const navItems = [
   { label: "Notifications",     to: "/cho/notifications"      },
 ];
 
-const PIE_COLORS = ["#1a56db", "#93c5fd", "#dbeafe", "#bfdbfe", "#eff6ff"];
+const DONUT_COLORS = ["#1a56db", "#16a34a", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#64748b"];
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// "2026-09-15", "9/15/2026", a Date, or a Firestore timestamp -> "2026-09"
+function monthKeyOf(value) {
+  if (!value) return null;
+  if (typeof value === "object" && value.seconds) value = new Date(value.seconds * 1000);
+  if (value instanceof Date) {
+    return isNaN(value) ? null : `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}`;
+  }
+  const s = String(value).trim();
+  let m = /^(\d{4})-(\d{2})/.exec(s);
+  if (m) return `${m[1]}-${m[2]}`;
+  m = /^(\d{1,2})\/\d{1,2}\/(\d{4})/.exec(s); // M/D/YYYY
+  if (m) return `${m[2]}-${String(m[1]).padStart(2, "0")}`;
+  const d = new Date(s);
+  return isNaN(d) ? null : monthKeyOf(d);
+}
+
+// Years that have any received/distributed data, plus the current year (newest first)
+function trendYears(receivedItems, distributionList) {
+  const years = new Set([new Date().getFullYear()]);
+  receivedItems.forEach(i => {
+    const k = monthKeyOf(i.addedDate || i.receivedAt || i.date || i.createdAt || i.manufactureDate);
+    if (k) years.add(Number(k.slice(0, 4)));
+  });
+  distributionList.forEach(d => {
+    const k = monthKeyOf(d.date || d.createdAt);
+    if (k) years.add(Number(k.slice(0, 4)));
+  });
+  return [...years].sort((a, b) => b - a);
+}
+
+// Boxes received vs. boxes distributed for EVERY month of the chosen year
+// (Jan -> Dec); months with no activity show as 0.
+function buildTrend(receivedItems, distributionList, year) {
+  const map = {};
+  const add = (key, field, n) => {
+    if (!key || !key.startsWith(`${year}-`)) return;
+    map[key] = map[key] || { received: 0, distributed: 0 };
+    map[key][field] += Number(n) || 0;
+  };
+  receivedItems.forEach(i => add(monthKeyOf(i.addedDate || i.receivedAt || i.date || i.createdAt || i.manufactureDate), "received", i.quantity));
+  distributionList.forEach(d => add(monthKeyOf(d.date || d.createdAt), "distributed", d.totalBoxes));
+  return MONTH_SHORT.map((label, idx) => {
+    const r = map[`${year}-${String(idx + 1).padStart(2, "0")}`] || { received: 0, distributed: 0 };
+    return { month: label, received: r.received, distributed: r.distributed };
+  });
+}
+
+// Donut you can hover or click: the chosen slice pops out, the rest fade,
+// and the centre shows that slice's boxes. Every item gets a legend row
+// (scrolls if there are many), including ones with 0 boxes.
+function InteractiveDonut({ items, prefix }) {
+  const [selected, setSelected] = useState(null);
+  const [hovered, setHovered] = useState(null);
+  const active = hovered ?? selected;
+  const ring = items.filter(i => i.value > 0);
+  const total = ring.reduce((s, i) => s + i.value, 0);
+  const colorOf = (name) => DONUT_COLORS[Math.max(0, items.findIndex(i => i.name === name)) % DONUT_COLORS.length];
+  const activeItem = items.find(i => i.name === active);
+  const activeIdx = ring.findIndex(i => i.name === active);
+  const pct = (v) => (total ? Math.round((v / total) * 1000) / 10 : 0);
+  const toggle = (name) => setSelected(prev => (prev === name ? null : name));
+
+  return (
+    <>
+      <div className={`${prefix}-donut-wrap`}>
+        <PieChart width={190} height={190}>
+          <Pie data={ring} cx={90} cy={90} innerRadius={58} outerRadius={80} dataKey="value"
+            startAngle={90} endAngle={-270} stroke="#fff"
+            activeIndex={activeIdx >= 0 ? activeIdx : undefined}
+            activeShape={(p) => <Sector {...p} outerRadius={p.outerRadius + 7} />}
+            onMouseEnter={(_, i) => setHovered(ring[i]?.name ?? null)}
+            onMouseLeave={() => setHovered(null)}
+            onClick={(_, i) => toggle(ring[i]?.name)}
+            style={{ cursor: "pointer" }}>
+            {ring.map(r => (
+              <Cell key={r.name} fill={colorOf(r.name)} fillOpacity={!active || active === r.name ? 1 : 0.25} />
+            ))}
+          </Pie>
+        </PieChart>
+        <div className={`${prefix}-donut-center`}>
+          <p className={`${prefix}-donut-pct`}>{activeItem ? activeItem.value : total}</p>
+          <p className={`${prefix}-donut-label`}>{activeItem ? `${pct(activeItem.value)}% OF TOTAL` : "BOXES"}</p>
+        </div>
+      </div>
+
+      <p style={{ textAlign: "center", fontSize: 12, color: "#6b7280", margin: "0 0 8px", minHeight: 16 }}>
+        {activeItem ? <><strong style={{ color: "#0f172a" }}>{activeItem.name}</strong> · {activeItem.value} boxes</> : "Hover or click a slice or a row to highlight it"}
+      </p>
+
+      <div className={`${prefix}-rhu-legend`} style={{ maxHeight: 240, overflowY: "auto", paddingRight: 4 }}>
+        {items.map(it => {
+          const isActive = active === it.name;
+          return (
+            <div key={it.name} className={`${prefix}-rhu-row`}
+              onMouseEnter={() => setHovered(it.name)} onMouseLeave={() => setHovered(null)}
+              onClick={() => toggle(it.name)}
+              style={{
+                cursor: "pointer", padding: "4px 8px", borderRadius: 6,
+                background: isActive ? "#eff6ff" : "transparent",
+                opacity: active && !isActive ? 0.55 : 1,
+                outline: selected === it.name ? "1px solid #bfdbfe" : "none",
+              }}>
+              <span className={`${prefix}-rhu-dot`} style={{ background: colorOf(it.name) }} />
+              <span className={`${prefix}-rhu-name`}>{it.name}</span>
+              <span className={`${prefix}-rhu-pct`}>{it.value} boxes</span>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
 
 const EXPIRY_WARNING_DAYS = 90; // "Expiring Soon" window (days)
 
@@ -33,9 +147,9 @@ export default function CHODashboard() {
   const unreadCount = useUnreadCount();
   const unreadMessages = useUnreadMessageCount();
   const [search, setSearch] = useState("");
+  const [trendYear, setTrendYear] = useState(new Date().getFullYear());
   const [inventory, setInventory] = useState([]);
   const [distributions, setDistributions] = useState([]);
-  const [notifications, setNotifications] = useState([]);
   const [choBatches, setChoBatches] = useState([]);
   const [totalMalolosPopulation, setTotalMalolosPopulation] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -47,10 +161,9 @@ export default function CHODashboard() {
   async function loadData() {
     setLoading(true);
     try {
-      const [invSnap, distSnap, notifSnap, barangaySnap, choBatchSnap] = await Promise.all([
+      const [invSnap, distSnap, barangaySnap, choBatchSnap] = await Promise.all([
         getDocs(collection(db, "inventory")),
         getDocs(query(collection(db, "distributions"), where("fromType", "==", "cho"))),
-        getDocs(query(collection(db, "notifications"), where("fromType", "==", "cho"))),
         getDocs(collection(db, "cho_barangays")),
         getDocs(query(
           collection(db, "cho_batches"),
@@ -60,7 +173,6 @@ export default function CHODashboard() {
       ]);
       setInventory(invSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setDistributions(distSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setNotifications(notifSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setChoBatches(choBatchSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
       const totalPop = barangaySnap.docs.reduce((sum, doc) => {
@@ -88,70 +200,22 @@ export default function CHODashboard() {
     return days <= EXPIRY_WARNING_DAYS && days >= 0;
   });
 
-  // Items Expiring Soon — same batches counted in the EXPIRING SOON stat
-  // card above, shown soonest-first with a lotNumber and a critical/warning
-  // split (critical = expiring within a week, matching how low-stock
-  // severity is split elsewhere in the app).
-  const expiringSoonList = expiringItems
-    .map(b => {
-      const daysRemaining = (new Date(b.expiryDate) - new Date()) / (1000 * 60 * 60 * 24);
-      return {
-        id: b.id,
-        name: b.name,
-        lotNumber: b.lotNumber,
-        expiryDate: b.expiryDate,
-        remaining: b.remaining ?? b.quantity ?? 0,
-        isVaccine: !!b.isVaccine,
-        daysRemaining,
-        status: daysRemaining <= 7 ? "critical" : "warning",
-      };
-    })
-    .sort((a, b) => a.daysRemaining - b.daysRemaining)
-    .slice(0, 5);
+  // Inventory trend: boxes received into CHO stock vs. boxes distributed, per month
+  const yearOptions = trendYears(choBatches, distributions);
+  const trendData = buildTrend(choBatches, distributions, trendYear);
+  const trendEmpty = trendData.every(r => !r.received && !r.distributed);
 
-  const categoryMap = {};
-  inventory.forEach(i => {
-    const cat = i.category || "Other";
-    categoryMap[cat] = (categoryMap[cat] || 0) + (i.remaining ?? i.quantity ?? 0);
-  });
-  const barData = Object.entries(categoryMap).map(([category, value]) => ({ category, value }));
-
+  // Distribution by RHU: every RHU that has received boxes (no 5-item cap)
   const rhuMap = {};
   distributions.forEach(d => {
     (d.rhuDistribution || []).forEach(r => {
       rhuMap[r.name] = (rhuMap[r.name] || 0) + (r.boxes || 0);
     });
   });
-
+  const rhuNumber = (name) => parseInt((String(name).match(/\d+/) || [0])[0], 10);
   const pieData = Object.entries(rhuMap)
     .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => {
-      const matchA = a.name.match(/\d+/);
-      const matchB = b.name.match(/\d+/);
-      const numA = matchA ? parseInt(matchA[0], 10) : 0;
-      const numB = matchB ? parseInt(matchB[0], 10) : 0;
-      return numA - numB;
-    })
-    .slice(0, 5);
-
-  const pieTotal = pieData.reduce((s, d) => s + d.value, 0);
-
-  const recentActivity = [
-    ...inventory.map(i => ({
-      id: i.id,
-      title: `Added: ${i.name}`,
-      sub: `${i.quantity} boxes — ${i.category}`,
-      time: i.date || "—",
-      color: "#1a56db"
-    })),
-    ...distributions.map(d => ({
-      id: d.id,
-      title: `Distributed: ${d.medicineName}`,
-      sub: `${d.totalBoxes} boxes to all RHUs`,
-      time: d.date || "—",
-      color: "#16a34a"
-    }))
-  ].slice(0, 5);
+    .sort((a, b) => rhuNumber(a.name) - rhuNumber(b.name));
 
   return (
     <div className="cho-layout">
@@ -221,20 +285,13 @@ export default function CHODashboard() {
             </div>
           </div>
 
-          <div className="cho-stats-grid">
+          <div className="cho-stats-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))" }}>
             <div className="cho-stat-card">
               <p className="cho-stat-label">TOTAL MALOLOS POPULATION</p>
               <div className="cho-stat-row">
                 <span className="cho-stat-value">{totalMalolosPopulation.toLocaleString()}</span>
               </div>
               <p className="cho-stat-sub">Combined population of all barangays</p>
-            </div>
-            <div className="cho-stat-card">
-              <p className="cho-stat-label">TOTAL INVENTORY</p>
-              <div className="cho-stat-row">
-                <span className="cho-stat-value">{inventory.length}</span>
-                <span className="cho-stat-arrow">›</span>
-              </div>
             </div>
             <div className="cho-stat-card">
               <p className="cho-stat-label">TOTAL BATCHES</p>
@@ -247,13 +304,6 @@ export default function CHODashboard() {
                 <span className="cho-stat-value">{choBatches.reduce((s, b) => s + ((b.remaining ?? b.quantity) || 0), 0)}</span>
               </div>
               <p className="cho-stat-sub">Currently in stock</p>
-            </div>
-            <div className="cho-stat-card">
-              <p className="cho-stat-label">INITIAL QUANTITY</p>
-              <div className="cho-stat-row">
-                <span className="cho-stat-value">{choBatches.reduce((s, b) => s + (b.quantity || 0), 0)}</span>
-              </div>
-              <p className="cho-stat-sub">Total received</p>
             </div>
             <div className="cho-stat-card cho-stat--orange">
               <p className="cho-stat-label">LOW STOCK ALERTS</p>
@@ -274,93 +324,34 @@ export default function CHODashboard() {
               <div className="cho-stat-row"><span className="cho-stat-value">10</span></div>
               <p className="cho-stat-sub">Rural Health Units</p>
             </div>
-            <div className="cho-stat-card">
-              <p className="cho-stat-label">DISTRIBUTIONS MADE</p>
-              <div className="cho-stat-row"><span className="cho-stat-value">{distributions.length}</span></div>
-              <p className="cho-stat-sub">Total distribution plans</p>
-            </div>
           </div>
-
-          <section className="cho-section">
-            <div className="cho-section-hd">
-              <h2 className="cho-section-title">Latest Notifications</h2>
-              <NavLink to="/cho/notifications" className="cho-view-all">View All</NavLink>
-            </div>
-            {notifications.length === 0 ? (
-              <div className="cho-empty-small">
-                <p>No notifications yet. They will appear here once you start distributing inventory.</p>
-              </div>
-            ) : (
-              <div className="cho-notif-list">
-                {notifications.slice(0, 4).map(n => (
-                  <div key={n.id} className="cho-notif-item"
-                    style={{ background: "#f9fafb", borderLeft: "3px solid #1a56db" }}>
-                    <div className="cho-notif-body">
-                      <div>
-                        <p className="cho-notif-title">{n.title}</p>
-                        <p className="cho-notif-msg">{n.message}</p>
-                      </div>
-                    </div>
-                    <span className="cho-notif-time">{n.date || "—"}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* Items Expiring Soon */}
-          <section className="cho-section">
-            <div className="cho-section-hd">
-              <h2 className="cho-section-title">Items Expiring Soon</h2>
-              <NavLink to="/cho/batch-inventory" className="cho-view-all">View Inventory</NavLink>
-            </div>
-            {expiringSoonList.length === 0 ? (
-              <div className="cho-empty-small">
-                <p>No batches are expiring within the next 30 days.</p>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {expiringSoonList.map(f => (
-                  <div key={f.id} style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "12px 14px", borderRadius: "8px",
-                    background: f.status === "critical" ? "#fef2f2" : "#fffbeb",
-                    border: `1px solid ${f.status === "critical" ? "#fecaca" : "#fde68a"}`,
-                  }}>
-                    <div>
-                      <p style={{ margin: 0, fontWeight: 600, color: "#0f172a" }}>{f.name}{f.isVaccine ? " 💉" : ""}</p>
-                      <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#6b7280" }}>
-                        {f.remaining} boxes remaining · Lot {f.lotNumber || "—"} · expires {f.expiryDate}
-                      </p>
-                    </div>
-                    <span style={{
-                      fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "99px",
-                      background: f.status === "critical" ? "#dc2626" : "#d97706", color: "#fff",
-                    }}>
-                      ~{Math.round(f.daysRemaining)} days left
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
 
           <div className="cho-charts-row">
             <div className="cho-chart-card">
               <div className="cho-section-hd">
-                <h2 className="cho-section-title">Inventory by Category</h2>
-                <span className="cho-badge">Live</span>
+                <h2 className="cho-section-title">Inventory Trend</h2>
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <select value={trendYear} onChange={e => setTrendYear(Number(e.target.value))}
+                    style={{ padding: "4px 8px", fontSize: 12, border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", color: "#374151" }}>
+                    {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <span className="cho-badge">Live</span>
+                </span>
               </div>
-              {barData.length === 0 ? (
-                <div className="cho-empty-small"><p>No inventory data yet.</p></div>
+              <p style={{ fontSize: 12, color: "#6b7280", margin: "-6px 0 10px" }}>Boxes received into CHO stock vs. boxes distributed, per month.</p>
+              {trendEmpty ? (
+                <div className="cho-empty-small"><p>No inventory activity in {trendYear}.</p></div>
               ) : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={barData} barSize={36}>
-                    <XAxis dataKey="category" tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} />
+                <ResponsiveContainer width="100%" height={240}>
+                  <LineChart data={trendData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                    <XAxis dataKey="month" interval={0} tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13 }} cursor={{ fill: "#f3f4f6" }} />
-                    <Bar dataKey="value" fill="#93c5fd" radius={[4, 4, 0, 0]} />
-                  </BarChart>
+                    <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13 }} />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                    <Line type="monotone" dataKey="received" name="Received" stroke="#1a56db" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                    <Line type="monotone" dataKey="distributed" name="Distributed" stroke="#16a34a" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  </LineChart>
                 </ResponsiveContainer>
               )}
             </div>
@@ -372,61 +363,11 @@ export default function CHODashboard() {
               {pieData.length === 0 ? (
                 <div className="cho-empty-small"><p>No distribution data yet.</p></div>
               ) : (
-                <>
-                  <div className="cho-donut-wrap">
-                    <PieChart width={190} height={190}>
-                      <Pie data={pieData} cx={90} cy={90} innerRadius={58} outerRadius={82}
-                        dataKey="value" startAngle={90} endAngle={-270}>
-                        {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                      </Pie>
-                    </PieChart>
-                    <div className="cho-donut-center">
-                      <p className="cho-donut-pct">{pieTotal}</p>
-                      <p className="cho-donut-label">BOXES</p>
-                    </div>
-                  </div>
-                  <div className="cho-rhu-legend">
-                    {pieData.map((d, i) => (
-                      <div key={d.name} className="cho-rhu-row">
-                        <span className="cho-rhu-dot" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                        <span className="cho-rhu-name">{d.name}</span>
-                        <span className="cho-rhu-pct">{d.value} boxes</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
+                <InteractiveDonut items={pieData} prefix="cho" />
               )}
             </div>
           </div>
 
-          <section className="cho-section">
-            <div className="cho-section-hd">
-              <h2 className="cho-section-title">Recent Activity</h2>
-              <NavLink to="/cho/reports" className="cho-view-all">View All</NavLink>
-            </div>
-            {recentActivity.length === 0 ? (
-              <div className="cho-empty-small">
-                <p>No recent activity. Logs will appear here as you manage inventory and distributions.</p>
-              </div>
-            ) : (
-              <div className="cho-activity-list">
-                {recentActivity.map(a => (
-                  <div key={a.id} className="cho-activity-item">
-                    <div className="cho-activity-icon" style={{ background: a.color + "18", color: a.color }}>
-                      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                        <path d="M20 7h-3V4a2 2 0 00-2-2H9a2 2 0 00-2 2v3H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
-                      </svg>
-                    </div>
-                    <div className="cho-activity-body">
-                      <p className="cho-activity-title">{a.title}</p>
-                      <p className="cho-activity-sub">{a.sub}</p>
-                    </div>
-                    <span className="cho-activity-time">{a.time}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
         </main>
       </div>
     </div>

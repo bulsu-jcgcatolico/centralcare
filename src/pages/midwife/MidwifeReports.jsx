@@ -51,6 +51,13 @@ function monthBefore(monthKey) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+// Compact styling for the per-column filter row under a table header
+const FILTER_TH = { padding: "6px 8px", textTransform: "none", background: "#fff", fontWeight: 400 };
+const FILTER_INPUT = {
+  width: "100%", boxSizing: "border-box", padding: "5px 8px", fontSize: "12px",
+  border: "1px solid #d1d5db", borderRadius: "6px", background: "#fff", color: "#111827",
+};
+
 export default function MidwifeReports() {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
@@ -65,6 +72,12 @@ export default function MidwifeReports() {
   // "End-of-Month Report" tab — patient consumption + immunization/wastage
   // metrics, separate from the Activity Log tab above.
   const [activeTab, setActiveTab] = useState("activity"); // "activity" | "dispensed" | "eom" | "fhsis"
+  // Per-column filters shown under the table header
+  const [colFilters, setColFilters] = useState({});
+  const setCol = (key, value) => setColFilters(prev => ({ ...prev, [key]: value }));
+  const hasColFilters = Object.values(colFilters).some(v => String(v ?? "").trim() !== "");
+  const norm = (v) => String(v ?? "").trim().toLowerCase();
+  const contains = (value, q) => !norm(q) || norm(value).includes(norm(q));
   const [immunizationLogs, setImmunizationLogs] = useState([]);
   const [eomMonthKey, setEomMonthKey] = useState(getCurrentMonthKey());
 
@@ -149,13 +162,21 @@ export default function MidwifeReports() {
 
   const months = [...new Set(allActivities.map(a => a.month).filter(Boolean))].sort().reverse();
 
-  const displayed = (selectedMonth === "all"
+  const baseDisplayed = (selectedMonth === "all"
     ? allActivities
     : allActivities.filter(a => a.month === selectedMonth)
   ).filter(a => (a.displayName || "").toLowerCase().includes(search.trim().toLowerCase()));
 
-  const monthlyInvCount  = displayed.filter(a => a.actType === "inventory").length;
-  const monthlyDispCount = displayed.filter(a => a.actType === "dispense").length;
+  const displayed = baseDisplayed.filter(a =>
+    (!colFilters.type || a.actType === colFilters.type) &&
+    contains(a.displayName, colFilters.name) &&
+    contains(a.displayQty, colFilters.details) &&
+    (!colFilters.month || a.month === colFilters.month) &&
+    contains(a.displayDate, colFilters.date)
+  );
+
+  const monthlyInvCount  = baseDisplayed.filter(a => a.actType === "inventory").length;
+  const monthlyDispCount = baseDisplayed.filter(a => a.actType === "dispense").length;
   const monthlyBoxesDispensed = dispenseLogs
     .filter(d => selectedMonth === "all" || getMonthYear(d.date) === selectedMonth)
     .reduce((s, d) => s + (d.boxesDispensed || 0), 0);
@@ -164,7 +185,7 @@ export default function MidwifeReports() {
 
   // "Dispensed to Patients" tab — one row per dispense log, filtered by the
   // same month dropdown and search box as the Activity tab.
-  const dispensedRows = dispenseLogs
+  const dispensedBase = dispenseLogs
     .filter(l => selectedMonth === "all" || getMonthYear(l.date) === selectedMonth)
     .filter(l => {
       const q = search.trim().toLowerCase();
@@ -174,8 +195,15 @@ export default function MidwifeReports() {
     })
     .slice()
     .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
-  const dispensedBoxes = dispensedRows.reduce((sum, l) => sum + (Number(l.boxesDispensed) || 0), 0);
-  const dispensedPatients = new Set(dispensedRows.map(l => (l.patientName || "").trim().toLowerCase()).filter(Boolean)).size;
+  const dispensedRows = dispensedBase.filter(l =>
+    contains(l.date, colFilters.dDate) &&
+    contains(l.patientName, colFilters.dPatient) &&
+    contains(l.medicineName, colFilters.dMedicine) &&
+    contains(l.boxesDispensed, colFilters.dQty) &&
+    contains(l.lotNumber, colFilters.dLot)
+  );
+  const dispensedBoxes = dispensedBase.reduce((sum, l) => sum + (Number(l.boxesDispensed) || 0), 0);
+  const dispensedPatients = new Set(dispensedBase.map(l => (l.patientName || "").trim().toLowerCase()).filter(Boolean)).size;
 
   // ── End-of-Month tab metrics ──
   const eomMonthOptions = recentMonthKeys(6);
@@ -415,7 +443,7 @@ export default function MidwifeReports() {
                   <div className="midwife-stats-grid midwife-stats-grid--3">
                     <div className="midwife-stat-card-box">
                       <p className="midwife-stat-label">DISPENSE RECORDS</p>
-                      <div className="midwife-stat-row"><span className="midwife-stat-value">{dispensedRows.length}</span></div>
+                      <div className="midwife-stat-row"><span className="midwife-stat-value">{dispensedBase.length}</span></div>
                       <p className="midwife-stat-sub">{periodLabel}</p>
                     </div>
                     <div className="midwife-stat-card-box">
@@ -432,7 +460,7 @@ export default function MidwifeReports() {
 
                   {loading ? (
                     <div className="midwife-empty-state"><p>Loading...</p></div>
-                  ) : dispensedRows.length === 0 ? (
+                  ) : dispensedBase.length === 0 ? (
                     <div className="midwife-empty-state">
                       <h2 className="midwife-empty-title">No Dispense Records for {periodLabel}</h2>
                       <p className="midwife-empty-text">Medicines you dispense to patients will appear here.</p>
@@ -448,8 +476,10 @@ export default function MidwifeReports() {
                             <th>QUANTITY</th>
                             <th>LOT #</th>
                           </tr>
+                          <tr><th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="e.g. 8/28" value={colFilters.dDate || ""} onChange={e => setCol("dDate", e.target.value)} /></th><th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="Filter…" value={colFilters.dPatient || ""} onChange={e => setCol("dPatient", e.target.value)} /></th><th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="Filter…" value={colFilters.dMedicine || ""} onChange={e => setCol("dMedicine", e.target.value)} /></th><th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="Qty" value={colFilters.dQty || ""} onChange={e => setCol("dQty", e.target.value)} /></th><th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="Filter…" value={colFilters.dLot || ""} onChange={e => setCol("dLot", e.target.value)} /></th></tr>
                         </thead>
                         <tbody>
+                          {dispensedRows.length === 0 && (<tr><td colSpan={5} style={{ textAlign: "center", padding: "28px", color: "#6b7280" }}>No records match the current filters.</td></tr>)}
                           {dispensedRows.map(l => (
                             <tr key={l.id}>
                               <td>{l.date || "—"}</td>
@@ -505,7 +535,7 @@ export default function MidwifeReports() {
 
               {loading ? (
                 <div className="midwife-empty-state"><p>Loading...</p></div>
-              ) : displayed.length === 0 ? (
+              ) : baseDisplayed.length === 0 ? (
                 <div className="midwife-empty-state">
                   <div className="midwife-empty-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="64" height="64">
@@ -526,8 +556,10 @@ export default function MidwifeReports() {
                         <th>MONTH</th>
                         <th>DATE</th>
                       </tr>
+                      <tr><th style={FILTER_TH}><select style={FILTER_INPUT} value={colFilters.type || ""} onChange={e => setCol("type", e.target.value)}><option value="">All</option><option value="inventory">Received</option><option value="dispense">Dispensed</option></select></th><th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="Filter…" value={colFilters.name || ""} onChange={e => setCol("name", e.target.value)} /></th><th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="Filter…" value={colFilters.details || ""} onChange={e => setCol("details", e.target.value)} /></th><th style={FILTER_TH}><select style={FILTER_INPUT} value={colFilters.month || ""} onChange={e => setCol("month", e.target.value)}><option value="">All</option>{months.map(m => <option key={m} value={m}>{m}</option>)}</select></th><th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="e.g. 8/28" value={colFilters.date || ""} onChange={e => setCol("date", e.target.value)} /></th></tr>
                     </thead>
                     <tbody>
+                      {displayed.length === 0 && (<tr><td colSpan={5} style={{ textAlign: "center", padding: "28px", color: "#6b7280" }}>No records match the current filters.</td></tr>)}
                       {displayed.map(item => (
                         <tr key={item.id}>
                           <td>

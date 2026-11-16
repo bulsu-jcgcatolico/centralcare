@@ -60,6 +60,13 @@ const PLACEHOLDERS = {
   population: "Search RHU or barangay name...",
 };
 
+// Compact styling for the per-column filter row under a table header
+const FILTER_TH = { padding: "6px 8px", textTransform: "none", background: "#fff", fontWeight: 400 };
+const FILTER_INPUT = {
+  width: "100%", boxSizing: "border-box", padding: "5px 8px", fontSize: "12px",
+  border: "1px solid #d1d5db", borderRadius: "6px", background: "#fff", color: "#111827",
+};
+
 function ReportTabs({ tabs, active, onChange }) {
   return (
     <div className="reports-tabbar"
@@ -80,6 +87,12 @@ function ReportTabs({ tabs, active, onChange }) {
 }
 
 function ActivityTab({ search }) {
+  // Per-column filters shown under the table header
+  const [colFilters, setColFilters] = useState({});
+  const setCol = (key, value) => setColFilters(prev => ({ ...prev, [key]: value }));
+  const hasColFilters = Object.values(colFilters).some(v => String(v ?? "").trim() !== "");
+  const norm = (v) => String(v ?? "").trim().toLowerCase();
+  const contains = (value, q) => !norm(q) || norm(value).includes(norm(q));
   const [selectedMonth, setSelectedMonth] = useState("all");
   const [inventory, setInventory] = useState([]);
   const [distributions, setDistributions] = useState([]);
@@ -119,13 +132,23 @@ function ActivityTab({ search }) {
 
   const months = [...new Set(allActivities.map(a => a.month).filter(Boolean))].sort().reverse();
 
-  const displayed = (selectedMonth === "all"
+  const baseDisplayed = (selectedMonth === "all"
     ? allActivities
     : allActivities.filter(a => a.month === selectedMonth)
   ).filter(a => (a.displayName || "").toLowerCase().includes(search.trim().toLowerCase()));
 
-  const monthlyInvCount  = displayed.filter(a => a.actType === "inventory").length;
-  const monthlyDistCount = displayed.filter(a => a.actType === "distribution").length;
+  const statusOptions = [...new Set(baseDisplayed.map(a => a.status || "Accepted"))];
+  const displayed = baseDisplayed.filter(a =>
+    (!colFilters.type || a.actType === colFilters.type) &&
+    contains(a.displayName, colFilters.name) &&
+    contains(a.displayQty, colFilters.qty) &&
+    (!colFilters.month || a.month === colFilters.month) &&
+    contains(a.displayDate, colFilters.date) &&
+    (!colFilters.status || norm(a.status || "Accepted") === norm(colFilters.status))
+  );
+
+  const monthlyInvCount  = baseDisplayed.filter(a => a.actType === "inventory").length;
+  const monthlyDistCount = baseDisplayed.filter(a => a.actType === "distribution").length;
   const monthlyTotalBoxes = distributions
     .filter(d => selectedMonth === "all" || getMonthYear(d.date) === selectedMonth)
     .reduce((s, d) => s + (d.totalBoxes || 0), 0);
@@ -172,7 +195,7 @@ function ActivityTab({ search }) {
 
               {loading ? (
                 <div className="cho-empty-state"><p>Loading...</p></div>
-              ) : displayed.length === 0 ? (
+              ) : baseDisplayed.length === 0 ? (
                 <div className="cho-empty-state">
                   <div className="cho-empty-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="64" height="64">
@@ -194,8 +217,10 @@ function ActivityTab({ search }) {
                         <th>DATE</th>
                         <th>STATUS</th>
                       </tr>
+                      <tr><th style={FILTER_TH}><select style={FILTER_INPUT} value={colFilters.type || ""} onChange={e => setCol("type", e.target.value)}><option value="">All</option><option value="inventory">Inventory</option><option value="distribution">Distribution</option></select></th><th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="Filter…" value={colFilters.name || ""} onChange={e => setCol("name", e.target.value)} /></th><th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="Filter…" value={colFilters.qty || ""} onChange={e => setCol("qty", e.target.value)} /></th><th style={FILTER_TH}><select style={FILTER_INPUT} value={colFilters.month || ""} onChange={e => setCol("month", e.target.value)}><option value="">All</option>{months.map(m => <option key={m} value={m}>{m}</option>)}</select></th><th style={FILTER_TH}><input style={FILTER_INPUT} placeholder="e.g. 8/28" value={colFilters.date || ""} onChange={e => setCol("date", e.target.value)} /></th><th style={FILTER_TH}><select style={FILTER_INPUT} value={colFilters.status || ""} onChange={e => setCol("status", e.target.value)}><option value="">All</option>{statusOptions.map(st => <option key={st} value={st}>{st}</option>)}</select></th></tr>
                     </thead>
                     <tbody>
+                      {displayed.length === 0 && (<tr><td colSpan={6} style={{ textAlign: "center", padding: "28px", color: "#6b7280" }}>No records match the current filters.</td></tr>)}
                       {displayed.map(item => (
                         <tr key={item.id}>
                           <td>
