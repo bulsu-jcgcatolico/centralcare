@@ -43,6 +43,7 @@ export default function CHOBarangay() {
   const [search, setSearch] = useState("");
   const [barangays, setBarangays] = useState([]);
   const [assignedMap, setAssignedMap] = useState({}); // barangayName -> rhuName
+  const [totalRHUs, setTotalRHUs] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -79,6 +80,7 @@ export default function CHOBarangay() {
         (data.assignedBarangays || []).forEach(name => { map[name] = data.rhuName; });
       });
       setAssignedMap(map);
+      setTotalRHUs(snap.size);
     } catch (err) { console.error(err); }
   }
 
@@ -154,7 +156,6 @@ export default function CHOBarangay() {
   const filteredBarangays = barangays.filter(b =>
     (b.barangayName || "").toLowerCase().includes(search.toLowerCase())
   );
-  const assignedCount = barangays.filter(b => assignedMap[b.barangayName || b.id]).length;
 
   return (
     <div className="rhu-layout">
@@ -221,8 +222,8 @@ export default function CHOBarangay() {
               <div className="cho-stat-row"><span className="cho-stat-value">{barangays.length}</span></div>
             </div>
             <div className="cho-stat-card">
-              <p className="cho-stat-label">ASSIGNED TO AN RHU</p>
-              <div className="cho-stat-row"><span className="cho-stat-value">{assignedCount}</span></div>
+              <p className="cho-stat-label">TOTAL RHU</p>
+              <div className="cho-stat-row"><span className="cho-stat-value">{totalRHUs}</span></div>
             </div>
           </div>
 

@@ -272,7 +272,7 @@ export default function RHUBarangay() {
                 </svg>
               </div>
               <div>
-                <span className="bgy-card-title">TOTAL HEADCOUNT</span>
+                <span className="bgy-card-title">TOTAL RHU POPULATION</span>
                 <p className="bgy-card-val">{totalRawPopulation.toLocaleString()}</p>
               </div>
             </div>
