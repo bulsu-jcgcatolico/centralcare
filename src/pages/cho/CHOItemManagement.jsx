@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
-  collection, doc, setDoc, getDoc, getDocs, deleteDoc, serverTimestamp
+  collection, doc, setDoc, getDoc, getDocs, serverTimestamp
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
@@ -43,6 +43,9 @@ export default function CHOItemManagement() {
   const unreadMessages = useUnreadMessageCount();
 
   const [search, setSearch] = useState("");
+  const [colFilters, setColFilters] = useState({
+    productId: "", name: "", dosageForm: "", category: "", subCategory: "", brand: ""
+  });
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -174,20 +177,41 @@ export default function CHOItemManagement() {
     setSaving(false);
   }
 
-  async function deleteProduct(p) {
-    if (!confirm(`Delete "${p.name}" (${p.productId}) from catalog?`)) return;
-    try {
-      await deleteDoc(doc(db, PRODUCTS_COLLECTION, p.id));
-      setProducts(products.filter(x => x.id !== p.id));
-    } catch (err) { showToast("Error: " + err.message, "error"); }
-  }
+  const setColFilter = (key, value) =>
+    setColFilters(prev => ({ ...prev, [key]: value }));
+  const clearColFilters = () =>
+    setColFilters({ productId: "", name: "", dosageForm: "", category: "", subCategory: "", brand: "" });
+  const hasColFilters = Object.values(colFilters).some(v => v);
 
-  const filteredProducts = products.filter(p =>
-    (p.name || "").toLowerCase().includes(search.toLowerCase()) ||
-    (p.productId || "").toLowerCase().includes(search.toLowerCase()) ||
-    (p.category || "").toLowerCase().includes(search.toLowerCase()) ||
-    (p.brand || "").toLowerCase().includes(search.toLowerCase())
-  );
+  // Unique values per column for the dropdown filters
+  const uniqueOptions = useMemo(() => {
+    const uniq = (key) => [...new Set(products.map(p => p[key]).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
+    return {
+      dosageForm: uniq("dosageForm"),
+      category: uniq("category"),
+      subCategory: uniq("subCategory"),
+      brand: uniq("brand"),
+    };
+  }, [products]);
+
+  const filteredProducts = products.filter(p => {
+    const q = search.toLowerCase();
+    const matchesSearch =
+      (p.name || "").toLowerCase().includes(q) ||
+      (p.productId || "").toLowerCase().includes(q) ||
+      (p.category || "").toLowerCase().includes(q) ||
+      (p.brand || "").toLowerCase().includes(q);
+    if (!matchesSearch) return false;
+
+    const f = colFilters;
+    if (f.productId && !(p.productId || p.id || "").toLowerCase().includes(f.productId.toLowerCase())) return false;
+    if (f.name && !(p.name || "").toLowerCase().includes(f.name.toLowerCase())) return false;
+    if (f.dosageForm && (p.dosageForm || "") !== f.dosageForm) return false;
+    if (f.category && (p.category || "") !== f.category) return false;
+    if (f.subCategory && (p.subCategory || "") !== f.subCategory) return false;
+    if (f.brand && (p.brand || "") !== f.brand) return false;
+    return true;
+  });
 
   return (
     <div className="cho-layout">
@@ -261,7 +285,7 @@ export default function CHOItemManagement() {
 
           {loading ? (
             <div className="cho-empty-state"><p>Loading medical catalog...</p></div>
-          ) : filteredProducts.length === 0 ? (
+          ) : products.length === 0 ? (
             <div className="cho-empty-state">
               <div className="cho-empty-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="64" height="64">
@@ -278,16 +302,54 @@ export default function CHOItemManagement() {
                 <table className="cho-table">
                   <thead>
                     <tr>
-                      <th>PRODUCT ID</th>
-                      <th>NAME</th>
-                      <th>DOSAGE FORM</th>
-                      <th>CATEGORY</th>
-                      <th>SUB-CATEGORY</th>
-                      <th>BRAND</th>
-                      <th>ACTION</th>
+                      <th>
+                        <div className="cho-th-label">PRODUCT ID</div>
+                        <input className="cho-th-filter" type="text" placeholder="Filter..." value={colFilters.productId} onChange={e => setColFilter("productId", e.target.value)} />
+                      </th>
+                      <th>
+                        <div className="cho-th-label">NAME</div>
+                        <input className="cho-th-filter" type="text" placeholder="Filter..." value={colFilters.name} onChange={e => setColFilter("name", e.target.value)} />
+                      </th>
+                      <th>
+                        <div className="cho-th-label">DOSAGE FORM</div>
+                        <select className="cho-th-filter" value={colFilters.dosageForm} onChange={e => setColFilter("dosageForm", e.target.value)}>
+                          <option value="">All</option>
+                          {uniqueOptions.dosageForm.map(v => <option key={v} value={v}>{v}</option>)}
+                        </select>
+                      </th>
+                      <th>
+                        <div className="cho-th-label">CATEGORY</div>
+                        <select className="cho-th-filter" value={colFilters.category} onChange={e => setColFilter("category", e.target.value)}>
+                          <option value="">All</option>
+                          {uniqueOptions.category.map(v => <option key={v} value={v}>{v}</option>)}
+                        </select>
+                      </th>
+                      <th>
+                        <div className="cho-th-label">SUB-CATEGORY</div>
+                        <select className="cho-th-filter" value={colFilters.subCategory} onChange={e => setColFilter("subCategory", e.target.value)}>
+                          <option value="">All</option>
+                          {uniqueOptions.subCategory.map(v => <option key={v} value={v}>{v}</option>)}
+                        </select>
+                      </th>
+                      <th>
+                        <div className="cho-th-label">BRAND</div>
+                        <select className="cho-th-filter" value={colFilters.brand} onChange={e => setColFilter("brand", e.target.value)}>
+                          <option value="">All</option>
+                          {uniqueOptions.brand.map(v => <option key={v} value={v}>{v}</option>)}
+                        </select>
+                      </th>
+                      <th>
+                        <div className="cho-th-label">ACTION</div>
+                        {hasColFilters && (
+                          <button className="cho-th-clear" onClick={clearColFilters}>Clear filters</button>
+                        )}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
+                    {filteredProducts.length === 0 && (
+                      <tr><td colSpan={7} style={{ textAlign: "center", padding: "24px", color: "#6b7280" }}>No items match the current filters.</td></tr>
+                    )}
                     {filteredProducts.map(p => (
                       <tr key={p.id}>
                         <td className="cho-product-key"><strong>{p.productId || p.id}</strong></td>
@@ -303,7 +365,6 @@ export default function CHOItemManagement() {
                         <td>
                           <div className="cho-action-group">
                             <button className="cho-btn-action cho-btn-review" onClick={() => openEditModal(p)}>Edit</button>
-                            <button className="cho-btn-action cho-btn-danger" onClick={() => deleteProduct(p)}>Delete</button>
                           </div>
                         </td>
                       </tr>
@@ -394,6 +455,29 @@ export default function CHOItemManagement() {
           height: auto !important;
           overflow-y: visible !important;
           overflow-x: auto !important;
+        }
+        .cho-th-label { margin-bottom: 6px; }
+        .cho-th-filter {
+          width: 100%;
+          min-width: 90px;
+          padding: 4px 6px;
+          font-size: 12px;
+          font-weight: 400;
+          border: 1px solid #d1d5db;
+          border-radius: 6px;
+          background: #fff;
+          color: #111827;
+          box-sizing: border-box;
+        }
+        .cho-th-clear {
+          padding: 4px 8px;
+          font-size: 12px;
+          border: 1px solid #d1d5db;
+          border-radius: 6px;
+          background: #fff;
+          color: #2563eb;
+          cursor: pointer;
+          white-space: nowrap;
         }
       `}</style>
     </div>
