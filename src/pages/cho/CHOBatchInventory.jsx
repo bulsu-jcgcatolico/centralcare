@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -61,11 +61,12 @@ export default function CHOBatchInventory() {
   const unreadMessages = useUnreadMessageCount();
 
   const [search, setSearch] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState("all");
-  const [selectedProduct, setSelectedProduct] = useState("all");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedSubCategory, setSelectedSubCategory] = useState("all");
-  const [selectedExpiry, setSelectedExpiry] = useState("all");
+  // Per-column header filters ("" = no filter)
+  const EMPTY_FILTERS = {
+    batchId: "", productId: "", name: "", category: "", subCategory: "",
+    brand: "", lotNumber: "", month: "", expiry: ""
+  };
+  const [colFilters, setColFilters] = useState(EMPTY_FILTERS);
   
   const [products, setProducts] = useState([]);
   const [batches, setBatches] = useState([]);
@@ -206,6 +207,7 @@ export default function CHOBatchInventory() {
         productId: matchedProduct.productId,
         name: matchedProduct.name,
         category: matchedProduct.category,
+        dosageForm: matchedProduct.dosageForm ?? "",
         subCategory: matchedProduct.subCategory ?? "",
         brand: matchedProduct.brand ?? "",
         lotNumber: lotNumber.trim(),
@@ -229,46 +231,62 @@ export default function CHOBatchInventory() {
     setSaving(false);
   }
 
-  // Generate dynamic list of available months from batches
-  const months = [...new Set(batches.map(b => b.month).filter(Boolean))].sort().reverse();
+  const setColFilter = (key, value) =>
+    setColFilters(prev => ({ ...prev, [key]: value }));
+  const clearColFilters = () => setColFilters(EMPTY_FILTERS);
+  const hasColFilters = Object.values(colFilters).some(v => v);
 
-  // Product ID dropdown options (one entry per product that has batches)
-  const productOptions = [...new Map(
-    batches.filter(b => b.productId).map(b => [b.productId, b.name])
-  ).entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  // Physical form (Tablet, Capsule, Vial...). Older batches may not have it saved,
+  // so fall back to the product catalog.
+  const formOf = (b) =>
+    (b.dosageForm || products.find(p => p.productId === b.productId)?.dosageForm || "").trim();
 
-  // Category / sub-category dropdown options (sub-categories follow the chosen category)
-  const categoryOptions = [...new Set(batches.map(i => (i.category || "").trim()).filter(Boolean))].sort();
-  const subCategoryOptions = [...new Set(
-    batches
-      .filter(i => selectedCategory === "all" || (i.category || "").trim() === selectedCategory)
-      .map(i => (i.subCategory || "").trim()).filter(Boolean)
-  )].sort();
+  // Older batches may not have a brand saved, so fall back to the product catalog
+  const brandOf = (b) =>
+    (b.brand || products.find(p => p.productId === b.productId)?.brand || "").trim();
 
-  // Filter batches by search keyword and dropdown month selection
+  // Dropdown options come from the batches actually on the page
+  const filterOptions = useMemo(() => {
+    const uniq = (fn) => [...new Set(batches.map(fn).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
+    return {
+      category: uniq(b => formOf(b)),
+      subCategory: uniq(b => (b.subCategory || "").trim()),
+      brand: uniq(b => brandOf(b)),
+      month: [...new Set(batches.map(b => b.month).filter(Boolean))].sort().reverse(),
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batches, products]);
+
+  // Filter batches by search keyword and header filters
   const filteredBatches = batches
     .filter(b => {
-      const matchesSearch = 
-        (b.name || "").toLowerCase().includes(search.toLowerCase()) ||
-        (b.productId || "").toLowerCase().includes(search.toLowerCase()) ||
-        (b.batchId || "").toLowerCase().includes(search.toLowerCase()) ||
-        (b.lotNumber || "").toLowerCase().includes(search.toLowerCase());
+      const q = search.toLowerCase();
+      const matchesSearch =
+        (b.name || "").toLowerCase().includes(q) ||
+        (b.productId || "").toLowerCase().includes(q) ||
+        (b.batchId || "").toLowerCase().includes(q) ||
+        (b.lotNumber || "").toLowerCase().includes(q);
+      if (!matchesSearch) return false;
 
-      const matchesMonth = selectedMonth === "all" || b.month === selectedMonth;
-      const matchesProduct = selectedProduct === "all" || b.productId === selectedProduct;
-      const i = b;
-      const matchesCategory = (selectedCategory === "all" || (i.category || "").trim() === selectedCategory) && (selectedSubCategory === "all" || (i.subCategory || "").trim() === selectedSubCategory);
-      let matchesExpiry = true;
-      if (selectedExpiry !== "all") {
-        if (!b.expiryDate) matchesExpiry = false;
-        else {
-          const d = daysUntil(b.expiryDate);
-          matchesExpiry = selectedExpiry === "expired" ? d < 0
-            : selectedExpiry === "soon" ? (d >= 0 && d <= EXPIRY_WARNING_DAYS)
-            : d > EXPIRY_WARNING_DAYS;
-        }
+      const f = colFilters;
+      const has = (val, needle) => (val || "").toLowerCase().includes(needle.toLowerCase());
+      if (f.batchId && !has(b.batchId, f.batchId)) return false;
+      if (f.productId && !has(b.productId, f.productId)) return false;
+      if (f.name && !has(b.name, f.name)) return false;
+      if (f.lotNumber && !has(b.lotNumber, f.lotNumber)) return false;
+      if (f.category && formOf(b) !== f.category) return false;
+      if (f.subCategory && (b.subCategory || "").trim() !== f.subCategory) return false;
+      if (f.brand && brandOf(b) !== f.brand) return false;
+      if (f.month && b.month !== f.month) return false;
+      if (f.expiry) {
+        if (!b.expiryDate) return false;
+        const d = daysUntil(b.expiryDate);
+        const ok = f.expiry === "expired" ? d < 0
+          : f.expiry === "soon" ? (d >= 0 && d <= EXPIRY_WARNING_DAYS)
+          : d > EXPIRY_WARNING_DAYS;
+        if (!ok) return false;
       }
-      return matchesSearch && matchesMonth && matchesProduct && matchesCategory && matchesExpiry;
+      return true;
     })
     .slice()
     .sort((a, b) => {
@@ -291,7 +309,7 @@ export default function CHOBatchInventory() {
     const days = daysUntil(b.expiryDate);
     return days <= EXPIRY_WARNING_DAYS && days >= 0;
   }).length;
-  const periodLabel = selectedMonth === "all" ? "All time" : monthLabel(selectedMonth);
+  const periodLabel = !colFilters.month ? "All time" : monthLabel(colFilters.month);
 
   return (
     <div>
@@ -359,80 +377,113 @@ export default function CHOBatchInventory() {
                 </div>
                 {/* Header Action Bar matching CHOReports filter format */}
                 <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
-                  <select className="cho-input" style={{ width: "auto", minWidth: "180px" }}
-                    value={selectedProduct} onChange={e => setSelectedProduct(e.target.value)}>
-                    <option value="all">All Product IDs</option>
-                    {productOptions.map(([id, name]) => <option key={id} value={id}>{id} — {name}</option>)}
-                  </select>
-                  <select className="cho-input" style={{ width: "auto", minWidth: "160px" }}
-                    value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
-                    <option value="all">All Months (date added)</option>
-                    {months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
-                  </select>
                   <button className="cho-btn-secondary" onClick={() => window.print()}>Print / PDF</button>
                   <button className="cho-btn-primary" onClick={openAddModal}>+ Add New Batch</button>
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", margin: 0 }}>
-                <select className="cho-input" style={{ width: "190px", flex: "0 0 auto", padding: "6px 10px", fontSize: "13px" }}
-                  value={selectedCategory} onChange={e => { setSelectedCategory(e.target.value); setSelectedSubCategory("all"); }}>
-                  <option value="all">All Categories</option>
-                  {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <select className="cho-input" style={{ width: "190px", flex: "0 0 auto", padding: "6px 10px", fontSize: "13px" }}
-                  value={selectedSubCategory} onChange={e => setSelectedSubCategory(e.target.value)}>
-                  <option value="all">All Sub-Categories</option>
-                  {subCategoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <select className="cho-input" style={{ width: "190px", flex: "0 0 auto", padding: "6px 10px", fontSize: "13px" }}
-                  value={selectedExpiry} onChange={e => setSelectedExpiry(e.target.value)}>
-                  <option value="all">All Expiry</option>
-                  <option value="expired">Expired</option>
-                  <option value="soon">Expiring within {EXPIRY_WARNING_DAYS} days</option>
-                  <option value="ok">Not expiring soon</option>
-                </select>
-                {(selectedCategory !== "all" || selectedSubCategory !== "all" || selectedExpiry !== "all" || selectedProduct !== "all" || selectedMonth !== "all" || search) && (
-                  <button className="cho-btn-secondary" onClick={() => { setSelectedCategory("all"); setSelectedSubCategory("all"); setSelectedExpiry("all"); setSelectedProduct("all"); setSelectedMonth("all"); setSearch(""); }}>
-                    Clear filters
-                  </button>
-                )}
-              </div>
-
               {loading ? (
                 <div className="cho-empty-state"><p>Loading batch inventory...</p></div>
-              ) : filteredBatches.length === 0 ? (
+              ) : batches.length === 0 ? (
                 <div className="cho-empty-state">
                   <div className="cho-empty-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="64" height="64">
                       <path d="M20 7h-3V4a2 2 0 00-2-2H9a2 2 0 00-2 2v3H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
                     </svg>
                   </div>
-                  <h2 className="cho-empty-title">No Batches for {periodLabel}</h2>
-                  <p className="cho-empty-text">No batch inventory matches your search criteria or selected month.</p>
+                  <h2 className="cho-empty-title">No Batches Yet</h2>
+                  <p className="cho-empty-text">No batches have been logged yet.</p>
                   <button className="cho-btn-primary" onClick={openAddModal}>+ Add New Batch</button>
                 </div>
               ) : (
                 <section className="cho-section">
                   <div className="cho-table-wrapper">
-                  <table className="cho-table">
+                  <table className="cho-table cho-batch-table">
+                    <colgroup>
+                      <col style={{ width: "7%" }} />
+                      <col style={{ width: "6%" }} />
+                      <col style={{ width: "12%" }} />
+                      <col style={{ width: "8%" }} />
+                      <col style={{ width: "9%" }} />
+                      <col style={{ width: "6%" }} />
+                      <col style={{ width: "7%" }} />
+                      <col style={{ width: "7%" }} />
+                      <col style={{ width: "7%" }} />
+                      <col style={{ width: "8%" }} />
+                      <col style={{ width: "8%" }} />
+                      <col style={{ width: "8%" }} />
+                      <col style={{ width: "7%" }} />
+                    </colgroup>
                     <thead>
                       <tr>
-                        <th>BATCH ID</th>
-                        <th>PRODUCT ID</th>
-                        <th>NAME</th>
-                        <th>CATEGORY</th>
-                        <th>SUB-CATEGORY</th>
-                        <th>LOT #</th>
-                        <th>INITIAL QTY</th>
-                        <th>REMAINING</th>
-                        <th>MANUFACTURE DATE</th>
-                        <th>DATE ADDED</th>
-                        <th>EXPIRY</th>
-                        <th>ACTIONS</th>
+                        <th>
+                          <div className="cho-th-label">BATCH ID</div>
+                          <input className="cho-th-filter" type="text" placeholder="Filter..." value={colFilters.batchId} onChange={e => setColFilter("batchId", e.target.value)} />
+                        </th>
+                        <th>
+                          <div className="cho-th-label">PRODUCT ID</div>
+                          <input className="cho-th-filter" type="text" placeholder="Filter..." value={colFilters.productId} onChange={e => setColFilter("productId", e.target.value)} />
+                        </th>
+                        <th>
+                          <div className="cho-th-label">MEDICINE NAME AND STRENGTH</div>
+                          <input className="cho-th-filter" type="text" placeholder="Filter..." value={colFilters.name} onChange={e => setColFilter("name", e.target.value)} />
+                        </th>
+                        <th>
+                          <div className="cho-th-label">FORM</div>
+                          <select className="cho-th-filter" value={colFilters.category} onChange={e => setColFilter("category", e.target.value)}>
+                            <option value="">All</option>
+                            {filterOptions.category.map(v => <option key={v} value={v}>{v}</option>)}
+                          </select>
+                        </th>
+                        <th>
+                          <div className="cho-th-label">CATEGORY</div>
+                          <select className="cho-th-filter" value={colFilters.subCategory} onChange={e => setColFilter("subCategory", e.target.value)}>
+                            <option value="">All</option>
+                            {filterOptions.subCategory.map(v => <option key={v} value={v}>{v}</option>)}
+                          </select>
+                        </th>
+                        <th>
+                          <div className="cho-th-label">BRAND</div>
+                          <select className="cho-th-filter" value={colFilters.brand} onChange={e => setColFilter("brand", e.target.value)}>
+                            <option value="">All</option>
+                            {filterOptions.brand.map(v => <option key={v} value={v}>{v}</option>)}
+                          </select>
+                        </th>
+                        <th>
+                          <div className="cho-th-label">LOT #</div>
+                          <input className="cho-th-filter" type="text" placeholder="Filter..." value={colFilters.lotNumber} onChange={e => setColFilter("lotNumber", e.target.value)} />
+                        </th>
+                        <th><div className="cho-th-label">INITIAL QTY</div></th>
+                        <th><div className="cho-th-label">REMAINING</div></th>
+                        <th><div className="cho-th-label">MANUFACTURE DATE</div></th>
+                        <th>
+                          <div className="cho-th-label">DATE ADDED</div>
+                          <select className="cho-th-filter" value={colFilters.month} onChange={e => setColFilter("month", e.target.value)}>
+                            <option value="">All</option>
+                            {filterOptions.month.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+                          </select>
+                        </th>
+                        <th>
+                          <div className="cho-th-label">EXPIRY</div>
+                          <select className="cho-th-filter" value={colFilters.expiry} onChange={e => setColFilter("expiry", e.target.value)}>
+                            <option value="">All</option>
+                            <option value="expired">Expired</option>
+                            <option value="soon">Within {EXPIRY_WARNING_DAYS} days</option>
+                            <option value="ok">Not expiring soon</option>
+                          </select>
+                        </th>
+                        <th>
+                          <div className="cho-th-label">ACTIONS</div>
+                          {hasColFilters && (
+                            <button className="cho-th-clear" onClick={clearColFilters}>Clear filters</button>
+                          )}
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
+                      {filteredBatches.length === 0 && (
+                        <tr><td colSpan={13} style={{ textAlign: "center", padding: "24px", color: "#6b7280" }}>No batches match the current filters.</td></tr>
+                      )}
                       {filteredBatches.map(b => {
                         const remaining = (b.remaining ?? b.quantity) || 0;
                         return (
@@ -440,7 +491,7 @@ export default function CHOBatchInventory() {
                             <td className="cho-product-key"><strong>{b.batchId || "—"}</strong></td>
                             <td className="cho-product-key">{b.productId || "—"}</td>
                             <td><strong>{b.name}</strong></td>
-                            <td>{b.category}</td>
+                            <td>{formOf(b) || "—"}</td>
                             <td>
                               {b.subCategory
                                 ? <span className="cho-subcategory-pill">{b.subCategory}</span>
@@ -451,6 +502,7 @@ export default function CHOBatchInventory() {
                                 </span>
                               )}
                             </td>
+                            <td>{brandOf(b) || "—"}</td>
                             <td className="cho-product-key">{b.lotNumber || "—"}</td>
                             <td>{b.quantity} {b.isVaccine ? "vials" : "boxes"}</td>
                             <td><strong>{remaining} {b.isVaccine ? "vials" : "boxes"}</strong></td>
@@ -502,7 +554,7 @@ export default function CHOBatchInventory() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
               <thead>
                 <tr>
-                  {["Batch ID", "Product ID", "Name", "Lot #", "Initial Qty", "Remaining", "Manufacture Date", "Date Added", "Expiry"].map(h => (
+                  {["Batch ID", "Product ID", "Medicine Name and Strength", "Form", "Category", "Brand", "Lot #", "Initial Qty", "Remaining", "Manufacture Date", "Date Added", "Expiry"].map(h => (
                     <th key={h} style={{ border: "1px solid #999", padding: "6px", textAlign: "left", background: "#eee" }}>
                       {h}
                     </th>
@@ -515,6 +567,9 @@ export default function CHOBatchInventory() {
                     <td style={{ border: "1px solid #999", padding: "6px" }}>{b.batchId || "—"}</td>
                     <td style={{ border: "1px solid #999", padding: "6px" }}>{b.productId || "—"}</td>
                     <td style={{ border: "1px solid #999", padding: "6px" }}>{b.name || "—"}</td>
+                    <td style={{ border: "1px solid #999", padding: "6px" }}>{formOf(b) || "—"}</td>
+                    <td style={{ border: "1px solid #999", padding: "6px" }}>{b.subCategory || "—"}</td>
+                    <td style={{ border: "1px solid #999", padding: "6px" }}>{brandOf(b) || "—"}</td>
                     <td style={{ border: "1px solid #999", padding: "6px" }}>{b.lotNumber || "—"}</td>
                     <td style={{ border: "1px solid #999", padding: "6px" }}>{b.quantity || 0}</td>
                     <td style={{ border: "1px solid #999", padding: "6px" }}>{(b.remaining ?? b.quantity) || 0}</td>
@@ -541,7 +596,58 @@ export default function CHOBatchInventory() {
           max-height: none !important;
           height: auto !important;
           overflow-y: visible !important;
-          overflow-x: auto !important;
+          overflow-x: visible !important;
+        }
+
+        /* Fit all 13 columns inside the card: no horizontal slider */
+        .cho-batch-table {
+          width: 100% !important;
+          min-width: 0 !important;
+          table-layout: fixed !important;
+        }
+        .cho-batch-table th,
+        .cho-batch-table td {
+          padding: 10px 6px !important;
+          font-size: 12px !important;
+          line-height: 1.35 !important;
+          white-space: normal !important;
+          overflow-wrap: anywhere;
+          vertical-align: middle;
+        }
+        .cho-batch-table th { font-size: 10.5px !important; }
+        .cho-batch-table td:nth-child(8),
+        .cho-batch-table td:nth-child(9) { white-space: nowrap !important; }
+        .cho-batch-table .cho-subcategory-pill {
+          display: inline-block;
+          padding: 3px 8px;
+          font-size: 11px;
+          white-space: normal;
+        }
+        .cho-batch-table .cho-btn-secondary { padding: 4px 10px !important; }
+
+        /* Header filters (same look as Item Management) */
+        .cho-th-label { margin-bottom: 6px; }
+        .cho-th-filter {
+          width: 100%;
+          min-width: 0;
+          padding: 4px 4px;
+          font-size: 12px;
+          font-weight: 400;
+          border: 1px solid #d1d5db;
+          border-radius: 6px;
+          background: #fff;
+          color: #111827;
+          box-sizing: border-box;
+        }
+        .cho-th-clear {
+          padding: 4px 8px;
+          font-size: 12px;
+          border: 1px solid #d1d5db;
+          border-radius: 6px;
+          background: #fff;
+          color: #2563eb;
+          cursor: pointer;
+          white-space: nowrap;
         }
       `}</style>
 
@@ -613,8 +719,8 @@ export default function CHOBatchInventory() {
               {productIdInput.trim() && (
                 matchedProduct ? (
                   <div className="cho-product-preview">
-                    <div className="cho-product-preview-row"><span>Name</span><strong>{matchedProduct.name}</strong></div>
-                    <div className="cho-product-preview-row"><span>Category</span><strong>{matchedProduct.category}</strong></div>
+                    <div className="cho-product-preview-row"><span>Medicine Name and Strength</span><strong>{matchedProduct.name}</strong></div>
+                    <div className="cho-product-preview-row"><span>Form</span><strong>{matchedProduct.dosageForm || "—"}</strong></div>
                     <div className="cho-product-preview-row"><span>Brand</span><strong>{matchedProduct.brand || "—"}</strong></div>
                   </div>
                 ) : (

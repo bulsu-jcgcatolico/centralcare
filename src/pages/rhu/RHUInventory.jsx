@@ -65,6 +65,11 @@ function itemMonthKey(item) {
   return null;
 }
 
+// Physical form of the medicine (Tablet, Capsule, Vial...). Older records may not
+// have it saved, so vaccines fall back to "Vial".
+function formOf(item) {
+  return String(item.dosageForm || (item.isVaccine ? "Vial" : "")).trim();
+}
 function invMonthLabel(key) {
   const [y, m] = key.split("-");
   return `${INV_MONTH_NAMES[+m - 1]} ${y}`;
@@ -78,10 +83,12 @@ export default function RHUInventory() {
   const { showToast } = useToast();
 
   const [search, setSearch] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState("all");
-  const [selectedExpiry, setSelectedExpiry] = useState("all");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedSubCategory, setSelectedSubCategory] = useState("all");
+  // Per-column header filters ("" = no filter)
+  const EMPTY_FILTERS = {
+    productKey: "", name: "", lotNumber: "", category: "", subCategory: "",
+    month: "", expiry: "", status: ""
+  };
+  const [colFilters, setColFilters] = useState(EMPTY_FILTERS);
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -92,6 +99,7 @@ export default function RHUInventory() {
   const [productName, setProductName] = useState("");
   const [lotNumber, setLotNumber] = useState("");
   const [category, setCategory] = useState("General Consumption");
+  const [dosageForm, setDosageForm] = useState("Tablet");
   const [subCategory, setSubCategory] = useState("");
   const [quantity, setQuantity] = useState("");
   const [tabletsPerBox, setTabletsPerBox] = useState("");
@@ -222,6 +230,7 @@ export default function RHUInventory() {
           lotNumber: lotNumber.trim(),
           category,
           subCategory,
+          dosageForm: dosageForm,
           quantity: qty,
           remaining: qty,
           tabletsPerBox: parseInt(tabletsPerBox) || 30,
@@ -241,7 +250,7 @@ export default function RHUInventory() {
         showToast("Item saved successfully!", "success");
       }
 
-      setProductName(""); setLotNumber(""); setCategory("General Consumption");
+      setProductName(""); setLotNumber(""); setCategory("General Consumption"); setDosageForm("Tablet");
       setSubCategory(""); setQuantity(""); setTabletsPerBox(""); setSource(""); setExpiry("");
       setIsVaccine(false); setDoseType("single"); setDosesPerVial(""); setFhsisAntigen("other");
       setShowAddModal(false);
@@ -318,29 +327,43 @@ export default function RHUInventory() {
     return status === "" || status === "pending";
   });
 
-  // Filter dropdown options (built from everything in this inventory)
-  const monthOptions = [...new Set(inventory.map(itemMonthKey).filter(Boolean))].sort().reverse();
+  const setColFilter = (key, value) =>
+    setColFilters(prev => ({ ...prev, [key]: value }));
+  const clearColFilters = () => setColFilters(EMPTY_FILTERS);
+  const hasColFilters = Object.values(colFilters).some(v => v);
 
-  // Category / sub-category dropdown options (sub-categories follow the chosen category)
-  const categoryOptions = [...new Set(inventory.map(i => (i.category || "").trim()).filter(Boolean))].sort();
-  const subCategoryOptions = [...new Set(
-    inventory
-      .filter(i => selectedCategory === "all" || (i.category || "").trim() === selectedCategory)
-      .map(i => (i.subCategory || "").trim()).filter(Boolean)
-  )].sort();
+  // Dropdown options (built from everything in this inventory)
+  const uniqSorted = (fn) => [...new Set(inventory.map(fn).filter(Boolean))].sort((x, y) => String(x).localeCompare(String(y)));
+  const filterOptions = {
+    category: uniqSorted(i => formOf(i)),
+    subCategory: uniqSorted(i => (i.subCategory || "").trim()),
+    month: [...new Set(inventory.map(itemMonthKey).filter(Boolean))].sort().reverse(),
+  };
 
-  const displayList = (activeTab === "active" ? activeInventory : pendingInventory)
-    .filter(item => [item.name, item.productKey, item.lotNumber, item.category, item.subCategory]
+  // For the actual table rows rendered
+  const tabList = (activeTab === "active" ? activeInventory : pendingInventory);
+  const displayList = tabList
+    .filter(i => [i.name, i.productKey, i.lotNumber, i.dosageForm, i.category, i.subCategory]
       .some(v => String(v ?? "").toLowerCase().includes(search.trim().toLowerCase())))
-    .filter(i => (selectedCategory === "all" || (i.category || "").trim() === selectedCategory) && (selectedSubCategory === "all" || (i.subCategory || "").trim() === selectedSubCategory))
-    .filter(i => selectedMonth === "all" || itemMonthKey(i) === selectedMonth)
     .filter(i => {
-      if (selectedExpiry === "all") return true;
-      if (!i.expiry) return false;
-      const d = daysUntil(i.expiry);
-      if (selectedExpiry === "expired") return d < 0;
-      if (selectedExpiry === "soon") return d >= 0 && d <= EXPIRY_WARNING_DAYS;
-      return d > EXPIRY_WARNING_DAYS; // "ok"
+      const f = colFilters;
+      const has = (val, needle) => String(val ?? "").toLowerCase().includes(needle.trim().toLowerCase());
+      if (f.productKey && !has(i.productKey, f.productKey)) return false;
+      if (f.name && !has(i.name, f.name)) return false;
+      if (f.lotNumber && !has(i.lotNumber, f.lotNumber)) return false;
+      if (f.category && formOf(i) !== f.category) return false;
+      if (f.subCategory && (i.subCategory || "").trim() !== f.subCategory) return false;
+      if (f.month && itemMonthKey(i) !== f.month) return false;
+      if (f.status && getStatus(i.remaining ?? i.quantity ?? 0) !== f.status) return false;
+      if (f.expiry) {
+        if (!i.expiry) return false;
+        const d = daysUntil(i.expiry);
+        const ok = f.expiry === "expired" ? d < 0
+          : f.expiry === "soon" ? (d >= 0 && d <= EXPIRY_WARNING_DAYS)
+          : d > EXPIRY_WARNING_DAYS;
+        if (!ok) return false;
+      }
+      return true;
     })
     .slice()
     .sort((a, b) => {
@@ -401,6 +424,22 @@ export default function RHUInventory() {
         .rhu-layout .rhu-inv-table tbody td { padding: 14px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
         .rhu-layout .rhu-inv-table tbody tr:hover td { background: #f8fafc; }
         .rhu-layout .rhu-inv-table tbody tr:last-child td { border-bottom: none; }
+
+        /* Fit every column inside the card (no horizontal slider) + header filters */
+        .rhu-layout .inv-fit-table { table-layout: fixed; width: 100%; min-width: 0; }
+        .rhu-layout .inv-fit-table thead th { padding: 10px 6px !important; font-size: 10.5px; vertical-align: top; }
+        .rhu-layout .inv-fit-table tbody td { padding: 10px 6px !important; font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
+        .rhu-layout .inv-fit-table .rhu-subcategory-pill { display: inline-block; padding: 3px 8px; font-size: 11px; white-space: normal; }
+        .rhu-layout .inv-th-label { margin-bottom: 6px; }
+        .rhu-layout .inv-th-filter {
+          width: 100%; min-width: 0; padding: 4px; font-size: 12px; font-weight: 400;
+          letter-spacing: normal; text-transform: none;
+          border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #111827; box-sizing: border-box;
+        }
+        .rhu-layout .inv-th-clear {
+          padding: 4px 6px; font-size: 11px; font-weight: 500; letter-spacing: normal; text-transform: none;
+          border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #2563eb; cursor: pointer; white-space: normal;
+        }
 
         /* Add-item modal */
         .rhu-modal-overlay .rhu-modal { border-radius: 16px; box-shadow: 0 24px 60px rgba(15,23,42,.25); }
@@ -533,36 +572,6 @@ export default function RHUInventory() {
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", marginBottom: 0 }}>
-            <select className="rhu-input" style={{ width: "190px", flex: "0 0 auto", padding: "6px 10px", fontSize: "13px" }}
-              value={selectedCategory} onChange={e => { setSelectedCategory(e.target.value); setSelectedSubCategory("all"); }}>
-              <option value="all">All Categories</option>
-              {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <select className="rhu-input" style={{ width: "190px", flex: "0 0 auto", padding: "6px 10px", fontSize: "13px" }}
-              value={selectedSubCategory} onChange={e => setSelectedSubCategory(e.target.value)}>
-              <option value="all">All Sub-Categories</option>
-              {subCategoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <select className="rhu-input" style={{ width: "190px", flex: "0 0 auto", padding: "6px 10px", fontSize: "13px" }}
-              value={selectedExpiry} onChange={e => setSelectedExpiry(e.target.value)}>
-              <option value="all">All Expiry</option>
-              <option value="expired">Expired</option>
-              <option value="soon">Expiring within {EXPIRY_WARNING_DAYS} days</option>
-              <option value="ok">Not expiring soon</option>
-            </select>
-            <select className="rhu-input" style={{ width: "190px", flex: "0 0 auto", padding: "6px 10px", fontSize: "13px" }}
-              value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
-              <option value="all">All Months (date received)</option>
-              {monthOptions.map(m => <option key={m} value={m}>{invMonthLabel(m)}</option>)}
-            </select>
-            {(selectedExpiry !== "all" || selectedMonth !== "all" || selectedCategory !== "all" || selectedSubCategory !== "all" || search) && (
-              <button className="rhu-btn-secondary" onClick={() => { setSelectedExpiry("all"); setSelectedMonth("all"); setSelectedCategory("all"); setSelectedSubCategory("all"); setSearch(""); }}>
-                Clear filters
-              </button>
-            )}
-          </div>
-
           {!checkingBalance && !balanceAlreadySubmitted && (
             <div className="rhu-empty-state" style={{ background: "#fff7ed", border: "1px solid #fed7aa", padding: "12px 16px", marginBottom: 0, textAlign: "left" }}>
               <p style={{ margin: 0, color: "#9a3412", fontWeight: 600 }}>
@@ -576,7 +585,7 @@ export default function RHUInventory() {
 
           {loading ? (
             <div className="rhu-empty-state"><p>Loading inventory...</p></div>
-          ) : displayList.length === 0 ? (
+          ) : tabList.length === 0 ? (
             <div className="rhu-empty-state">
               <div className="rhu-empty-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="64" height="64">
@@ -594,35 +603,88 @@ export default function RHUInventory() {
             </div>
           ) : (
             <section className="rhu-inv-section" style={{ flexShrink: 0 }}>
-              <div className="rhu-inv-scroll-box" style={{ width: "100%", overflowY: "visible", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-                <table className="rhu-inv-table">
+              <div className="rhu-inv-scroll-box" style={{ width: "100%", overflowY: "visible", overflowX: "visible" }}>
+                <table className="rhu-inv-table inv-fit-table">
                   <colgroup>
-                    <col style={{ width: "11%" }} />
-                    <col style={{ width: "17%" }} />
                     <col style={{ width: "9%" }} />
-                    <col style={{ width: "11%" }} />
-                    <col style={{ width: "11%" }} />
+                    <col style={{ width: "16%" }} />
                     <col style={{ width: "8%" }} />
                     <col style={{ width: "9%" }} />
                     <col style={{ width: "10%" }} />
                     <col style={{ width: "8%" }} />
-                    <col style={{ width: "6%" }} />
+                    <col style={{ width: "8%" }} />
+                    <col style={{ width: "9%" }} />
+                    <col style={{ width: "8%" }} />
+                    <col style={{ width: "8%" }} />
+                    <col style={{ width: "7%" }} />
                   </colgroup>
                   <thead>
                     <tr>
-                      <th>PRODUCT KEY</th>
-                      <th>ITEM NAME</th>
-                      <th>LOT #</th>
-                      <th>CATEGORY</th>
-                      <th>SUB-CATEGORY</th>
-                      <th>QUANTITY</th>
-                      <th>REMAINING</th>
-                      <th>EXPIRY</th>
-                      <th>STATUS</th>
-                      <th>ACTIONS</th>
+                      <th>
+                        <div className="inv-th-label">PRODUCT KEY</div>
+                        <input className="inv-th-filter" type="text" placeholder="Filter..." value={colFilters.productKey} onChange={e => setColFilter("productKey", e.target.value)} />
+                      </th>
+                      <th>
+                        <div className="inv-th-label">MEDICINE NAME AND STRENGTH</div>
+                        <input className="inv-th-filter" type="text" placeholder="Filter..." value={colFilters.name} onChange={e => setColFilter("name", e.target.value)} />
+                      </th>
+                      <th>
+                        <div className="inv-th-label">LOT #</div>
+                        <input className="inv-th-filter" type="text" placeholder="Filter..." value={colFilters.lotNumber} onChange={e => setColFilter("lotNumber", e.target.value)} />
+                      </th>
+                      <th>
+                        <div className="inv-th-label">FORM</div>
+                        <select className="inv-th-filter" value={colFilters.category} onChange={e => setColFilter("category", e.target.value)}>
+                          <option value="">All</option>
+                          {filterOptions.category.map(v => <option key={v} value={v}>{v}</option>)}
+                        </select>
+                      </th>
+                      <th>
+                        <div className="inv-th-label">CATEGORY</div>
+                        <select className="inv-th-filter" value={colFilters.subCategory} onChange={e => setColFilter("subCategory", e.target.value)}>
+                          <option value="">All</option>
+                          {filterOptions.subCategory.map(v => <option key={v} value={v}>{v}</option>)}
+                        </select>
+                      </th>
+                      <th><div className="inv-th-label">QUANTITY</div></th>
+                      <th><div className="inv-th-label">REMAINING</div></th>
+                      <th>
+                        <div className="inv-th-label">DATE RECEIVED</div>
+                        <select className="inv-th-filter" value={colFilters.month} onChange={e => setColFilter("month", e.target.value)}>
+                          <option value="">All</option>
+                          {filterOptions.month.map(m => <option key={m} value={m}>{invMonthLabel(m)}</option>)}
+                        </select>
+                      </th>
+                      <th>
+                        <div className="inv-th-label">EXPIRY</div>
+                        <select className="inv-th-filter" value={colFilters.expiry} onChange={e => setColFilter("expiry", e.target.value)}>
+                          <option value="">All</option>
+                          <option value="expired">Expired</option>
+                          <option value="soon">Within {EXPIRY_WARNING_DAYS} days</option>
+                          <option value="ok">Not expiring soon</option>
+                        </select>
+                      </th>
+                      <th>
+                        <div className="inv-th-label">STATUS</div>
+                        <select className="inv-th-filter" value={colFilters.status} onChange={e => setColFilter("status", e.target.value)}>
+                          <option value="">All</option>
+                          <option value="Good">Good</option>
+                          <option value="Low">Low</option>
+                          <option value="Critical">Critical</option>
+                        </select>
+                      </th>
+                      <th>
+                        <div className="inv-th-label">ACTIONS</div>
+                        {hasColFilters && (
+                          <button className="inv-th-clear" onClick={clearColFilters}>Clear filters</button>
+                        )}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
+                    {displayList.length === 0 && (
+                      <tr><td colSpan={11} style={{ textAlign: "center", padding: "24px", color: "#6b7280" }}>No items match the current filters.</td></tr>
+                    )}
                     {displayList.map(item => {
                       const remaining = item.remaining ?? item.quantity;
                       const isPending = activeTab === "pending";
@@ -632,7 +694,7 @@ export default function RHUInventory() {
                           <td className="rhu-product-key">{item.productKey || "—"}</td>
                           <td><strong>{item.name}</strong></td>
                           <td className="rhu-product-key">{item.lotNumber || "—"}</td>
-                          <td>{item.category}</td>
+                          <td>{formOf(item) || "—"}</td>
                           <td>
                             {item.subCategory
                               ? <span className="rhu-subcategory-pill">{item.subCategory}</span>
@@ -640,6 +702,7 @@ export default function RHUInventory() {
                           </td>
                           <td>{item.quantity} boxes</td>
                           <td><strong>{remaining} boxes</strong></td>
+                          <td>{invMonthLabel(itemMonthKey(item)) || "—"}</td>
                           <td>{item.expiry}</td>
                           <td>
                             {isPending ? (
@@ -691,14 +754,20 @@ export default function RHUInventory() {
               </div>
               <div className="rhu-form-row rhu-form-row--3">
                 <div className="rhu-form-field">
-                  <label className="rhu-label">Category</label>
-                  <select className="rhu-input" value={category} onChange={e => setCategory(e.target.value)}>
-                    <option>General Consumption</option>
-                    <option>Non-Consumption</option>
+                  <label className="rhu-label">Form</label>
+                  <select className="rhu-input" value={dosageForm} onChange={e => setDosageForm(e.target.value)}>
+                    <option>Tablet</option>
+                    <option>Capsule</option>
+                    <option>Syrup</option>
+                    <option>Injection</option>
+                    <option>Vial</option>
+                    <option>Ointment</option>
+                    <option>Drops</option>
+                    <option>Other</option>
                   </select>
                 </div>
                 <div className="rhu-form-field">
-                  <label className="rhu-label">Sub-Category</label>
+                  <label className="rhu-label">Category</label>
                   <input className="rhu-input" type="text" placeholder="e.g., Antibiotic"
                     value={subCategory} onChange={e => setSubCategory(e.target.value)} />
                 </div>

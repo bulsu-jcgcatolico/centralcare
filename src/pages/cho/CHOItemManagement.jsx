@@ -30,6 +30,7 @@ const FORM_PREFIXES = {
   Capsule:    "CAP",
   Syrup:      "SYR",
   Injection:  "INJ",
+  Vial:       "VIA",
   Ointment:   "OIN",
   Drops:      "DRP",
   Other:      "GEN",
@@ -44,7 +45,7 @@ export default function CHOItemManagement() {
 
   const [search, setSearch] = useState("");
   const [colFilters, setColFilters] = useState({
-    productId: "", name: "", dosageForm: "", category: "", subCategory: "", brand: ""
+    productId: "", name: "", dosageForm: "", subCategory: "", brand: ""
   });
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -180,7 +181,7 @@ export default function CHOItemManagement() {
   const setColFilter = (key, value) =>
     setColFilters(prev => ({ ...prev, [key]: value }));
   const clearColFilters = () =>
-    setColFilters({ productId: "", name: "", dosageForm: "", category: "", subCategory: "", brand: "" });
+    setColFilters({ productId: "", name: "", dosageForm: "", subCategory: "", brand: "" });
   const hasColFilters = Object.values(colFilters).some(v => v);
 
   // Unique values per column for the dropdown filters
@@ -188,7 +189,6 @@ export default function CHOItemManagement() {
     const uniq = (key) => [...new Set(products.map(p => p[key]).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
     return {
       dosageForm: uniq("dosageForm"),
-      category: uniq("category"),
       subCategory: uniq("subCategory"),
       brand: uniq("brand"),
     };
@@ -199,7 +199,8 @@ export default function CHOItemManagement() {
     const matchesSearch =
       (p.name || "").toLowerCase().includes(q) ||
       (p.productId || "").toLowerCase().includes(q) ||
-      (p.category || "").toLowerCase().includes(q) ||
+      (p.dosageForm || "").toLowerCase().includes(q) ||
+      (p.subCategory || "").toLowerCase().includes(q) ||
       (p.brand || "").toLowerCase().includes(q);
     if (!matchesSearch) return false;
 
@@ -207,7 +208,6 @@ export default function CHOItemManagement() {
     if (f.productId && !(p.productId || p.id || "").toLowerCase().includes(f.productId.toLowerCase())) return false;
     if (f.name && !(p.name || "").toLowerCase().includes(f.name.toLowerCase())) return false;
     if (f.dosageForm && (p.dosageForm || "") !== f.dosageForm) return false;
-    if (f.category && (p.category || "") !== f.category) return false;
     if (f.subCategory && (p.subCategory || "") !== f.subCategory) return false;
     if (f.brand && (p.brand || "") !== f.brand) return false;
     return true;
@@ -250,7 +250,7 @@ export default function CHOItemManagement() {
       <div className="cho-main">
         <header className="cho-topbar">
           <input className="cho-search" type="text"
-            placeholder="Search catalog by name, ID, category, or brand..."
+            placeholder="Search catalog by name, ID, form, category, or brand..."
             value={search} onChange={(e) => setSearch(e.target.value)} />
           <div className="cho-topbar-right">
             <div className="cho-user">
@@ -299,7 +299,15 @@ export default function CHOItemManagement() {
           ) : (
             <section className="cho-section">
               <div className="cho-table-wrapper">
-                <table className="cho-table">
+                <table className="cho-table cho-item-table">
+                  <colgroup>
+                    <col style={{ width: "12%" }} />
+                    <col style={{ width: "28%" }} />
+                    <col style={{ width: "14%" }} />
+                    <col style={{ width: "18%" }} />
+                    <col style={{ width: "16%" }} />
+                    <col style={{ width: "12%" }} />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th>
@@ -307,11 +315,11 @@ export default function CHOItemManagement() {
                         <input className="cho-th-filter" type="text" placeholder="Filter..." value={colFilters.productId} onChange={e => setColFilter("productId", e.target.value)} />
                       </th>
                       <th>
-                        <div className="cho-th-label">NAME</div>
+                        <div className="cho-th-label">MEDICINE NAME AND STRENGTH</div>
                         <input className="cho-th-filter" type="text" placeholder="Filter..." value={colFilters.name} onChange={e => setColFilter("name", e.target.value)} />
                       </th>
                       <th>
-                        <div className="cho-th-label">DOSAGE FORM</div>
+                        <div className="cho-th-label">FORM</div>
                         <select className="cho-th-filter" value={colFilters.dosageForm} onChange={e => setColFilter("dosageForm", e.target.value)}>
                           <option value="">All</option>
                           {uniqueOptions.dosageForm.map(v => <option key={v} value={v}>{v}</option>)}
@@ -319,13 +327,6 @@ export default function CHOItemManagement() {
                       </th>
                       <th>
                         <div className="cho-th-label">CATEGORY</div>
-                        <select className="cho-th-filter" value={colFilters.category} onChange={e => setColFilter("category", e.target.value)}>
-                          <option value="">All</option>
-                          {uniqueOptions.category.map(v => <option key={v} value={v}>{v}</option>)}
-                        </select>
-                      </th>
-                      <th>
-                        <div className="cho-th-label">SUB-CATEGORY</div>
                         <select className="cho-th-filter" value={colFilters.subCategory} onChange={e => setColFilter("subCategory", e.target.value)}>
                           <option value="">All</option>
                           {uniqueOptions.subCategory.map(v => <option key={v} value={v}>{v}</option>)}
@@ -348,14 +349,13 @@ export default function CHOItemManagement() {
                   </thead>
                   <tbody>
                     {filteredProducts.length === 0 && (
-                      <tr><td colSpan={7} style={{ textAlign: "center", padding: "24px", color: "#6b7280" }}>No items match the current filters.</td></tr>
+                      <tr><td colSpan={6} style={{ textAlign: "center", padding: "24px", color: "#6b7280" }}>No items match the current filters.</td></tr>
                     )}
                     {filteredProducts.map(p => (
                       <tr key={p.id}>
                         <td className="cho-product-key"><strong>{p.productId || p.id}</strong></td>
                         <td><strong>{p.name}</strong></td>
                         <td>{p.dosageForm || "—"}</td>
-                        <td>{p.category || "—"}</td>
                         <td>
                           {p.subCategory
                             ? <span className="cho-subcategory-pill">{p.subCategory}</span>
@@ -388,7 +388,7 @@ export default function CHOItemManagement() {
             <div className="cho-modal-body">
               <div className="cho-form-row">
                 <div className="cho-form-field">
-                  <label className="cho-label">Dosage Form</label>
+                  <label className="cho-label">Form</label>
                   <select className="cho-input" value={dosageForm} onChange={handleDosageFormChange}>
                     {Object.keys(FORM_PREFIXES).map(form => (
                       <option key={form} value={form}>{form}</option>
@@ -404,26 +404,15 @@ export default function CHOItemManagement() {
               </div>
 
               <div className="cho-form-field">
-                <label className="cho-label">Product Name <span className="cho-required">*</span></label>
+                <label className="cho-label">Medicine Name and Strength <span className="cho-required">*</span></label>
                 <input className="cho-input" type="text" placeholder="e.g., Amoxicillin 500mg"
                   value={name} onChange={e => setName(e.target.value)} />
               </div>
 
-              <div className="cho-form-row">
-                <div className="cho-form-field">
-                  <label className="cho-label">Category</label>
-                  <select className="cho-input" value={category} onChange={e => setCategory(e.target.value)}>
-                    <option value="General Consumption">General Consumption</option>
-                    <option value="Targeted Programs">Targeted Programs</option>
-                    <option value="Emergency Supplies">Emergency Supplies</option>
-                    <option value="Equipment & Medical Tools">Equipment & Medical Tools</option>
-                  </select>
-                </div>
-                <div className="cho-form-field">
-                  <label className="cho-label">Sub-Category</label>
-                  <input className="cho-input" type="text" placeholder="e.g., Antibiotic, Maternal Care"
-                    value={subCategory} onChange={e => setSubCategory(e.target.value)} />
-                </div>
+              <div className="cho-form-field">
+                <label className="cho-label">Category</label>
+                <input className="cho-input" type="text" placeholder="e.g., Antibiotic, Vaccine, Maternal Care"
+                  value={subCategory} onChange={e => setSubCategory(e.target.value)} />
               </div>
 
               <div className="cho-form-field">
@@ -454,7 +443,30 @@ export default function CHOItemManagement() {
           max-height: none !important;
           height: auto !important;
           overflow-y: visible !important;
-          overflow-x: auto !important;
+          overflow-x: visible !important;
+        }
+
+        /* Fit every column inside the card: no horizontal slider */
+        .cho-item-table {
+          width: 100% !important;
+          min-width: 0 !important;
+          table-layout: fixed !important;
+        }
+        .cho-item-table th,
+        .cho-item-table td {
+          padding: 10px 8px !important;
+          font-size: 12.5px !important;
+          line-height: 1.35 !important;
+          white-space: normal !important;
+          overflow-wrap: anywhere;
+          vertical-align: middle;
+        }
+        .cho-item-table th { font-size: 10.5px !important; vertical-align: top; }
+        .cho-item-table .cho-subcategory-pill {
+          display: inline-block;
+          padding: 3px 8px;
+          font-size: 11px;
+          white-space: normal;
         }
         .cho-th-label { margin-bottom: 6px; }
         .cho-th-filter {
